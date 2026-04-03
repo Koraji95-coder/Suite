@@ -1,0 +1,164 @@
+import { PROJECT_CATEGORIES } from "./models";
+
+export const categoryColor = (cat: string | null | undefined): string =>
+	PROJECT_CATEGORIES.find((category) =>
+		category.key === (cat === "QAQC" ? "Standards" : cat),
+	)?.color ?? "#94a3b8";
+
+export type ProjectCategoryTone =
+	| "coding"
+	| "substation"
+	| "standards"
+	| "school"
+	| "other"
+	| "generic";
+
+export const normalizeProjectCategory = (
+	cat: string | null | undefined,
+): ProjectCategoryTone => {
+	const normalized =
+		cat === "QAQC" ? "standards" : String(cat || "").trim().toLowerCase();
+	switch (normalized) {
+		case "coding":
+			return "coding";
+		case "substation":
+			return "substation";
+		case "standards":
+			return "standards";
+		case "school":
+			return "school";
+		case "other":
+			return "other";
+		default:
+			return "generic";
+	}
+};
+
+export const formatDateOnly = (isoOrDateLike: string): string => {
+	const [y, m, d] = isoOrDateLike.split("T")[0].split("-").map(Number);
+	return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+};
+
+export const formatDateMMDDYYYY = (isoOrDateLike: string): string => {
+	const [y, m, d] = isoOrDateLike.split("T")[0].split("-");
+	return `${m}-${d}-${y}`;
+};
+
+export const toDateOnly = (datetimeLocal: string): string =>
+	datetimeLocal ? datetimeLocal.split("T")[0] : "";
+
+export const deriveAcadeProjectFilePath = (
+	projectName: string | null | undefined,
+	projectRootPath: string | null | undefined,
+): string => {
+	const normalizedProjectName = String(projectName || "").trim();
+	const normalizedProjectRoot = String(projectRootPath || "").trim();
+	if (!normalizedProjectName || !normalizedProjectRoot) {
+		return "";
+	}
+
+	const sanitizedStem =
+		normalizedProjectName
+			.replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "-")
+			.replace(/\s+/g, " ")
+			.trim()
+			.replace(/[ .]+$/g, "") || "project";
+
+	const rootWithoutTrailingSlashes = normalizedProjectRoot.replace(/[\\/]+$/g, "");
+	if (!rootWithoutTrailingSlashes) {
+		return "";
+	}
+
+	const separator = rootWithoutTrailingSlashes.includes("\\") ? "\\" : "/";
+	return `${rootWithoutTrailingSlashes}${separator}${sanitizedStem}.wdp`;
+};
+
+/** Returns a CSS variable string for the priority's semantic color. */
+export const getPriorityColor = (priority: string): string => {
+	switch (priority) {
+		case "urgent":
+			return "var(--danger)";
+		case "high":
+			return "var(--warning)";
+		case "medium":
+			return "var(--primary)";
+		default:
+			return "var(--text-muted)";
+	}
+};
+
+export type PriorityTone = "low" | "medium" | "high" | "urgent";
+
+export const getPriorityTone = (priority: string): PriorityTone => {
+	switch (priority) {
+		case "urgent":
+			return "urgent";
+		case "high":
+			return "high";
+		case "medium":
+			return "medium";
+		default:
+			return "low";
+	}
+};
+
+export type UrgencyTone = "none" | "danger" | "warning" | "success";
+
+export const getUrgencyTone = (dueDate: string | null): UrgencyTone => {
+	if (!dueDate) return "none";
+	const [y, m, d] = dueDate.split("T")[0].split("-").map(Number);
+	const due = new Date(y, m - 1, d);
+	const now = new Date();
+	now.setHours(0, 0, 0, 0);
+	const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+	if (diffHours < 24) return "danger";
+	if (diffHours < 168) return "warning";
+	return "success";
+};
+
+export const getDeadlineStatus = (deadline: string | null) => {
+	if (!deadline) return { text: "No deadline", color: "var(--text-muted)" };
+	const [y, m, d] = deadline.split("T")[0].split("-").map(Number);
+	const dueDate = new Date(y, m - 1, d);
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	const diffDays = Math.ceil(
+		(dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+	);
+
+	if (diffDays < 0) {
+		return {
+			text: `Overdue by ${Math.abs(diffDays)} days`,
+			color: "var(--danger)",
+		};
+	}
+	if (diffDays === 0) return { text: "Due today", color: "var(--danger)" };
+	if (diffDays === 1) return { text: "Due tomorrow", color: "var(--warning)" };
+	if (diffDays <= 7) {
+		return {
+			text: `${diffDays} days remaining`,
+			color: "var(--warning)",
+		};
+	}
+	return {
+		text: `${diffDays} days remaining`,
+		color: "var(--success)",
+	};
+};
+
+export const getFileIcon = (mimeType: string): string => {
+	if (mimeType.startsWith("image/")) return "\u{1F5BC}\uFE0F";
+	if (mimeType.startsWith("video/")) return "\u{1F3A5}";
+	if (mimeType.includes("pdf")) return "\u{1F4C4}";
+	if (mimeType.includes("zip") || mimeType.includes("rar")) return "\u{1F4E6}";
+	if (mimeType.includes("word")) return "\u{1F4DD}";
+	if (mimeType.includes("excel") || mimeType.includes("spreadsheet")) {
+		return "\u{1F4CA}";
+	}
+	return "\u{1F4C4}";
+};

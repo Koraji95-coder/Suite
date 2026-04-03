@@ -21,6 +21,12 @@ const MARKDOWN_PATTERN = /\.(md|mdx)$/i;
 const EXCLUDED_PATH_PARTS = new Set(["upgrade-archive"]);
 
 const SECTION_META = {
+	frontend: {
+		id: "frontend-app",
+		title: "Frontend",
+		description:
+			"Browser-owned architecture, feature slices, and UI/runtime flow notes.",
+	},
 	agent: {
 		id: "agent-lab",
 		title: "Agent Lab",
@@ -34,10 +40,22 @@ const SECTION_META = {
 			"AutoDraft and related automation references, cutover notes, and workflow experiments.",
 	},
 	backend: {
-		id: "backend-integration",
-		title: "Backend & Integration",
+		id: "backend-core",
+		title: "Backend",
 		description:
-			"Bridge, backend, and integration notes that support the local runtime and toolchain.",
+			"Hosted-core API, service, and route-group ownership notes.",
+	},
+	"runtime-control": {
+		id: "runtime-control",
+		title: "Runtime Control",
+		description:
+			"Workstation-local companion, bring-up, transfer, and local action guidance.",
+	},
+	cad: {
+		id: "cad-local",
+		title: "CAD",
+		description:
+			"AutoCAD execution, named-pipe transport, and local CAD integration references.",
 	},
 	development: {
 		id: "developer-workshop",
@@ -50,6 +68,12 @@ const SECTION_META = {
 		title: "Security & Auth",
 		description:
 			"Authentication, secrets, environment, and rollout hardening guidance for developer use.",
+	},
+	archive: {
+		id: "legacy-archive",
+		title: "Legacy Archive",
+		description:
+			"Historical-only notes kept for reference and migration context.",
 	},
 	root: {
 		id: "workspace-docs",
@@ -195,6 +219,24 @@ function inferTags(relativePath, sectionId) {
 	}
 	if (normalized.includes("autodraft") || normalized.includes("autowire")) {
 		tags.add("automation");
+	}
+	if (normalized.includes("autocad")) {
+		tags.add("autocad");
+	}
+	if (normalized.includes("acade")) {
+		tags.add("acade");
+	}
+	if (normalized.includes("autodesk")) {
+		tags.add("autodesk");
+	}
+	if (normalized.includes("electrical")) {
+		tags.add("electrical");
+	}
+	if (normalized.includes("api")) {
+		tags.add("api");
+	}
+	if (normalized.includes("offline-help")) {
+		tags.add("offline-help");
 	}
 
 	return [...tags].sort((left, right) => left.localeCompare(right));

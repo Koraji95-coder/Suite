@@ -22,8 +22,8 @@
         </div>
         <div class="brand-copy">
           <span class="brand-kicker">Suite Operator Shell</span>
-          <strong id="workspace-heading">Office / Runtime</strong>
-          <span id="workspace-subheading">Local operator studio for Office and runtime control.</span>
+          <strong id="workspace-heading">Office Workspace</strong>
+          <span id="workspace-subheading">Unified Office and runtime control client.</span>
         </div>
       </div>
 
@@ -35,8 +35,8 @@
       <div class="header-tools">
         <div class="command-deck">
           <label class="command-field" for="command-input">
-            <span class="command-label">Command Deck</span>
-            <input id="command-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search actions, routes, docs, and local handoffs">
+            <span class="command-label">Action Search</span>
+            <input id="command-input" type="search" autocomplete="off" spellcheck="false" placeholder="Search actions, routes, references, and handoffs">
           </label>
           <div id="command-results" class="command-results hidden"></div>
         </div>
@@ -48,9 +48,24 @@
           </div>
           <div id="overall-status-pill" class="status-pill booting">Booting</div>
           <div id="provider-status-pill" class="status-pill pending">Office</div>
-          <button id="utility-context-btn" type="button" class="top-btn">Context</button>
-          <button id="utility-logs-btn" type="button" class="top-btn">Logs</button>
-          <button id="utility-inbox-btn" type="button" class="top-btn">Inbox</button>
+          <div class="header-control-cluster">
+            <button id="utility-dock-btn" type="button" class="top-btn" aria-pressed="false">Open Dock</button>
+            <div class="header-menu">
+              <button id="display-menu-btn" type="button" class="top-btn" aria-haspopup="menu" aria-expanded="false">View</button>
+              <div id="display-menu" class="display-menu hidden" role="menu" aria-label="Shell display controls">
+                <div class="display-menu-section">
+                  <div class="nav-eyebrow">View controls</div>
+                  <div id="shell-scale-controls" class="scale-controls display-scale-controls" aria-label="Shell content scale">
+                    <span class="scale-label">Content scale</span>
+                    <button type="button" class="scale-btn" data-scale-preset="100">100%</button>
+                    <button type="button" class="scale-btn" data-scale-preset="110">110%</button>
+                    <button type="button" class="scale-btn" data-scale-preset="125">125%</button>
+                    <button type="button" class="scale-btn" data-scale-preset="140">140%</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -68,7 +83,7 @@
         </section>
 
         <section class="nav-section">
-          <div class="nav-eyebrow">Pinned Actions</div>
+          <div class="nav-eyebrow">Quick Actions</div>
           <div id="workspace-actions" class="nav-actions"></div>
         </section>
       </aside>

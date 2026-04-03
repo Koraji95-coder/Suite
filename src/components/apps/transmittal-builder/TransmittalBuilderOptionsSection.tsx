@@ -1,12 +1,12 @@
 import { Checkbox } from "@/components/apps/ui/checkbox";
 import { Section } from "@/components/apps/ui/PageFrame";
 import { Panel } from "@/components/primitives/Panel";
-import styles from "./TransmittalBuilderOptionsSection.module.css";
 import {
 	type DraftState,
 	OPTION_GROUPS,
 	type OptionKey,
-} from "./transmittalBuilderModels";
+} from "@/features/transmittal-builder";
+import styles from "./TransmittalBuilderOptionsSection.module.css";
 
 const TransmittalSection = Section;
 

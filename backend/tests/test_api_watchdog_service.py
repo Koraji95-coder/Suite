@@ -240,6 +240,112 @@ class TestWatchdogMonitorService(unittest.TestCase):
             self.assertEqual((overview.get("events") or {}).get("inWindow"), 2)
             self.assertIn("file_modified", (overview.get("events") or {}).get("byType") or {})
 
+    def test_dashboard_snapshot_aggregates_watchdog_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = make_service(temp_dir)
+            now_ms = int(time.time() * 1000)
+            service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "name": "Desktop Collector",
+                    "collectorType": "filesystem",
+                    "workstationId": "DUSTIN-HOME",
+                    "capabilities": ["filesystem"],
+                },
+            )
+            service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "name": "AutoCAD Collector",
+                    "collectorType": "autocad_state",
+                    "workstationId": "DUSTIN-HOME",
+                    "capabilities": ["autocad", "drawing_sessions", "commands"],
+                },
+            )
+            service.collector_heartbeat(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "status": "online",
+                    "metadata": {
+                        "sourceAvailable": True,
+                        "activeDrawingPath": r"C:\\Projects\\Alpha\\Drawing1.dwg",
+                        "activeDrawingName": "Drawing1.dwg",
+                        "currentSessionId": "session-1",
+                        "trackerUpdatedAt": now_ms - 200,
+                        "lastActivityAt": now_ms - 300,
+                    },
+                },
+            )
+            service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "events": [
+                        {
+                            "eventType": "file_modified",
+                            "projectId": "project-1",
+                            "path": r"C:\\repo\\a.txt",
+                            "timestamp": now_ms - 3000,
+                        }
+                    ],
+                },
+            )
+            service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-cad",
+                    "events": [
+                        {
+                            "eventType": "drawing_opened",
+                            "projectId": "project-1",
+                            "drawingPath": r"C:\\Projects\\Alpha\\Drawing1.dwg",
+                            "timestamp": now_ms - 1000,
+                            "sessionId": "session-1",
+                        }
+                    ],
+                },
+            )
+
+            snapshot = service.dashboard_snapshot(
+                "user:demo",
+                project_id="project-1",
+                collector_id="collector-cad",
+                time_window_ms=60 * 60 * 1000,
+                events_limit=8,
+                sessions_limit=8,
+            )
+
+            self.assertEqual(snapshot.get("projectId"), "project-1")
+            self.assertEqual(snapshot.get("collectorId"), "collector-cad")
+            self.assertEqual(snapshot.get("timeWindowMs"), 60 * 60 * 1000)
+            self.assertEqual(
+                int((((snapshot.get("collectors") or {}).get("count")) or 0)),
+                2,
+            )
+            self.assertEqual(
+                int((((snapshot.get("events") or {}).get("count")) or 0)),
+                1,
+            )
+            self.assertEqual(
+                str(((((snapshot.get("events") or {}).get("events")) or [{}])[0]).get("collectorId") or ""),
+                "collector-cad",
+            )
+            self.assertEqual(
+                int((((snapshot.get("sessions") or {}).get("count")) or 0)),
+                1,
+            )
+            self.assertEqual(
+                str(((((snapshot.get("sessions") or {}).get("sessions")) or [{}])[0]).get("sessionId") or ""),
+                "session-1",
+            )
+            self.assertEqual(
+                int(((((snapshot.get("overview") or {}).get("events")) or {}).get("inWindow") or 0)),
+                2,
+            )
+
     def test_list_sessions_summarizes_autocad_activity(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             service = make_service(temp_dir)

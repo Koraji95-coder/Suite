@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import socket
@@ -15,6 +16,14 @@ def _excerpt(value: Any, *, max_length: int = 1200) -> str:
     return f"{text[: max_length - 3]}..."
 
 
+def _default_recommended_actions(*, ready: bool, next_step: str | None) -> list[str]:
+    if ready:
+        return []
+    if next_step:
+        return [f"Run `{next_step}` to initialize the repository and repair hooks."]
+    return ["Run `npm run worktale:bootstrap` to initialize the repository and repair hooks."]
+
+
 class WorktaleRuntime:
     def __init__(
         self,
@@ -25,6 +34,7 @@ class WorktaleRuntime:
         shutil_module: Any = shutil,
         os_module: Any = os,
         socket_module: Any = socket,
+        json_module: Any = json,
     ) -> None:
         self.repo_root = Path(repo_root).resolve()
         self.logger = logger
@@ -32,6 +42,7 @@ class WorktaleRuntime:
         self.shutil_module = shutil_module
         self.os_module = os_module
         self.socket_module = socket_module
+        self.json_module = json_module
 
     def _read_text(self, path: Path) -> str:
         try:
@@ -54,8 +65,10 @@ class WorktaleRuntime:
         return (
             "worktale post-commit hook" in post_commit
             or "worktale capture" in post_commit
+            or "run-worktale-cli.mjs" in post_commit
             or "worktale post-commit hook" in post_commit_ps1
             or "worktale capture" in post_commit_ps1
+            or "run-worktale-cli.mjs" in post_commit_ps1
         )
 
     def _is_post_push_hook_installed(self) -> bool:
@@ -63,6 +76,8 @@ class WorktaleRuntime:
         return (
             "worktale post-push reminder" in post_push
             or "worktale digest" in post_push
+            or "worktale:digest" in post_push
+            or "run-worktale-cli.mjs" in post_push
         )
 
     def _run_checked_command(
@@ -116,7 +131,78 @@ class WorktaleRuntime:
             "stderr": str(completed.stderr or ""),
         }
 
-    def check_readiness(self) -> Dict[str, Any]:
+    def _resolve_node_command(self) -> str:
+        node_path = self.shutil_module.which("node")
+        return str(node_path or "").strip()
+
+    def _resolve_repo_script(self, relative_path: str) -> Path:
+        return (self.repo_root / relative_path).resolve()
+
+    def _run_node_script(
+        self,
+        relative_path: str,
+        *,
+        args: list[str] | None = None,
+    ) -> Dict[str, Any]:
+        node_command = self._resolve_node_command()
+        if not node_command:
+            return {
+                "ok": False,
+                "returncode": -1,
+                "stdout": "",
+                "stderr": "node is not available on PATH.",
+            }
+        script_path = self._resolve_repo_script(relative_path)
+        if not script_path.exists():
+            return {
+                "ok": False,
+                "returncode": -1,
+                "stdout": "",
+                "stderr": f"Script not found: {script_path}",
+            }
+        command = [node_command, str(script_path), *(args or [])]
+        return self._run_command(command, cwd=self.repo_root)
+
+    def _check_readiness_via_scripts(self) -> Dict[str, Any] | None:
+        result = self._run_node_script(
+            "scripts/check-worktale-readiness.mjs",
+            args=["--json"],
+        )
+        if not result["ok"]:
+            return None
+        try:
+            parsed = self.json_module.loads(str(result["stdout"] or "{}"))
+        except Exception:
+            return None
+        if not isinstance(parsed, dict):
+            return None
+        checks = parsed.get("checks") if isinstance(parsed.get("checks"), dict) else {}
+        issues = parsed.get("issues") if isinstance(parsed.get("issues"), list) else []
+        next_step = str(parsed.get("nextStep") or "").strip() or None
+        recommended_actions = (
+            parsed.get("recommendedActions")
+            if isinstance(parsed.get("recommendedActions"), list)
+            else _default_recommended_actions(
+                ready=bool(parsed.get("ready")),
+                next_step=next_step,
+            )
+        )
+        return {
+            "ready": bool(parsed.get("ready")),
+            "checks": {
+                **checks,
+                "repoPath": str(checks.get("repoPath") or self.repo_root),
+            },
+            "issues": [str(item).strip() for item in issues if str(item).strip()],
+            "recommendedActions": [
+                str(item).strip()
+                for item in recommended_actions
+                if str(item).strip()
+            ],
+            "nextStep": next_step,
+        }
+
+    def _check_readiness_fallback(self) -> Dict[str, Any]:
         cli_path = self.shutil_module.which("worktale")
         cli_installed = bool(cli_path)
         repo_exists = self.repo_root.exists() and self.repo_root.is_dir()
@@ -146,7 +232,7 @@ class WorktaleRuntime:
             recommended_actions.append("Ensure publish runs from a Git repository root.")
         if not git_email_configured:
             issues.append("Git user email is not configured.")
-            recommended_actions.append("Run `git config user.email \"you@example.com\"`.")
+            recommended_actions.append('Run `git config user.email "you@example.com"`.')
         if not bootstrapped:
             issues.append("Worktale is not bootstrapped for this repository yet.")
             recommended_actions.append(
@@ -179,22 +265,45 @@ class WorktaleRuntime:
             },
             "issues": issues,
             "recommendedActions": recommended_actions,
+            "nextStep": "npm run worktale:bootstrap" if issues else None,
         }
+
+    def check_readiness(self) -> Dict[str, Any]:
+        script_readiness = self._check_readiness_via_scripts()
+        if script_readiness is not None:
+            return script_readiness
+        return self._check_readiness_fallback()
 
     def bootstrap_hooks(self) -> Dict[str, Any]:
         readiness = self.check_readiness()
-        if not readiness["checks"]["cliInstalled"]:
-            raise RuntimeError("Worktale CLI is not installed.")
-        if not readiness["checks"]["repoExists"]:
+        if not readiness["checks"].get("repoExists"):
             raise RuntimeError("Repository path is unavailable.")
-        if not readiness["checks"]["gitRepository"]:
+        if not readiness["checks"].get("gitRepository"):
             raise RuntimeError("Repository .git folder is missing.")
+
+        bootstrap_result = self._run_node_script("scripts/bootstrap-worktale.mjs")
+        if bootstrap_result["ok"]:
+            after = self.check_readiness()
+            return {
+                "ok": True,
+                "command": ["node", "scripts/bootstrap-worktale.mjs"],
+                "commands": [["node", "scripts/bootstrap-worktale.mjs"]],
+                "stdout": _excerpt(bootstrap_result["stdout"]),
+                "stderr": _excerpt(bootstrap_result["stderr"]),
+                "checks": after["checks"],
+                "ready": bool(after["ready"]),
+                "issues": list(after["issues"]),
+                "recommendedActions": list(after["recommendedActions"]),
+            }
+
+        if not readiness["checks"].get("cliInstalled"):
+            raise RuntimeError("Worktale CLI is not installed.")
 
         commands_run: list[list[str]] = []
         stdout_excerpt = ""
         stderr_excerpt = ""
 
-        if not readiness["checks"]["bootstrapped"]:
+        if not readiness["checks"].get("bootstrapped"):
             init_command = ["worktale", "init"]
             init_result = self._run_checked_command(init_command, cwd=self.repo_root)
             commands_run.append(init_command)
@@ -202,8 +311,8 @@ class WorktaleRuntime:
             stderr_excerpt = _excerpt(init_result["stderr"])
             readiness = self.check_readiness()
 
-        post_commit_installed = bool(readiness["checks"]["postCommitHookInstalled"])
-        post_push_installed = bool(readiness["checks"]["postPushHookInstalled"])
+        post_commit_installed = bool(readiness["checks"].get("postCommitHookInstalled"))
+        post_push_installed = bool(readiness["checks"].get("postPushHookInstalled"))
         if not post_commit_installed and not post_push_installed:
             install_command = ["worktale", "hook", "install", str(self.repo_root)]
             install_result = self._run_checked_command(install_command, cwd=self.repo_root)
@@ -211,8 +320,8 @@ class WorktaleRuntime:
             stdout_excerpt = _excerpt(install_result["stdout"])
             stderr_excerpt = _excerpt(install_result["stderr"])
             readiness = self.check_readiness()
-            post_commit_installed = bool(readiness["checks"]["postCommitHookInstalled"])
-            post_push_installed = bool(readiness["checks"]["postPushHookInstalled"])
+            post_commit_installed = bool(readiness["checks"].get("postCommitHookInstalled"))
+            post_push_installed = bool(readiness["checks"].get("postPushHookInstalled"))
 
         if post_commit_installed != post_push_installed:
             uninstall_command = ["worktale", "hook", "uninstall", str(self.repo_root)]
@@ -237,6 +346,19 @@ class WorktaleRuntime:
         }
 
     def publish_note(self, note_text: str) -> Dict[str, Any]:
+        runner_result = self._run_node_script(
+            "scripts/run-worktale-cli.mjs",
+            args=["note", str(note_text or "").strip()],
+        )
+        if runner_result["ok"]:
+            return {
+                "ok": True,
+                "command": ["node", "scripts/run-worktale-cli.mjs", "note", str(note_text or "").strip()],
+                "returncode": int(runner_result["returncode"]),
+                "stdout": _excerpt(runner_result["stdout"]),
+                "stderr": _excerpt(runner_result["stderr"]),
+            }
+
         command = ["worktale", "note", str(note_text or "").strip()]
         result = self._run_command(command, cwd=self.repo_root)
         return {

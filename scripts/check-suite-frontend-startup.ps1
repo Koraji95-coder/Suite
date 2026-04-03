@@ -155,12 +155,138 @@ function Get-FrontendWorkerProcess {
 }
 
 function Test-FrontendHealth {
-    try {
-        $response = Invoke-WebRequest -Uri $frontendUrl -UseBasicParsing -TimeoutSec 2
-        return ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500)
+    param(
+        [ValidateRange(1, 10)][int]$Attempts = 3,
+        [ValidateRange(1, 30)][int]$TimeoutSec = 2,
+        [ValidateRange(0, 5000)][int]$DelayMilliseconds = 400
+    )
+
+    Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+
+    function Invoke-FrontendProbeRequest {
+        param(
+            [Parameter(Mandatory = $true)][string]$Method,
+            [Parameter(Mandatory = $true)][int]$RequestTimeoutSec
+        )
+
+        $handler = [System.Net.Http.HttpClientHandler]::new()
+        $handler.UseProxy = $false
+        $client = [System.Net.Http.HttpClient]::new($handler)
+        $client.Timeout = [TimeSpan]::FromSeconds($RequestTimeoutSec)
+        $request = $null
+        try {
+            $httpMethod = if ($Method -eq "HEAD") {
+                [System.Net.Http.HttpMethod]::Head
+            }
+            else {
+                [System.Net.Http.HttpMethod]::Get
+            }
+            $request = [System.Net.Http.HttpRequestMessage]::new($httpMethod, $frontendUrl)
+            $response = $client.SendAsync(
+                $request,
+                [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead
+            ).GetAwaiter().GetResult()
+            $statusCode = [int]$response.StatusCode
+            return [pscustomobject]@{
+                Ready = ($statusCode -ge 200 -and $statusCode -lt 500)
+                StatusCode = $statusCode
+                Method = $Method
+                Error = $null
+            }
+        }
+        catch {
+            return [pscustomobject]@{
+                Ready = $false
+                StatusCode = $null
+                Method = $Method
+                Error = $_.Exception.Message
+            }
+        }
+        finally {
+            if ($null -ne $request) {
+                $request.Dispose()
+            }
+            $client.Dispose()
+            $handler.Dispose()
+        }
     }
-    catch {
-        return $false
+
+    function Test-FrontendTcpReachability {
+        param([Parameter(Mandatory = $true)][int]$RequestTimeoutSec)
+
+        $tcpClient = [System.Net.Sockets.TcpClient]::new()
+        try {
+            $asyncResult = $tcpClient.BeginConnect("127.0.0.1", 5173, $null, $null)
+            if (-not $asyncResult.AsyncWaitHandle.WaitOne(([TimeSpan]::FromSeconds($RequestTimeoutSec)))) {
+                throw "tcp connect timed out"
+            }
+
+            $tcpClient.EndConnect($asyncResult)
+            return [pscustomobject]@{
+                Ready = $true
+                Method = "TCP"
+                Error = $null
+            }
+        }
+        catch {
+            return [pscustomobject]@{
+                Ready = $false
+                Method = "TCP"
+                Error = $_.Exception.Message
+            }
+        }
+        finally {
+            $tcpClient.Dispose()
+        }
+    }
+
+    $tcpProbe = Test-FrontendTcpReachability -RequestTimeoutSec $TimeoutSec
+    if ($tcpProbe.Ready) {
+        return [pscustomobject]@{
+            Ready = $true
+            AttemptCount = 1
+            TimeoutSec = $TimeoutSec
+            Method = $tcpProbe.Method
+            StatusCode = $null
+            LastError = $null
+            FallbackUsed = $true
+        }
+    }
+
+    $lastError = $null
+    $lastMethod = $null
+    $lastStatusCode = $null
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+        foreach ($method in @("HEAD", "GET")) {
+            $probeResult = Invoke-FrontendProbeRequest -Method $method -RequestTimeoutSec $TimeoutSec
+            $lastMethod = $probeResult.Method
+            $lastStatusCode = $probeResult.StatusCode
+            $lastError = $probeResult.Error
+            if ($probeResult.Ready) {
+                return [pscustomobject]@{
+                    Ready = $true
+                    AttemptCount = $attempt
+                    TimeoutSec = $TimeoutSec
+                    Method = $probeResult.Method
+                    StatusCode = $probeResult.StatusCode
+                    LastError = $null
+                }
+            }
+        }
+
+        if ($attempt -lt $Attempts -and $DelayMilliseconds -gt 0) {
+            Start-Sleep -Milliseconds $DelayMilliseconds
+        }
+    }
+
+    return [pscustomobject]@{
+        Ready = $false
+        AttemptCount = $Attempts
+        TimeoutSec = $TimeoutSec
+        Method = $lastMethod
+        StatusCode = $lastStatusCode
+        LastError = if ($lastError) { $lastError } else { $tcpProbe.Error }
+        FallbackUsed = $false
     }
 }
 
@@ -218,7 +344,8 @@ if ($frontendContainer) {
 }
 $listeningProcess = Get-ListeningFrontendProcess
 $listening = $null -ne $listeningProcess
-$frontendEndpointReady = Test-FrontendHealth
+$frontendProbe = Test-FrontendHealth
+$frontendEndpointReady = [bool]$frontendProbe.Ready
 $healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
 $running = $frontendContainerRunning -or $listening -or $null -ne $workerProcess
 $startAttempted = $false
@@ -230,7 +357,7 @@ $healthSource = if ($frontendContainerHealthy) {
     "docker_compose_healthcheck"
 }
 elseif ($frontendContainerRunning -and $frontendEndpointReady) {
-    "host_http_probe"
+    if ($frontendProbe.FallbackUsed) { "host_port_probe" } else { "host_http_probe" }
 }
 else {
     $null
@@ -267,7 +394,8 @@ if (-not $frontendContainerRunning -and $StartIfMissing) {
                     $frontendContainerHealthy = $false
                 }
 
-                $frontendEndpointReady = Test-FrontendHealth
+                $frontendProbe = Test-FrontendHealth
+                $frontendEndpointReady = [bool]$frontendProbe.Ready
                 $healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
                 if ($frontendContainerRunning) {
                     $startupMode = "docker_compose"
@@ -293,7 +421,8 @@ if (-not $frontendContainerRunning -and -not $workerProcess -and -not $listening
     $workerProcess = Get-FrontendWorkerProcess
 }
 $listening = $null -ne $listeningProcess
-$frontendEndpointReady = Test-FrontendHealth
+$frontendProbe = Test-FrontendHealth
+$frontendEndpointReady = [bool]$frontendProbe.Ready
 $healthy = ($frontendContainerRunning -and $frontendEndpointReady) -or $frontendContainerHealthy
 $running = $frontendContainerRunning -or $listening -or $null -ne $workerProcess
 if (-not $startupMode -and $frontendContainerRunning) {
@@ -306,7 +435,7 @@ $healthSource = if ($frontendContainerHealthy) {
     "docker_compose_healthcheck"
 }
 elseif ($frontendContainerRunning -and $frontendEndpointReady) {
-    "host_http_probe"
+    if ($frontendProbe.FallbackUsed) { "host_port_probe" } else { "host_http_probe" }
 }
 else {
     $null
@@ -315,7 +444,8 @@ $process = if ($frontendContainerRunning) { $null } elseif ($listeningProcess) {
 $ownershipDrift = $ownershipDrift -or ($running -and -not $frontendContainerRunning)
 
 if ($healthy -and $frontendContainerHealthy -and -not $frontendEndpointReady) {
-    $warningMessage = "Frontend Docker healthcheck passed even though the host HTTP probe to $frontendUrl timed out."
+    $probeErrorSuffix = if ([string]::IsNullOrWhiteSpace([string]$frontendProbe.LastError)) { "" } else { " Last probe error: $([string]$frontendProbe.LastError)." }
+    $warningMessage = "Frontend Docker healthcheck passed even though $($frontendProbe.AttemptCount) host HTTP probe(s) to $frontendUrl did not succeed.$probeErrorSuffix"
 }
 
 if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
@@ -349,6 +479,12 @@ $result = [pscustomobject]@{
     ExpectedStartupMode = "docker_compose"
     OwnershipDrift = $ownershipDrift
     EndpointReachable = $frontendEndpointReady
+    EndpointProbeAttempts = $frontendProbe.AttemptCount
+    EndpointProbeTimeoutSec = $frontendProbe.TimeoutSec
+    EndpointProbeMethod = $frontendProbe.Method
+    EndpointProbeStatusCode = $frontendProbe.StatusCode
+    EndpointProbeLastError = $frontendProbe.LastError
+    EndpointProbeFallbackUsed = [bool]$frontendProbe.FallbackUsed
     ContainerHealth = $frontendContainerHealth
     HealthSource = $healthSource
 }
@@ -366,6 +502,13 @@ else {
     Write-Host "Startup mode: $($result.StartupMode)"
     Write-Host "Ownership drift: $($result.OwnershipDrift)"
     Write-Host "Endpoint reachable: $($result.EndpointReachable)"
+    Write-Host "Endpoint probe attempts: $($result.EndpointProbeAttempts)"
+    if ($result.EndpointProbeMethod) {
+        Write-Host "Endpoint probe method: $($result.EndpointProbeMethod)"
+    }
+    if ($null -ne $result.EndpointProbeStatusCode) {
+        Write-Host "Endpoint probe status: $($result.EndpointProbeStatusCode)"
+    }
     Write-Host "Container health: $($result.ContainerHealth)"
     Write-Host "Health source: $($result.HealthSource)"
     if ($result.CommandLine) {

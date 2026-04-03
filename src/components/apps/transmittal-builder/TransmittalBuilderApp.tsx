@@ -8,11 +8,15 @@ import {
 } from "@/components/apps/ui/TrustStateBadge";
 import { Badge } from "@/components/primitives/Badge";
 import { Text } from "@/components/primitives/Text";
+import {
+	formatTransmittalNativeStandardsCompactValue,
+	type TransmittalNativeStandardsReviewSnapshot,
+	useTransmittalBuilderState,
+} from "@/features/transmittal-builder";
 import { buildProjectDetailHref } from "@/lib/projectWorkflowNavigation";
 import styles from "./TransmittalBuilderApp.module.css";
 import { TransmittalBuilderMainForm } from "./TransmittalBuilderMainForm";
 import { TransmittalBuilderRightRail } from "./TransmittalBuilderRightRail";
-import { useTransmittalBuilderState } from "./useTransmittalBuilderState";
 
 interface PackageContextStage {
 	state: TrustState;
@@ -35,6 +39,9 @@ function resolvePackageContextStage(args: {
 	submitAttempted: boolean;
 	validationErrors: number;
 	outputCount: number;
+	nativeStandardsReview: TransmittalNativeStandardsReviewSnapshot | null;
+	nativeStandardsReviewLoading: boolean;
+	nativeStandardsReviewError: string | null;
 }) {
 	const {
 		projectName,
@@ -49,6 +56,9 @@ function resolvePackageContextStage(args: {
 		submitAttempted,
 		validationErrors,
 		outputCount,
+		nativeStandardsReview,
+		nativeStandardsReviewLoading,
+		nativeStandardsReviewError,
 	} = args;
 	const label = projectName ?? "this package";
 
@@ -103,7 +113,59 @@ function resolvePackageContextStage(args: {
 			step: "Draft",
 			title: `${label} still has required draft fields missing.`,
 			detail:
-				"Finish the package details, contacts, and source files before generating documents.",
+			"Finish the package details, contacts, and source files before generating documents.",
+		} satisfies PackageContextStage;
+	}
+
+	if (standardMode && hasProject && hasDocuments && nativeStandardsReviewLoading) {
+		return {
+			state: "background",
+			label: "Load standards review",
+			step: "Review",
+			title: `Loading the latest native standards review for ${label}.`,
+			detail:
+				"The package is checking the current project-level standards result before issue.",
+		} satisfies PackageContextStage;
+	}
+
+	if (standardMode && hasProject && hasDocuments && nativeStandardsReviewError) {
+		return {
+			state: "needs-attention",
+			label: "Reload standards review",
+			step: "Review",
+			title: `Unable to load the latest native standards review for ${label}.`,
+			detail: nativeStandardsReviewError,
+		} satisfies PackageContextStage;
+	}
+
+	if (
+		standardMode &&
+		hasProject &&
+		hasDocuments &&
+		(!nativeStandardsReview || !nativeStandardsReview.hasRecordedReview)
+	) {
+		return {
+			state: "needs-attention",
+			label: "Run standards review",
+			step: "Review",
+			title: `Run the native standards review before issuing ${label}.`,
+			detail:
+				"The package is staged, but no project-level native standards review has been recorded yet.",
+		} satisfies PackageContextStage;
+	}
+
+	if (
+		standardMode &&
+		hasProject &&
+		hasDocuments &&
+		nativeStandardsReview?.isBlocking
+	) {
+		return {
+			state: "needs-attention",
+			label: "Resolve standards review",
+			step: "Review",
+			title: `Native standards review still has blockers for ${label}.`,
+			detail: nativeStandardsReview.summaryMessage,
 		} satisfies PackageContextStage;
 	}
 
@@ -190,6 +252,9 @@ export function TransmittalBuilderApp({
 		submitAttempted: state.submitAttempted,
 		validationErrors: state.validation.errors.length,
 		outputCount: state.outputs.length,
+		nativeStandardsReview: state.nativeStandardsReview,
+		nativeStandardsReviewLoading: state.nativeStandardsReviewLoading,
+		nativeStandardsReviewError: state.nativeStandardsReviewError,
 	});
 	const contextMetrics = useMemo<ContextMetric[]>(() => {
 		const metrics: ContextMetric[] = [];
@@ -200,7 +265,7 @@ export function TransmittalBuilderApp({
 					: state.preferredIssueSet.selectedDrawingPaths.length;
 			metrics.push({
 				label: "Issue set",
-				value: `${state.preferredIssueSet.issueTag} • ${packageRowCount} row${
+				value: `${state.preferredIssueSet.issueTag} | ${packageRowCount} row${
 					packageRowCount === 1 ? "" : "s"
 				}`,
 			});
@@ -210,6 +275,14 @@ export function TransmittalBuilderApp({
 		}
 		if (pendingReviewCount > 0) {
 			metrics.push({ label: "Pending review", value: pendingReviewCount });
+		}
+		if (standardMode && Boolean(state.draft.selectedProjectId)) {
+			metrics.push({
+				label: "Native standards",
+				value: formatTransmittalNativeStandardsCompactValue(
+					state.nativeStandardsReview,
+				),
+			});
 		}
 		if (state.completeContacts.length > 0) {
 			metrics.push({
@@ -225,8 +298,11 @@ export function TransmittalBuilderApp({
 		documentCount,
 		pendingReviewCount,
 		state.completeContacts.length,
+		state.draft.selectedProjectId,
+		state.nativeStandardsReview,
 		state.outputs.length,
 		state.preferredIssueSet,
+		standardMode,
 	]);
 	const workflowLinks = state.draft.selectedProjectId
 		? [
@@ -370,9 +446,12 @@ export function TransmittalBuilderApp({
 						completeContactsCount={state.completeContacts.length}
 					fileSummary={state.fileSummary}
 					optionSummary={state.optionSummary}
+					nativeStandardsReview={state.nativeStandardsReview}
+					nativeStandardsReviewLoading={state.nativeStandardsReviewLoading}
+					nativeStandardsReviewError={state.nativeStandardsReviewError}
 					preferredIssueSetSummary={
 						state.preferredIssueSet
-							? `${state.preferredIssueSet.issueTag} • ${
+							? `${state.preferredIssueSet.issueTag} | ${
 									state.preferredIssueSet.selectedDrawingPaths.length
 							  } drawing${
 									state.preferredIssueSet.selectedDrawingPaths.length === 1
@@ -391,3 +470,4 @@ export function TransmittalBuilderApp({
 		</PageFrame>
 	);
 }
+

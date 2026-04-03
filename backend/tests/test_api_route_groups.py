@@ -481,9 +481,14 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/dashboard/load": ["POST"],
             "/api/dashboard/load/<job_id>": ["GET"],
             "/api/command-center/supabase-sync-status": ["GET"],
-            "/api/title-block-sync/scan": ["POST"],
-            "/api/title-block-sync/preview": ["POST"],
-            "/api/title-block-sync/apply": ["POST"],
+            "/api/project-setup/tickets": ["POST"],
+            "/api/project-setup/projects/<project_id>/profile": ["GET", "PUT"],
+            "/api/project-setup/preview": ["POST"],
+            "/api/project-setup/results": ["POST"],
+            "/api/project-standards/tickets": ["POST"],
+            "/api/project-standards/projects/<project_id>/profile": ["GET", "PUT"],
+            "/api/project-standards/projects/<project_id>/latest-review": ["GET"],
+            "/api/project-standards/results": ["POST"],
             "/api/work-ledger/publishers/worktale/readiness": ["GET"],
             "/api/work-ledger/publishers/worktale/bootstrap": ["POST"],
             "/api/work-ledger/entries/<entry_id>/publish/worktale": ["POST"],
@@ -515,12 +520,12 @@ class TestApiRouteGroups(unittest.TestCase):
             "/api/autocad/ws-ticket": ["POST"],
             "/api/watchdog/config": ["PUT"],
             "/api/watchdog/heartbeat": ["POST"],
-            "/api/watchdog/pick-root": ["POST"],
             "/api/watchdog/status": ["GET"],
             "/api/watchdog/collectors/register": ["POST"],
             "/api/watchdog/collectors/heartbeat": ["POST"],
             "/api/watchdog/collectors/events": ["POST"],
             "/api/watchdog/collectors": ["GET"],
+            "/api/watchdog/dashboard": ["GET"],
             "/api/watchdog/events": ["GET"],
             "/api/watchdog/overview": ["GET"],
             "/api/watchdog/sessions": ["GET"],
@@ -2270,9 +2275,6 @@ class TestApiRouteGroups(unittest.TestCase):
         response = self.client.post("/api/watchdog/heartbeat")
         self.assertEqual(response.status_code, 401)
 
-        response = self.client.post("/api/watchdog/pick-root")
-        self.assertEqual(response.status_code, 401)
-
         response = self.client.post("/api/watchdog/collectors/register", json={})
         self.assertEqual(response.status_code, 401)
 
@@ -2289,6 +2291,9 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
 
         response = self.client.get("/api/watchdog/overview")
+        self.assertEqual(response.status_code, 401)
+
+        response = self.client.get("/api/watchdog/dashboard")
         self.assertEqual(response.status_code, 401)
 
         response = self.client.get("/api/watchdog/projects/project-1/overview")
@@ -2512,6 +2517,39 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertTrue(overview_payload.get("ok"))
         self.assertEqual((overview_payload.get("collectors") or {}).get("total"), 1)
         self.assertEqual((overview_payload.get("events") or {}).get("inWindow"), 2)
+
+        dashboard_response = self.client.get(
+            "/api/watchdog/dashboard",
+            headers={"X-API-Key": "valid-key"},
+            query_string={
+                "projectId": "project-1",
+                "collectorId": "collector-a",
+                "timeWindowMs": 7 * 24 * 60 * 60 * 1000,
+                "eventsLimit": 8,
+                "sessionsLimit": 8,
+            },
+        )
+        self.assertEqual(dashboard_response.status_code, 200)
+        dashboard_payload = dashboard_response.get_json() or {}
+        self.assertTrue(dashboard_payload.get("ok"))
+        self.assertEqual(dashboard_payload.get("projectId"), "project-1")
+        self.assertEqual(dashboard_payload.get("collectorId"), "collector-a")
+        self.assertEqual(
+            int(((dashboard_payload.get("collectors") or {}).get("count") or 0)),
+            1,
+        )
+        self.assertEqual(
+            int(((dashboard_payload.get("events") or {}).get("count") or 0)),
+            2,
+        )
+        self.assertEqual(
+            int(((dashboard_payload.get("sessions") or {}).get("count") or 0)),
+            1,
+        )
+        self.assertEqual(
+            (((dashboard_payload.get("overview") or {}).get("events") or {}).get("inWindow")),
+            2,
+        )
 
         project_overview_response = self.client.get(
             "/api/watchdog/projects/project-1/overview",

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from flask import Blueprint, current_app, jsonify
+from flask_limiter import Limiter
 
 _RUNTIME_STATUS_CACHE_TTL_SECONDS = 15
 _runtime_status_cache_payload: Dict[str, Any] | None = None
@@ -367,11 +368,10 @@ def _launch_runtime_control() -> tuple[bool, str]:
     return True, "Suite Runtime Control is starting."
 
 
-def create_health_blueprint() -> Blueprint:
+def create_health_blueprint(*, limiter: Limiter | None = None) -> Blueprint:
     """Create /health route blueprint."""
     bp = Blueprint("health_api", __name__)
 
-    @bp.route("/health", methods=["GET"])
     def health():
         checked_at = _checked_at_iso()
         checks, recommendations = _suite_health_checks()
@@ -422,6 +422,10 @@ def create_health_blueprint() -> Blueprint:
                 },
             }
         )
+
+    bp.route("/health", methods=["GET"])(
+        limiter.exempt(health) if limiter is not None else health
+    )
 
     @bp.route("/api/runtime/status", methods=["GET"])
     def runtime_status():

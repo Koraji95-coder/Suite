@@ -7,9 +7,11 @@ internal sealed class RuntimeShellWindowState
     public int Width { get; set; }
     public int Height { get; set; }
     public string WindowState { get; set; } = "Normal";
-    public int UtilityPaneWidth { get; set; } = 400;
+    public int UtilityPaneWidth { get; set; } = RuntimeShellDisplaySettings.DefaultUtilityPaneWidth;
+    public bool UtilityPaneCollapsed { get; set; } = true;
     public string UtilityPaneTab { get; set; } = "context";
     public string ActiveLogSourceId { get; set; } = "transcript";
+    public int ContentScalePercent { get; set; } = RuntimeShellDisplaySettings.DefaultContentScalePercent;
 }
 
 internal static class RuntimeShellPhases

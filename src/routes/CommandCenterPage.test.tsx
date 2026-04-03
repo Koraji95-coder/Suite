@@ -102,9 +102,9 @@ describe("CommandCenterPage", () => {
 		expect(screen.getByText("Check Worktale Readiness")).toBeTruthy();
 		expect(screen.getByText("npm run worktale:doctor")).toBeTruthy();
 		expect(screen.getByText("Open Worktale Dashboard")).toBeTruthy();
-		expect(screen.getByText("worktale dash")).toBeTruthy();
+		expect(screen.getByText("npm run worktale:dash")).toBeTruthy();
 		expect(screen.getByText("Generate Worktale Digest")).toBeTruthy();
-		expect(screen.getByText("worktale digest")).toBeTruthy();
+		expect(screen.getByText("npm run worktale:digest")).toBeTruthy();
 	});
 
 	it("keeps runtime workstation controls out of the copied command groups", () => {

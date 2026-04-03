@@ -10,7 +10,10 @@ import { Dialog, DialogContent } from "@/components/apps/ui/dialog";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsDrawingDialogs.module.css";
 import { StandardsDrawingStatusIcon } from "./StandardsDrawingStatusIcon";
-import type { DrawingAnnotation, Issue } from "./standardsDrawingModels";
+import type {
+	DrawingAnnotation,
+	Issue,
+} from "@/features/standards-checker/standardsDrawingModels";
 
 interface StandardsDrawingDetailDialogProps {
 	selectedDrawing: DrawingAnnotation | null;

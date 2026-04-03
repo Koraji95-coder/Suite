@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle, FileText, XCircle } from "lucide-react";
 import type { CSSProperties } from "react";
-import type { DrawingAnnotation } from "./standardsDrawingModels";
+import type { DrawingAnnotation } from "@/features/standards-checker/standardsDrawingModels";
 
 interface StandardsDrawingStatusIconProps {
 	status: DrawingAnnotation["qa_status"];

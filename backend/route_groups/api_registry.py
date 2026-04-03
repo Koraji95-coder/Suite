@@ -11,6 +11,7 @@ from .api_agent import create_agent_blueprint
 from .api_agent_orchestration import create_agent_orchestration_blueprint
 from .api_auth_passkey import create_auth_passkey_blueprint
 from .api_autocad import create_autocad_blueprint
+from .api_autocad_reference_catalog import create_autocad_reference_catalog_blueprint
 from .api_backup import create_backup_blueprint
 from .api_auth_email import create_auth_email_blueprint
 from .api_batch_find_replace import create_batch_find_replace_blueprint
@@ -19,12 +20,13 @@ from .api_drawing_program import create_drawing_program_blueprint
 from .api_watchdog import create_watchdog_blueprint
 from .api_health import create_health_blueprint
 from .api_dashboard import create_dashboard_blueprint
+from .api_project_setup import create_project_setup_blueprint
+from .api_project_standards import create_project_standards_blueprint
 from .api_command_center import create_command_center_blueprint
 from .api_terminal_authoring import create_terminal_authoring_blueprint
 from .api_work_ledger import create_work_ledger_blueprint
 from .api_transmittal import create_transmittal_blueprint
 from .api_transmittal_render import create_transmittal_render_blueprint
-from .api_title_block_sync import create_title_block_sync_blueprint
 
 
 def register_route_groups(
@@ -180,6 +182,26 @@ def register_route_groups(
         )
     )
     app.register_blueprint(
+        create_project_setup_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            api_key=api_key,
+            supabase_url=supabase_url,
+            supabase_api_key=supabase_api_key,
+        )
+    )
+    app.register_blueprint(
+        create_project_standards_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+            api_key=api_key,
+            supabase_url=supabase_url,
+            supabase_api_key=supabase_api_key,
+        )
+    )
+    app.register_blueprint(
         create_command_center_blueprint(
             limiter=limiter,
             logger=logger,
@@ -193,14 +215,6 @@ def register_route_groups(
             require_supabase_user=require_supabase_user,
             is_valid_api_key=is_valid_api_key,
             schedule_cleanup=schedule_cleanup,
-            send_autocad_dotnet_command=send_autocad_dotnet_command,
-        )
-    )
-    app.register_blueprint(
-        create_title_block_sync_blueprint(
-            limiter=limiter,
-            logger=logger,
-            require_supabase_user=require_supabase_user,
             send_autocad_dotnet_command=send_autocad_dotnet_command,
         )
     )
@@ -237,6 +251,13 @@ def register_route_groups(
         )
     )
     app.register_blueprint(
+        create_autocad_reference_catalog_blueprint(
+            limiter=limiter,
+            logger=logger,
+            require_supabase_user=require_supabase_user,
+        )
+    )
+    app.register_blueprint(
         create_autocad_blueprint(
             require_autocad_auth=require_autocad_auth,
             limiter=limiter,
@@ -263,4 +284,4 @@ def register_route_groups(
             supabase_api_key=supabase_api_key,
         )
     )
-    app.register_blueprint(create_health_blueprint())
+    app.register_blueprint(create_health_blueprint(limiter=limiter))

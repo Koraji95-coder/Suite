@@ -1,10 +1,19 @@
 import type {
 	OutputFormat,
 	StandardDocumentSourceMode,
+	TransmittalNativeStandardsReviewSnapshot,
 	TransmittalType,
-} from "@/components/apps/transmittal-builder/transmittalBuilderModels";
+} from "@/features/transmittal-builder";
 import { logger } from "@/lib/logger";
-import { loadSetting, saveSetting } from "@/settings/userSettings";
+import {
+	loadSetting,
+	loadSettingsForProjects,
+	saveSetting,
+} from "@/settings/userSettings";
+import {
+	createProjectScopedFetchCache,
+	getLocalStorageApi,
+} from "@/services/projectWorkflowClientSupport";
 
 export interface ProjectTransmittalReceiptOutput {
 	label: string;
@@ -31,6 +40,7 @@ export interface ProjectTransmittalReceiptRecord {
 	pendingReviewCount: number;
 	cidDocumentCount: number;
 	contactCount: number;
+	nativeStandardsReview?: TransmittalNativeStandardsReviewSnapshot | null;
 	fileSummary: {
 		template: string;
 		index: string;
@@ -62,6 +72,7 @@ export interface ProjectTransmittalReceiptInput {
 	pendingReviewCount: number;
 	cidDocumentCount: number;
 	contactCount: number;
+	nativeStandardsReview?: TransmittalNativeStandardsReviewSnapshot | null;
 	fileSummary: {
 		template: string;
 		index: string;
@@ -77,6 +88,10 @@ export interface ProjectTransmittalReceiptInput {
 
 const RECEIPT_SETTING_KEY = "project_transmittal_receipts_v1";
 const LOCAL_STORAGE_PREFIX = "suite:project-transmittal-receipts";
+const transmittalReceiptFetchCache = createProjectScopedFetchCache<{
+	data: ProjectTransmittalReceiptRecord[];
+	error: Error | null;
+}>();
 
 function createId() {
 	return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -163,7 +178,41 @@ function normalizeOptionSummary(
 		})
 		.filter(
 			(entry): entry is { label: string; value: string } => entry !== null,
-		);
+	);
+}
+
+function normalizeNativeStandardsReview(
+	value: unknown,
+): TransmittalNativeStandardsReviewSnapshot | null {
+	if (!value || typeof value !== "object") {
+		return null;
+	}
+
+	const candidate = value as Partial<TransmittalNativeStandardsReviewSnapshot>;
+	return {
+		hasRecordedReview: Boolean(candidate.hasRecordedReview),
+		isBlocking: Boolean(candidate.isBlocking),
+		overallStatus:
+			candidate.overallStatus === "pass" ||
+			candidate.overallStatus === "warning" ||
+			candidate.overallStatus === "fail"
+				? candidate.overallStatus
+				: null,
+		recordedAt: normalizeDate(candidate.recordedAt),
+		requestId: normalizeText(candidate.requestId) || null,
+		standardsCategory: normalizeText(candidate.standardsCategory) || null,
+		selectedStandardCount: Math.max(
+			0,
+			Number(candidate.selectedStandardCount || 0),
+		),
+		inspectedDrawingCount: Math.max(
+			0,
+			Number(candidate.inspectedDrawingCount || 0),
+		),
+		warningCount: Math.max(0, Number(candidate.warningCount || 0)),
+		providerPath: normalizeText(candidate.providerPath) || null,
+		summaryMessage: normalizeText(candidate.summaryMessage),
+	};
 }
 
 function normalizeRecord(
@@ -208,6 +257,9 @@ function normalizeRecord(
 		pendingReviewCount: Math.max(0, Number(candidate.pendingReviewCount || 0)),
 		cidDocumentCount: Math.max(0, Number(candidate.cidDocumentCount || 0)),
 		contactCount: Math.max(0, Number(candidate.contactCount || 0)),
+		nativeStandardsReview: normalizeNativeStandardsReview(
+			candidate.nativeStandardsReview,
+		),
 		fileSummary: {
 			template: normalizeText(candidate.fileSummary?.template),
 			index: normalizeText(candidate.fileSummary?.index),
@@ -233,11 +285,12 @@ function buildLocalStorageKey(projectId: string) {
 function readLocalReceipts(
 	projectId: string,
 ): ProjectTransmittalReceiptRecord[] {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return [];
 	}
 	try {
-		const raw = localStorage.getItem(buildLocalStorageKey(projectId));
+		const raw = storage.getItem(buildLocalStorageKey(projectId));
 		if (!raw) {
 			return [];
 		}
@@ -262,15 +315,47 @@ function readLocalReceipts(
 	}
 }
 
+function normalizeStoredReceipts(
+	stored: unknown,
+	localFallback: ProjectTransmittalReceiptRecord[],
+): {
+	data: ProjectTransmittalReceiptRecord[];
+	error: Error | null;
+} {
+	if (stored === null || stored === undefined) {
+		return {
+			data: localFallback,
+			error: null,
+		};
+	}
+	if (!Array.isArray(stored)) {
+		return {
+			data: localFallback,
+			error: new Error("Stored transmittal receipt data is invalid."),
+		};
+	}
+	return {
+		data: sortReceipts(
+			stored
+				.map((entry) => normalizeRecord(entry))
+				.filter(
+					(entry): entry is ProjectTransmittalReceiptRecord => entry !== null,
+				),
+		),
+		error: null,
+	};
+}
+
 function writeLocalReceipts(
 	projectId: string,
 	entries: ProjectTransmittalReceiptRecord[],
 ) {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return;
 	}
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(projectId),
 			JSON.stringify(sortReceipts(entries)),
 		);
@@ -300,6 +385,103 @@ async function persistReceipts(
 }
 
 export const projectTransmittalReceiptService = {
+	async fetchReceiptsForProjects(projectIds: string[]): Promise<
+		Map<
+			string,
+			{
+				data: ProjectTransmittalReceiptRecord[];
+				error: Error | null;
+			}
+		>
+	> {
+		const normalizedProjectIds = Array.from(
+			new Set(
+				projectIds
+					.map((projectId) => normalizeText(projectId))
+					.filter(Boolean),
+			),
+		);
+		const results = new Map<
+			string,
+			{
+				data: ProjectTransmittalReceiptRecord[];
+				error: Error | null;
+			}
+		>();
+		if (normalizedProjectIds.length === 0) {
+			return results;
+		}
+
+		const missingProjectIds: string[] = [];
+		const inFlightPromises: Promise<void>[] = [];
+		for (const projectId of normalizedProjectIds) {
+			const cached = transmittalReceiptFetchCache.read(projectId);
+			if (cached) {
+				results.set(projectId, cached);
+				continue;
+			}
+
+			const inFlight = transmittalReceiptFetchCache.readInFlight(projectId);
+			if (inFlight) {
+				inFlightPromises.push(
+					inFlight.then((value) => {
+						results.set(projectId, value);
+					}),
+				);
+				continue;
+			}
+
+			missingProjectIds.push(projectId);
+		}
+
+		if (missingProjectIds.length > 0) {
+			const localFallbacks = new Map(
+				missingProjectIds.map((projectId) => [
+					projectId,
+					readLocalReceipts(projectId),
+				]),
+			);
+
+			try {
+				const storedByProject = await loadSettingsForProjects<unknown>(
+					RECEIPT_SETTING_KEY,
+					missingProjectIds,
+				);
+
+				for (const projectId of missingProjectIds) {
+					const { data, error } = normalizeStoredReceipts(
+						storedByProject.get(projectId),
+						localFallbacks.get(projectId) ?? [],
+					);
+					writeLocalReceipts(projectId, data);
+					const value = transmittalReceiptFetchCache.write(projectId, {
+						data,
+						error,
+					});
+					results.set(projectId, value);
+				}
+			} catch (error) {
+				const normalizedError =
+					error instanceof Error
+						? error
+						: new Error("Unable to load transmittal receipts.");
+				for (const projectId of missingProjectIds) {
+					const value = transmittalReceiptFetchCache.write(projectId, {
+						data: localFallbacks.get(projectId) ?? [],
+						error: normalizedError,
+					});
+					results.set(projectId, value);
+				}
+			}
+		}
+
+		if (inFlightPromises.length > 0) {
+			await Promise.all(inFlightPromises);
+		}
+
+		return results;
+	},
+
 	async fetchReceipts(projectId: string): Promise<{
 		data: ProjectTransmittalReceiptRecord[];
 		error: Error | null;
@@ -312,42 +494,50 @@ export const projectTransmittalReceiptService = {
 			};
 		}
 
+		const cached = transmittalReceiptFetchCache.read(normalizedProjectId);
+		if (cached) {
+			return cached;
+		}
+		const inFlight =
+			transmittalReceiptFetchCache.readInFlight(normalizedProjectId);
+		if (inFlight) {
+			return await inFlight;
+		}
+
 		const localFallback = readLocalReceipts(normalizedProjectId);
+		const loader = transmittalReceiptFetchCache.writeInFlight(
+			normalizedProjectId,
+			(async () => {
+				try {
+					const normalized = normalizeStoredReceipts(
+						await loadSetting<unknown>(
+							RECEIPT_SETTING_KEY,
+							normalizedProjectId,
+							null,
+						),
+						localFallback,
+					);
+					writeLocalReceipts(normalizedProjectId, normalized.data);
+					return transmittalReceiptFetchCache.write(normalizedProjectId, {
+						data: normalized.data,
+						error: normalized.error,
+					});
+				} catch (error) {
+					return transmittalReceiptFetchCache.write(normalizedProjectId, {
+						data: localFallback,
+						error:
+							error instanceof Error
+								? error
+								: new Error("Unable to load transmittal receipts."),
+					});
+				}
+			})(),
+		);
+
 		try {
-			const stored = await loadSetting<unknown>(
-				RECEIPT_SETTING_KEY,
-				normalizedProjectId,
-				null,
-			);
-			if (stored === null) {
-				return { data: localFallback, error: null };
-			}
-			if (!Array.isArray(stored)) {
-				return {
-					data: localFallback,
-					error: new Error("Stored transmittal receipt data is invalid."),
-				};
-			}
-			const normalized = sortReceipts(
-				stored
-					.map((entry) => normalizeRecord(entry))
-					.filter(
-						(entry): entry is ProjectTransmittalReceiptRecord => entry !== null,
-					),
-			);
-			writeLocalReceipts(normalizedProjectId, normalized);
-			return {
-				data: normalized,
-				error: null,
-			};
-		} catch (error) {
-			return {
-				data: localFallback,
-				error:
-					error instanceof Error
-						? error
-						: new Error("Unable to load transmittal receipts."),
-			};
+			return await loader;
+		} finally {
+			transmittalReceiptFetchCache.clearInFlight(normalizedProjectId);
 		}
 	},
 
@@ -389,6 +579,9 @@ export const projectTransmittalReceiptService = {
 			pendingReviewCount: Math.max(0, Number(input.pendingReviewCount || 0)),
 			cidDocumentCount: Math.max(0, Number(input.cidDocumentCount || 0)),
 			contactCount: Math.max(0, Number(input.contactCount || 0)),
+			nativeStandardsReview: normalizeNativeStandardsReview(
+				input.nativeStandardsReview,
+			),
 			fileSummary: {
 				template: normalizeText(input.fileSummary.template),
 				index: normalizeText(input.fileSummary.index),
@@ -406,6 +599,10 @@ export const projectTransmittalReceiptService = {
 			normalizedProjectId,
 			nextEntries,
 		);
+		transmittalReceiptFetchCache.write(normalizedProjectId, {
+			data: nextEntries,
+			error: persistError,
+		});
 		return {
 			data: receipt,
 			error: persistError,

@@ -10,12 +10,12 @@ import { buildProjectDetailHref } from "@/lib/projectWorkflowNavigation";
 import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
-} from "@/services/projectIssueSetService";
+} from "@/features/project-workflow/issueSetService";
+import { useStandardsCheckerState } from "@/features/standards-checker/useStandardsCheckerState";
 import styles from "./StandardsChecker.module.css";
 import { StandardsCheckerHeaderPanel } from "./StandardsCheckerHeaderPanel";
 import { StandardsCheckerStandardsList } from "./StandardsCheckerStandardsList";
 import { StandardsDrawingChecker } from "./StandardsDrawingPanel";
-import { useStandardsCheckerState } from "./useStandardsCheckerState";
 
 interface StandardsReviewStage {
 	state: TrustState;
@@ -149,18 +149,27 @@ export function StandardsChecker({
 }: StandardsCheckerProps) {
 	const {
 		activeCategory,
+		cadFamilyOptions,
+		cadReferenceSummary,
 		failCount,
 		filteredStandards,
 		getResultForStandard,
 		loadingProjects,
+		loadingProjectProfile,
 		mode,
 		passCount,
+		projectProfileStatus,
 		projectOptions,
 		results,
+		reviewStatus,
 		running,
+		saveProjectDefaults,
+		savingProjectProfile,
+		selectedCadFamilyId,
 		selectedProjectId,
 		selectedProjectName,
 		selectedStandards,
+		setSelectedCadFamilyId,
 		setSelectedProjectId,
 		setActiveCategory,
 		setMode,
@@ -256,7 +265,7 @@ export function StandardsChecker({
 				{preferredIssueSet ? (
 					<div className={styles.headerSummaryStrip}>
 						<span className={styles.headerSummaryPill}>
-							Package scope {preferredIssueSet.issueTag} •{" "}
+							Package scope {preferredIssueSet.issueTag} -{" "}
 							{preferredIssueSet.selectedDrawingPaths.length} drawing
 							{preferredIssueSet.selectedDrawingPaths.length === 1 ? "" : "s"}
 						</span>
@@ -268,18 +277,27 @@ export function StandardsChecker({
 			<StandardsCheckerHeaderPanel
 				activeCategory={activeCategory}
 				availableCount={filteredStandards.length}
+				cadFamilyOptions={cadFamilyOptions}
+				cadReferenceSummary={cadReferenceSummary}
 				failCount={failCount}
 				loadingProjects={loadingProjects}
+				loadingProjectProfile={loadingProjectProfile}
 				mode={mode}
+				onCadFamilyChange={setSelectedCadFamilyId}
 				onModeChange={setMode}
 				onProjectChange={setSelectedProjectId}
 				selectedCount={selectedCount}
 				onCategoryChange={setActiveCategory}
 				onRunChecks={runChecks}
+				onSaveProjectDefaults={saveProjectDefaults}
 				passCount={passCount}
+				projectProfileStatus={projectProfileStatus}
+				reviewStatus={reviewStatus}
 				projectOptions={projectOptions}
 				resultsCount={results.length}
 				running={running}
+				savingProjectProfile={savingProjectProfile}
+				selectedCadFamilyId={selectedCadFamilyId}
 				selectedProjectId={selectedProjectId}
 				warningCount={warningCount}
 			/>

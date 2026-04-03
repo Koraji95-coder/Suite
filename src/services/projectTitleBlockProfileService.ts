@@ -1,8 +1,8 @@
 import { logger } from "@/lib/logger";
 import { looksLikeUuid } from "@/lib/uuid";
-import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
-import { safeSupabaseQuery } from "@/supabase/utils";
+import { projectSetupBackendService } from "@/features/project-setup";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 
 export type ProjectTitleBlockProfileRow =
 	Database["public"]["Tables"]["project_title_block_profiles"]["Row"];
@@ -119,14 +119,11 @@ function buildDefaultProfile(
 }
 
 async function getCurrentUserId(): Promise<string | null> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) {
+	try {
+		return await getCurrentSupabaseUserId();
+	} catch {
 		return null;
 	}
-	return user.id;
 }
 
 function mergeProfileDefaults(
@@ -177,18 +174,12 @@ export const projectTitleBlockProfileService = {
 			};
 		}
 
-		const result = await safeSupabaseQuery(
-			async () =>
-				await supabase
-					.from("project_title_block_profiles")
-					.select("*")
-					.eq("project_id", normalizedProjectId)
-					.eq("user_id", userId)
-					.maybeSingle(),
-			"ProjectTitleBlockProfileService",
-		);
+		const result = await projectSetupBackendService.fetchProfile({
+			projectId: normalizedProjectId,
+			projectRootPath: defaults?.projectRootPath ?? null,
+		});
 
-		if (result.data) {
+		if (result.data && result.data.project_id) {
 			return {
 				data: mergeProfileDefaults(
 					result.data as ProjectTitleBlockProfileRow,
@@ -281,43 +272,37 @@ export const projectTitleBlockProfileService = {
 			return nextEntry;
 		}
 
-		const payload: ProjectTitleBlockProfileInsert = {
-			...payloadBase,
-			user_id: userId,
-		};
-
-		const runUpsert = (nextPayload: ProjectTitleBlockProfileInsert) =>
-			safeSupabaseQuery(
-				async () =>
-					await supabase
-						.from("project_title_block_profiles")
-						.upsert(nextPayload, { onConflict: "project_id" })
-						.select("*")
-						.maybeSingle(),
-				"ProjectTitleBlockProfileService",
-			);
-
-		let result = await runUpsert(payload);
-		if (result.error && isMissingAcadeProjectFilePathColumn(result.error)) {
-			logger.warn(
-				"ProjectTitleBlockProfileService",
-				"Hosted title block profile storage is missing acade_project_file_path; retrying with the legacy payload.",
-				{
+		try {
+			return (await projectSetupBackendService.saveProfile(normalizedProjectId, {
+				...payloadBase,
+				userId,
+			})) as ProjectTitleBlockProfileRow;
+		} catch (error) {
+			if (isMissingAcadeProjectFilePathColumn(error)) {
+				logger.warn(
+					"ProjectTitleBlockProfileService",
+					"Hosted title block profile storage is missing acade_project_file_path; retrying with the legacy payload.",
+					{
+						projectId: normalizedProjectId,
+						userId,
+						error:
+							error instanceof Error
+								? error.message
+								: String(error),
+					},
+				);
+				return (await projectSetupBackendService.saveProfile(normalizedProjectId, {
 					projectId: normalizedProjectId,
-					userId,
-					error:
-						result.error instanceof Error
-							? result.error.message
-							: String(result.error),
-				},
-			);
-			const legacyPayload = { ...payload };
-			delete legacyPayload.acade_project_file_path;
-			result = await runUpsert(legacyPayload);
-		}
-
-		if (result.data) {
-			return result.data as ProjectTitleBlockProfileRow;
+					blockName: payloadBase.block_name,
+					projectRootPath: payloadBase.project_root_path,
+					acadeLine1: payloadBase.acade_line1,
+					acadeLine2: payloadBase.acade_line2,
+					acadeLine4: payloadBase.acade_line4,
+					signerDrawnBy: payloadBase.signer_drawn_by,
+					signerCheckedBy: payloadBase.signer_checked_by,
+					signerEngineer: payloadBase.signer_engineer,
+				})) as ProjectTitleBlockProfileRow;
+			}
 		}
 
 		const current = readLocalProfiles();

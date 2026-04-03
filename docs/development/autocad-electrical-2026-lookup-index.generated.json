@@ -1,0 +1,1425 @@
+{
+	"schemaVersion": "suite.autodesk.acade.lookup-index.v1",
+	"generatedAt": "2026-04-02T17:01:36.323Z",
+	"source": {
+		"installationContext": "docs/development/autocad-electrical-2026-installation-context-reference.md",
+		"installationContextYaml": "docs/development/autocad-electrical-2026-installation-context.generated.yaml",
+		"menuIndex": "docs/development/autocad-electrical-2026-menu-index.generated.json",
+		"integrationPlaybook": "docs/development/autocad-electrical-2026-suite-integration-playbook.md"
+	},
+	"counts": {
+		"databases": 4,
+		"roles": 4,
+		"tables": 70,
+		"databasesWithErrors": 0
+	},
+	"availableRoleIds": [
+		"catalog_lookup",
+		"footprint_lookup",
+		"plc_lookup",
+		"via_component_lookup"
+	],
+	"recommendedDefaults": {
+		"catalog": "default_cat",
+		"plc": "ace_plc",
+		"viaComponent": "wdviacmp"
+	},
+	"roles": [
+		{
+			"id": "catalog_lookup",
+			"label": "Catalog Lookup",
+			"databaseCount": 1,
+			"tableCount": 63,
+			"fileNames": [
+				"default_cat.mdb"
+			],
+			"databaseIds": [
+				"default_cat"
+			],
+			"includesOptional": false
+		},
+		{
+			"id": "footprint_lookup",
+			"label": "Footprint Lookup",
+			"databaseCount": 1,
+			"tableCount": 0,
+			"fileNames": [
+				"footprint_lookup.mdb"
+			],
+			"databaseIds": [
+				"footprint_lookup"
+			],
+			"includesOptional": true
+		},
+		{
+			"id": "plc_lookup",
+			"label": "PLC Lookup",
+			"databaseCount": 1,
+			"tableCount": 4,
+			"fileNames": [
+				"ace_plc.mdb"
+			],
+			"databaseIds": [
+				"ace_plc"
+			],
+			"includesOptional": false
+		},
+		{
+			"id": "via_component_lookup",
+			"label": "Via Component Lookup",
+			"databaseCount": 1,
+			"tableCount": 3,
+			"fileNames": [
+				"wdviacmp.mdb"
+			],
+			"databaseIds": [
+				"wdviacmp"
+			],
+			"includesOptional": false
+		}
+	],
+	"databases": [
+		{
+			"id": "default_cat",
+			"fileName": "default_cat.mdb",
+			"filePath": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/default_cat.mdb",
+			"roleId": "catalog_lookup",
+			"roleLabel": "Catalog Lookup",
+			"label": "Default Catalog",
+			"description": "Primary catalog, family, and footprint lookup source for ACADE component selection.",
+			"isOptional": false,
+			"hasError": false,
+			"error": "",
+			"tableCount": 63,
+			"interestingTableCount": 8,
+			"tableNames": [
+				"_FAMILY_DESCRIPTION",
+				"_LISTBOX_DEF",
+				"_PINLIST",
+				"_TERMPROPS",
+				"_W0_CBLWIRES",
+				"_XREF_GRAPHICS",
+				"AM",
+				"AN",
+				"C0",
+				"CA",
+				"CB",
+				"CR",
+				"DI",
+				"DN",
+				"DO",
+				"DR",
+				"DS",
+				"EN",
+				"FM",
+				"FS",
+				"FT",
+				"FU",
+				"LR",
+				"LS",
+				"LT",
+				"MISC_CAT",
+				"MO",
+				"MS",
+				"NP",
+				"OL",
+				"PB",
+				"PE",
+				"PLCIO",
+				"PM",
+				"PNEU-ACT",
+				"PNEU-ALU",
+				"PNEU-CYL",
+				"PNEU-FLC",
+				"PNEU-FLT",
+				"PNEU-MET",
+				"PNEU-MFL",
+				"PNEU-MNF",
+				"PNEU-MOT",
+				"PNEU-NOZ",
+				"PNEU-OPR",
+				"PNEU-PMP",
+				"PNEU-TNK",
+				"PNEU-VAC",
+				"PNEU-VLV",
+				"PS",
+				"PW",
+				"PX",
+				"RE",
+				"SS",
+				"SU",
+				"SW",
+				"TD",
+				"TRMS",
+				"TS",
+				"VM",
+				"W0",
+				"WW",
+				"XF"
+			],
+			"interestingTables": [
+				{
+					"name": "_FAMILY_DESCRIPTION",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"RECNUM",
+						"FAMILY",
+						"DESC"
+					]
+				},
+				{
+					"name": "_LISTBOX_DEF",
+					"type": "TABLE",
+					"columnCount": 18,
+					"columns": [
+						"TABLENAME",
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COIL/VOLTAGE/STYLE",
+						"MISCELLANEOUS1/CONTACTS",
+						"MISCELLANEOUS2"
+					]
+				},
+				{
+					"name": "_PINLIST",
+					"type": "TABLE",
+					"columnCount": 8,
+					"columns": [
+						"RECNUM",
+						"MANUFACTURER",
+						"CATALOG",
+						"ASSEMBLYCODE",
+						"COILPINS",
+						"PINLIST",
+						"PEER_COILPINS",
+						"PEER_PINLIST"
+					]
+				},
+				{
+					"name": "_TERMPROPS",
+					"type": "TABLE",
+					"columnCount": 10,
+					"columns": [
+						"RECNUM",
+						"MANUFACTURER",
+						"CATALOG",
+						"ASSEMBLYCODE",
+						"LEVELS",
+						"LEVELDESCRIPTION",
+						"TPINL",
+						"TPINR"
+					]
+				},
+				{
+					"name": "_W0_CBLWIRES",
+					"type": "TABLE",
+					"columnCount": 5,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"CONDUCTOR",
+						"GAUGE",
+						"RECNUM"
+					]
+				},
+				{
+					"name": "_XREF_GRAPHICS",
+					"type": "TABLE",
+					"columnCount": 5,
+					"columns": [
+						"RECNUM",
+						"SEARCHORDER",
+						"SYMBOL",
+						"GRAPHIC",
+						"COMMENTS"
+					]
+				},
+				{
+					"name": "AM",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PLCIO",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"SERIES",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				}
+			],
+			"tables": [
+				{
+					"name": "_FAMILY_DESCRIPTION",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"RECNUM",
+						"FAMILY",
+						"DESC"
+					]
+				},
+				{
+					"name": "_LISTBOX_DEF",
+					"type": "TABLE",
+					"columnCount": 18,
+					"columns": [
+						"TABLENAME",
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COIL/VOLTAGE/STYLE",
+						"MISCELLANEOUS1/CONTACTS",
+						"MISCELLANEOUS2"
+					]
+				},
+				{
+					"name": "_PINLIST",
+					"type": "TABLE",
+					"columnCount": 8,
+					"columns": [
+						"RECNUM",
+						"MANUFACTURER",
+						"CATALOG",
+						"ASSEMBLYCODE",
+						"COILPINS",
+						"PINLIST",
+						"PEER_COILPINS",
+						"PEER_PINLIST"
+					]
+				},
+				{
+					"name": "_TERMPROPS",
+					"type": "TABLE",
+					"columnCount": 10,
+					"columns": [
+						"RECNUM",
+						"MANUFACTURER",
+						"CATALOG",
+						"ASSEMBLYCODE",
+						"LEVELS",
+						"LEVELDESCRIPTION",
+						"TPINL",
+						"TPINR"
+					]
+				},
+				{
+					"name": "_W0_CBLWIRES",
+					"type": "TABLE",
+					"columnCount": 5,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"CONDUCTOR",
+						"GAUGE",
+						"RECNUM"
+					]
+				},
+				{
+					"name": "_XREF_GRAPHICS",
+					"type": "TABLE",
+					"columnCount": 5,
+					"columns": [
+						"RECNUM",
+						"SEARCHORDER",
+						"SYMBOL",
+						"GRAPHIC",
+						"COMMENTS"
+					]
+				},
+				{
+					"name": "AM",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "AN",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "C0",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"PINS",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "CA",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"POWER",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "CB",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "CR",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COIL",
+						"CONTACTS",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "DI",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"DIMENSION",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "DN",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "DO",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "DR",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"HP",
+						"ENCLOSURE",
+						"KW_HP",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "DS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "EN",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "FM",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RANGE",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "FS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "FT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"CONTACTS",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "FU",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"RATING",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "LR",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COIL",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "LS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"ACTION_AND",
+						"CONTACTS",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "LT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "MISC_CAT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "MO",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"HP",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "MS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "NP",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COLOR_AND_",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "OL",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PB",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"CONTACTS",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PE",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PLCIO",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"SERIES",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PM",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-ACT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-ALU",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"THREAD",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-CYL",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"FORCE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-FLC",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"PRESSURE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-FLT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"FLOW",
+						"THREAD",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-MET",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RANGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-MFL",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"NOISE LEVEL",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-MNF",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"THREAD",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-MOT",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"HP",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-NOZ",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"THREAD",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-OPR",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-PMP",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VACUUM FLOW",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-TNK",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"VOLUME",
+						"THREAD",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-VAC",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PNEU-VLV",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"PRESSURE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"PRESSURE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PW",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "PX",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "RE",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "SS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"STYLE",
+						"CONTACTS",
+						"MISCELLANEOUS1",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "SU",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "SW",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"VOLTAGE",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "TD",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"COIL",
+						"CONTACTS",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "TRMS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "TS",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"CONTACTS",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "VM",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"RATING",
+						"TYPE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "W0",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"GAUGE",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "WW",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"DUCT SIZE W x H",
+						"TYPE",
+						"STYLE",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				},
+				{
+					"name": "XF",
+					"type": "TABLE",
+					"columnCount": 19,
+					"columns": [
+						"CATALOG",
+						"MANUFACTURER",
+						"DESCRIPTION",
+						"TYPE",
+						"RATING",
+						"MISCELLANEOUS1",
+						"MISCELLANEOUS2",
+						"ASSEMBLYCODE"
+					]
+				}
+			]
+		},
+		{
+			"id": "footprint_lookup",
+			"fileName": "footprint_lookup.mdb",
+			"filePath": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/footprint_lookup.mdb",
+			"roleId": "footprint_lookup",
+			"roleLabel": "Footprint Lookup",
+			"label": "Footprint Lookup",
+			"description": "Optional footprint lookup payload present on some workstations and sometimes empty.",
+			"isOptional": true,
+			"hasError": false,
+			"error": "",
+			"tableCount": 0,
+			"interestingTableCount": 0,
+			"tableNames": [],
+			"interestingTables": [],
+			"tables": []
+		},
+		{
+			"id": "ace_plc",
+			"fileName": "ace_plc.mdb",
+			"filePath": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/ace_plc.mdb",
+			"roleId": "plc_lookup",
+			"roleLabel": "PLC Lookup",
+			"label": "ACE PLC",
+			"description": "PLC manufacturer and style lookup source used by spreadsheet-to-PLC workflows.",
+			"isOptional": false,
+			"hasError": false,
+			"error": "",
+			"tableCount": 4,
+			"interestingTableCount": 4,
+			"tableNames": [
+				"MFG_Alias",
+				"PLC_Manufacturer",
+				"PLC_MSG",
+				"PLC_Styles"
+			],
+			"interestingTables": [
+				{
+					"name": "MFG_Alias",
+					"type": "TABLE",
+					"columnCount": 2,
+					"columns": [
+						"MANUFACTURER",
+						"ALIAS"
+					]
+				},
+				{
+					"name": "PLC_Manufacturer",
+					"type": "TABLE",
+					"columnCount": 4,
+					"columns": [
+						"MANUFACTURER",
+						"SERIES",
+						"TYPE",
+						"TABLE_NAME"
+					]
+				},
+				{
+					"name": "PLC_MSG",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"ID",
+						"FIND",
+						"WD_MSG_CODE"
+					]
+				},
+				{
+					"name": "PLC_Styles",
+					"type": "TABLE",
+					"columnCount": 13,
+					"columns": [
+						"STYLE",
+						"BOX_RIGHT",
+						"BOX_LEFT",
+						"BOX_TOP",
+						"BOX_BOTTOM",
+						"BOX_SPLIT_BOTTOM",
+						"BOX_SPLIT_TOP",
+						"METRIC_BOX_RIGHT"
+					]
+				}
+			],
+			"tables": [
+				{
+					"name": "MFG_Alias",
+					"type": "TABLE",
+					"columnCount": 2,
+					"columns": [
+						"MANUFACTURER",
+						"ALIAS"
+					]
+				},
+				{
+					"name": "PLC_Manufacturer",
+					"type": "TABLE",
+					"columnCount": 4,
+					"columns": [
+						"MANUFACTURER",
+						"SERIES",
+						"TYPE",
+						"TABLE_NAME"
+					]
+				},
+				{
+					"name": "PLC_MSG",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"ID",
+						"FIND",
+						"WD_MSG_CODE"
+					]
+				},
+				{
+					"name": "PLC_Styles",
+					"type": "TABLE",
+					"columnCount": 13,
+					"columns": [
+						"STYLE",
+						"BOX_RIGHT",
+						"BOX_LEFT",
+						"BOX_TOP",
+						"BOX_BOTTOM",
+						"BOX_SPLIT_BOTTOM",
+						"BOX_SPLIT_TOP",
+						"METRIC_BOX_RIGHT"
+					]
+				}
+			]
+		},
+		{
+			"id": "wdviacmp",
+			"fileName": "wdviacmp.mdb",
+			"filePath": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wdviacmp.mdb",
+			"roleId": "via_component_lookup",
+			"roleLabel": "Via Component Lookup",
+			"label": "Via Component Mapping",
+			"description": "Via-component mapping surface used for component and attribute swap relationships.",
+			"isOptional": false,
+			"hasError": false,
+			"error": "",
+			"tableCount": 3,
+			"interestingTableCount": 3,
+			"tableNames": [
+				"ATTRMAP",
+				"COMPSWAP",
+				"IOATTRMAP"
+			],
+			"interestingTables": [
+				{
+					"name": "ATTRMAP",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"VIA_ATTR",
+						"WD_ATTR",
+						"RECNUM"
+					]
+				},
+				{
+					"name": "COMPSWAP",
+					"type": "TABLE",
+					"columnCount": 4,
+					"columns": [
+						"VIACOMP",
+						"WDCOMP",
+						"XYOFFSET",
+						"Recnum"
+					]
+				},
+				{
+					"name": "IOATTRMAP",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"VIA_ATTR",
+						"WD_ATTR",
+						"RECNUM"
+					]
+				}
+			],
+			"tables": [
+				{
+					"name": "ATTRMAP",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"VIA_ATTR",
+						"WD_ATTR",
+						"RECNUM"
+					]
+				},
+				{
+					"name": "COMPSWAP",
+					"type": "TABLE",
+					"columnCount": 4,
+					"columns": [
+						"VIACOMP",
+						"WDCOMP",
+						"XYOFFSET",
+						"Recnum"
+					]
+				},
+				{
+					"name": "IOATTRMAP",
+					"type": "TABLE",
+					"columnCount": 3,
+					"columns": [
+						"VIA_ATTR",
+						"WD_ATTR",
+						"RECNUM"
+					]
+				}
+			]
+		}
+	]
+}

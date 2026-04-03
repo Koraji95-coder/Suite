@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from flask import Flask
+from flask_limiter import Limiter
 
 from backend.route_groups.api_health import create_health_blueprint
 
@@ -12,7 +13,14 @@ class TestApiHealth(unittest.TestCase):
     def setUp(self) -> None:
         app = Flask(__name__)
         app.config["TESTING"] = True
-        app.register_blueprint(create_health_blueprint())
+        self.limiter = Limiter(
+            app=app,
+            key_func=lambda: "test-client",
+            default_limits=["2 per hour"],
+            storage_uri="memory://",
+            strategy="fixed-window",
+        )
+        app.register_blueprint(create_health_blueprint(limiter=self.limiter))
         self.client = app.test_client()
 
     def test_health_payload_contract(self) -> None:
@@ -100,6 +108,10 @@ class TestApiHealth(unittest.TestCase):
         self.assertIsNotNone(session_check)
         self.assertEqual(session_check.get("severity"), "ready")
         self.assertFalse(bool(session_check.get("actionable")))
+
+    def test_health_endpoint_is_exempt_from_default_rate_limits(self) -> None:
+        responses = [self.client.get("/health") for _ in range(4)]
+        self.assertTrue(all(response.status_code == 200 for response in responses))
 
     def test_runtime_status_endpoint_uses_configured_loader(self) -> None:
         self.client.application.config["SUITE_RUNTIME_STATUS_LOADER"] = lambda: {

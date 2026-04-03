@@ -1,0 +1,1 @@
+# Keep the local Edge Functions directory present so Supabase can bring up edge-runtime during bootstrap.

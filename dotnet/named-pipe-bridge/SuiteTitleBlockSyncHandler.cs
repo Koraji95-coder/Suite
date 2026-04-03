@@ -1567,16 +1567,7 @@ static partial class ConduitRouteStubHandlers
                 var score = matchingTagCount * 10;
                 if (!string.IsNullOrWhiteSpace(blockNameHint))
                 {
-                    var normalizedBlockName = NormalizeAutoDraftName(blockName);
-                    var normalizedHint = NormalizeAutoDraftName(blockNameHint);
-                    if (string.Equals(normalizedBlockName, normalizedHint, StringComparison.Ordinal))
-                    {
-                        score += 50;
-                    }
-                    else if (normalizedBlockName.Contains(normalizedHint, StringComparison.Ordinal))
-                    {
-                        score += 20;
-                    }
+                    score += GetAutoDraftTitleBlockHintScore(blockName, blockNameHint);
                 }
 
                 matches.Add(

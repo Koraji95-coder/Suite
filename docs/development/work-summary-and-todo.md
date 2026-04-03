@@ -116,6 +116,9 @@ This is a restart/handoff doc summarizing what has already been completed and wh
 
 - Monetization/productization backlog is parked here for later:
   - `docs/development/monetization-readiness-backlog.md`
+- After the current runtime/title-block overhaul is stable, revisit the local-learning plan with Dustin:
+  - review `docs/backend/local-learning-opportunities.md`
+  - choose the first pilot, likely `transmittal_titleblock` confidence scoring
 
 ## March 25, 2026 Structural Reboot Checkpoint
 
@@ -153,6 +156,7 @@ This is a restart/handoff doc summarizing what has already been completed and wh
   - Revisions
   - Files & Telemetry
 - Title-block review is now a first-class lane inside the project delivery workflow rather than a separate app story.
+- Standards Checker now has a dedicated frontend feature owner and a canonical Autodesk-vs-Suite flow note instead of living only as a component-local app with implicit behavior.
 - Review decisions are now issue-set aware, and issue-set evidence now rolls up:
   - title block review
   - standards state
@@ -259,7 +263,7 @@ MCP workstation prep closeout status:
 1. Combined workstation doctor is available in MCP.
    - `repo.check_suite_workstation` reports backend, filesystem collector, AutoCAD collector, AutoCAD plugin, and AutoCAD readiness in one normalized payload.
 
-2. Deterministic workstation naming rules are documented in `docs/development/mcp-workstation-matrix.md`.
+2. Deterministic workstation naming rules are documented in `docs/runtime-control/mcp-workstation-matrix.md`.
 
 3. Restart-required note is unchanged.
    - Any change to `config.toml` still requires restarting the developer window/Codex session.
@@ -284,7 +288,7 @@ For the next session on `DUSTIN-HOME`:
    - `npm run workstation:mirror`
 6. The destination box can use the new npm alias instead of the raw PowerShell path:
    - `npm run workstation:restore -- -WorkstationId DUSTIN-HOME`
-7. Bootstrap Worktale on each workstation where changelog publishing matters:
+7. Bootstrap Worktale on each workstation as part of the local-ready baseline:
    - `npm install -g worktale`
    - `npm run worktale:bootstrap`
    - `npm run worktale:doctor`
@@ -296,7 +300,7 @@ For the next session on `DUSTIN-HOME`:
    - `npm run frontend:startup:check`
    - `npm run watchdog:autocad:doctor`
 9. For a full workstation replay guide, use:
-   - `docs/development/workstation-transfer-runbook.md`
+   - `docs/runtime-control/workstation-transfer-runbook.md`
 10. Keep workstation ids unique per box:
    - home machine stays `DUSTIN-HOME`
    - work machine should use `DUSTIN-WORK`
@@ -417,7 +421,7 @@ The next refactor work should stay focused on the largest remaining responsibili
 5. `src/components/apps/autodraft-studio/AutoDraftComparePanel.tsx` and `src/components/apps/autodraft-studio/autodraftService.ts`
    - Continue extracting compare preparation/execution, review queue state, viewport/canvas interaction, and learning/export adapters until the studio shell is orchestration-only.
 6. Secondary oversized models/hooks
-   - `src/components/apps/transmittal-builder/transmittalBuilderModels.ts`
+   - `src/features/transmittal-builder/models.ts`
    - remaining project manager state shells
    - any route/service file that architecture hotspots continue to flag after the above splits land
 

@@ -24,10 +24,12 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $bootstrapStateScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-bootstrap-state.ps1")).Path
 $logUtilsScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-log-utils.ps1")).Path
+$runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime-shared.ps1")).Path
 $runtimeCoreComposeScriptRelativePath = "scripts\runtime-core-compose.ps1"
 
 . $bootstrapStateScript
 . $logUtilsScript
+. $runtimeSharedScript
 
 function Convert-CommandOutputToText {
     param([object[]]$Output)
@@ -483,22 +485,7 @@ function New-StepResult {
 function Test-SupabaseOutputIndicatesReady {
     param([string]$Text)
 
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        return $false
-    }
-
-    if (
-        $Text -match "(?im)\bcontainer is not ready\b" -or
-        $Text -match "(?im)\bfailed to inspect\b" -or
-        $Text -match "(?im)\btry rerunning the command with --debug\b"
-    ) {
-        return $false
-    }
-
-    return (
-        $Text -match "(?im)\bsupabase local development setup is running\b" -or
-        $Text -match "(?im)\bProject URL\b"
-    )
+    return (Test-SuiteSupabaseStatusReady -Text $Text -RepoRoot $resolvedRepoRoot)
 }
 
 function Wait-ForSupabaseRuntimeReady {

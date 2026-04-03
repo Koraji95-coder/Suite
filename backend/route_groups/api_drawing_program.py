@@ -13,7 +13,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
-from .api_title_block_sync import DEFAULT_WDP_CONFIG_LINES, PANEL_DRAWING_TITLE_HINTS
+from backend.domains.project_setup import (
+    DEFAULT_WDP_CONFIG_LINES,
+    PANEL_DRAWING_TITLE_HINTS,
+)
+from backend.runtime_paths import is_absolute_path_value, resolve_runtime_directory
 
 
 def create_drawing_program_blueprint(
@@ -61,11 +65,11 @@ def create_drawing_program_blueprint(
         raw = _normalize_text(payload.get("projectRootPath"))
         if not raw:
             raise ValueError("projectRootPath is required.")
-        project_root = Path(raw).expanduser()
-        if not project_root.is_absolute():
+        if not is_absolute_path_value(raw):
             raise ValueError("projectRootPath must be an absolute path.")
-        if not project_root.exists() or not project_root.is_dir():
-            raise ValueError(f"projectRootPath does not exist or is not a directory: {project_root}")
+        project_root = resolve_runtime_directory(raw)
+        if project_root is None:
+            raise ValueError(f"projectRootPath does not exist or is not a directory: {raw}")
         return project_root.resolve()
 
     def _resolve_profile(payload: Dict[str, Any], project_root: Path) -> Dict[str, str]:

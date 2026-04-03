@@ -42,7 +42,7 @@ function Invoke-SuiteRuntimeLogRetention {
         }
 
         if (-not (Test-Path -LiteralPath $logPath)) {
-            $results.Add([pscustomobject]$result)
+            $null = $results.Add([pscustomobject]$result)
             continue
         }
 
@@ -61,10 +61,10 @@ function Invoke-SuiteRuntimeLogRetention {
             }
         }
         catch {
-            $warnings.Add(("Log retention skipped for {0}: {1}" -f $logPath, $_.Exception.Message))
+            $null = $warnings.Add(("Log retention skipped for {0}: {1}" -f $logPath, $_.Exception.Message))
         }
 
-        $results.Add([pscustomobject]$result)
+        $null = $results.Add([pscustomobject]$result)
     }
 
     return [pscustomobject]@{
@@ -94,10 +94,10 @@ function Invoke-SuiteRuntimeStageRetention {
             ForEach-Object {
                 try {
                     Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-                    $removedStageDirectories.Add($_.FullName)
+                    $null = $removedStageDirectories.Add($_.FullName)
                 }
                 catch {
-                    $warnings.Add(("Stage cleanup skipped for {0}: {1}" -f $_.FullName, $_.Exception.Message))
+                    $null = $warnings.Add(("Stage cleanup skipped for {0}: {1}" -f $_.FullName, $_.Exception.Message))
                 }
             }
     }

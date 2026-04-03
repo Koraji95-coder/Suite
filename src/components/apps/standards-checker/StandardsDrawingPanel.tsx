@@ -1,3 +1,4 @@
+import { useStandardsDrawingCheckerState } from "@/features/standards-checker/useStandardsDrawingCheckerState";
 import { StandardsDrawingCards } from "./StandardsDrawingCards";
 import { StandardsDrawingDeleteDialog } from "./StandardsDrawingDeleteDialog";
 import { StandardsDrawingDetailDialog } from "./StandardsDrawingDetailDialog";
@@ -6,7 +7,6 @@ import { StandardsDrawingHeader } from "./StandardsDrawingHeader";
 import styles from "./StandardsDrawingPanel.module.css";
 import { StandardsDrawingRulesDialog } from "./StandardsDrawingRulesDialog";
 import { StandardsDrawingUploadDialog } from "./StandardsDrawingUploadDialog";
-import { useStandardsDrawingCheckerState } from "./useStandardsDrawingCheckerState";
 
 export function StandardsDrawingChecker() {
 	const {

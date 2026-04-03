@@ -4,7 +4,7 @@ import {
 	type ProjectIssueSetRecord,
 	type ProjectIssueSetStatus,
 	projectIssueSetService,
-} from "@/services/projectIssueSetService";
+} from "@/features/project-workflow/issueSetService";
 import {
 	type DrawingRevisionRegisterRow,
 	projectRevisionRegisterService,
@@ -300,30 +300,42 @@ export function useDashboardDeliverySummary(
 				error: null,
 			}));
 
-			const results = await Promise.all(
-				projects.map(async (project) => {
-					const [issueSetsResult, revisionsResult, receiptsResult] =
-						await Promise.all([
-							projectIssueSetService.fetchIssueSets(project.id),
-							projectRevisionRegisterService.fetchEntries(project.id),
-							projectTransmittalReceiptService.fetchReceipts(project.id),
-						]);
+			const projectIds = projects.map((project) => project.id);
+			const [issueSetsByProject, revisionsByProject, receiptsByProject] =
+				await Promise.all([
+					projectIssueSetService.fetchIssueSetsForProjects(projectIds),
+					projectRevisionRegisterService.fetchEntriesForProjects(projectIds),
+					projectTransmittalReceiptService.fetchReceiptsForProjects(projectIds),
+				]);
 
-					const errors = [
-						issueSetsResult.error,
-						revisionsResult.error,
-						receiptsResult.error,
-					].filter((error): error is Error => error instanceof Error);
+			const results = projects.map((project) => {
+				const issueSetsResult = issueSetsByProject.get(project.id) ?? {
+					data: [],
+					error: null,
+				};
+				const revisionsResult = revisionsByProject.get(project.id) ?? {
+					data: [],
+					error: null,
+				};
+				const receiptsResult = receiptsByProject.get(project.id) ?? {
+					data: [],
+					error: null,
+				};
 
-					return {
-						project,
-						issueSets: issueSetsResult.data ?? [],
-						revisions: revisionsResult.data ?? [],
-						receipts: receiptsResult.data ?? [],
-						errors,
-					};
-				}),
-			);
+				const errors = [
+					issueSetsResult.error,
+					revisionsResult.error,
+					receiptsResult.error,
+				].filter((error): error is Error => error instanceof Error);
+
+				return {
+					project,
+					issueSets: issueSetsResult.data ?? [],
+					revisions: revisionsResult.data ?? [],
+					receipts: receiptsResult.data ?? [],
+					errors,
+				};
+			});
 
 			if (cancelled) {
 				return;

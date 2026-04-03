@@ -13,25 +13,27 @@ const STATUS_LABELS = {
 const WORKSPACE_META = {
   office: {
     label: "Office",
-    heading: "Live broker cubicle for chat, study, library, and growth workflows.",
-    summary: "Broker-backed operator cockpit with snapshot fallback when the local broker is unavailable.",
+    shellTitle: "Office Workspace",
+    heading: "Private workspace for communication, study, reference, and follow-through.",
+    summary: "Professional Office workspace for communication, research, and local reference.",
     views: [
-      { id: "chat", label: "Chat", title: "Unified cockpit for live thread routing, transcript, and guided moves." },
-      { id: "study", label: "Study", title: "Guided study sequence, scoring loops, and reflections." },
-      { id: "library", label: "Library", title: "Live knowledge ingestion, roots, and broker-indexed source material." },
-      { id: "growth", label: "Growth", title: "Proof tracks, research flow, and personal growth evidence." },
+      { id: "chat", label: "Conversations", title: "Routed communication, transcript review, and guided next actions." },
+      { id: "study", label: "Study", title: "Structured study sessions, scoring loops, and reflection." },
+      { id: "library", label: "Reference", title: "Knowledge intake, source review, and indexed reference material." },
+      { id: "growth", label: "Progress", title: "Research tracks, evidence, and follow-through." },
     ],
   },
   runtime: {
     label: "Suite Runtime",
-    heading: "Service health, trust, diagnostics, and project handoffs.",
-    summary: "Control plane for the local runtime, watchdogs, support surfaces, and later ACADE readiness work.",
+    shellTitle: "Runtime Control",
+    heading: "Runtime control, service health, diagnostics, and project readiness.",
+    summary: "Operational control surface for local services, watchdog coverage, support, and ACADE readiness.",
     views: [
-      { id: "runtime", label: "Runtime", title: "Bootstrap, services, and live runtime control." },
-      { id: "watchdog", label: "Watchdog", title: "Collector health and operator-facing telemetry trust." },
+      { id: "runtime", label: "Runtime", title: "Start, stop, and review local services." },
+      { id: "watchdog", label: "Watchdog", title: "Collector health, telemetry coverage, and trust status." },
       { id: "projects", label: "Projects / ACADE", title: "Project readiness, plugin state, and Autodesk reference." },
-      { id: "diagnostics", label: "Diagnostics", title: "Actionable checks, routes, and runtime recovery evidence." },
-      { id: "support", label: "Support", title: "Office service state, logs, support bundle, and workstation controls." },
+      { id: "diagnostics", label: "Diagnostics", title: "Checks, recovery actions, and runtime evidence." },
+      { id: "support", label: "Support", title: "Logs, support bundle, and workstation controls." },
     ],
   },
 };
@@ -59,6 +61,18 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
   hour12: true,
 });
+const UTILITY_PANE_WIDTH_MODE = Object.freeze({
+  wide: "wide",
+  compact: "compact",
+  narrow: "narrow",
+});
+const SHELL_DEFAULT_CONTENT_SCALE_PERCENT = 125;
+const SHELL_CONTENT_SCALE_PRESETS = Object.freeze([100, 110, 125, 140]);
+const UTILITY_PANE_DEFAULT_WIDTH = 440;
+const UTILITY_PANE_MIN_WIDTH = 360;
+const UTILITY_PANE_MAX_WIDTH = 820;
+const UTILITY_PANE_COMPACT_MAX_WIDTH = 520;
+const UTILITY_PANE_NARROW_MAX_WIDTH = 430;
 
 const EMPTY_RUNTIME_CATALOG = Object.freeze({
   serviceOrder: [],
@@ -84,10 +98,13 @@ const state = {
   action: null,
   actionServiceId: null,
   activeUtilityTab: "context",
-  utilityPaneWidth: 400,
+  utilityPaneWidth: UTILITY_PANE_DEFAULT_WIDTH,
+  utilityPaneCollapsed: true,
+  contentScalePercent: SHELL_DEFAULT_CONTENT_SCALE_PERCENT,
   autoScroll: true,
   commandQuery: "",
   commandFocused: false,
+  displayMenuOpen: false,
   actionRegistry: new Map(),
   actionCounter: 0,
   officeActionStatus: null,
@@ -110,6 +127,7 @@ const state = {
 };
 
 const dom = {
+  appShell: document.getElementById("app-shell"),
   workspaceHeading: document.getElementById("workspace-heading"),
   workspaceSubheading: document.getElementById("workspace-subheading"),
   workspaceSummary: document.getElementById("workspace-summary"),
@@ -120,13 +138,14 @@ const dom = {
   workspaceContent: document.getElementById("workspace-content"),
   overallStatusPill: document.getElementById("overall-status-pill"),
   providerStatusPill: document.getElementById("provider-status-pill"),
+  utilityDockBtn: document.getElementById("utility-dock-btn"),
+  displayMenuButton: document.getElementById("display-menu-btn"),
+  displayMenu: document.getElementById("display-menu"),
+  shellScaleControls: document.getElementById("shell-scale-controls"),
   clockDate: document.getElementById("clock-date"),
   clockTime: document.getElementById("clock-time"),
   commandInput: document.getElementById("command-input"),
   commandResults: document.getElementById("command-results"),
-  utilityContextBtn: document.getElementById("utility-context-btn"),
-  utilityLogsBtn: document.getElementById("utility-logs-btn"),
-  utilityInboxBtn: document.getElementById("utility-inbox-btn"),
   utilityPane: document.getElementById("utility-pane"),
   utilitySubtitle: document.getElementById("utility-subtitle"),
   utilityTabRow: document.getElementById("utility-tab-row"),
@@ -164,9 +183,148 @@ function tickClock() {
 }
 
 function applyUtilityPaneWidth() {
-  const width = Math.max(320, Math.min(640, Number(state.utilityPaneWidth) || 400));
+  const bounds = getUtilityPaneWidthBounds();
+  const width = Math.max(bounds.min, Math.min(bounds.max, Number(state.utilityPaneWidth) || UTILITY_PANE_DEFAULT_WIDTH));
   state.utilityPaneWidth = width;
+  document.documentElement.style.setProperty("--utility-pane-min-width", `${bounds.min}px`);
   document.documentElement.style.setProperty("--utility-pane-width", `${width}px`);
+  syncUtilityPaneLayoutState();
+}
+
+function syncShellChromeState() {
+  if (dom.appShell) {
+    dom.appShell.dataset.utilityCollapsed = state.utilityPaneCollapsed ? "true" : "false";
+    dom.appShell.dataset.workspace = state.activeWorkspace;
+  }
+
+  if (dom.utilityPane) {
+    dom.utilityPane.hidden = state.utilityPaneCollapsed;
+    dom.utilityPane.setAttribute("aria-hidden", state.utilityPaneCollapsed ? "true" : "false");
+  }
+
+  if (dom.utilityDockBtn) {
+    dom.utilityDockBtn.classList.toggle("is-active", !state.utilityPaneCollapsed);
+    dom.utilityDockBtn.setAttribute("aria-pressed", String(!state.utilityPaneCollapsed));
+    dom.utilityDockBtn.textContent = state.utilityPaneCollapsed ? "Open Dock" : "Close Dock";
+  }
+
+  if (dom.displayMenuButton) {
+    dom.displayMenuButton.classList.toggle("is-active", state.displayMenuOpen);
+    dom.displayMenuButton.setAttribute("aria-expanded", String(state.displayMenuOpen));
+  }
+
+  if (dom.displayMenu) {
+    dom.displayMenu.classList.toggle("hidden", !state.displayMenuOpen);
+  }
+}
+
+function normalizeContentScalePercent(value) {
+  return Math.max(
+    SHELL_CONTENT_SCALE_PRESETS[0],
+    Math.min(
+      SHELL_CONTENT_SCALE_PRESETS[SHELL_CONTENT_SCALE_PRESETS.length - 1],
+      Number(value) || SHELL_DEFAULT_CONTENT_SCALE_PERCENT,
+    ),
+  );
+}
+
+function getViewportScaleProfile() {
+  const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
+  const viewportHeight = Math.max(window.innerHeight || 0, document.documentElement?.clientHeight || 0);
+
+  if (viewportWidth >= 2400 || (viewportWidth >= 2200 && viewportHeight >= 1300)) {
+    return {
+      typeScale: 1.24,
+      spaceScale: 1.18,
+      navWidth: 320,
+      utilityPaneMinWidth: 460,
+    };
+  }
+
+  if (viewportWidth >= 1900 || viewportHeight >= 1200) {
+    return {
+      typeScale: 1.18,
+      spaceScale: 1.13,
+      navWidth: 292,
+      utilityPaneMinWidth: 430,
+    };
+  }
+
+  if (viewportWidth >= 1560) {
+    return {
+      typeScale: 1.1,
+      spaceScale: 1.08,
+      navWidth: 264,
+      utilityPaneMinWidth: 396,
+    };
+  }
+
+  return {
+    typeScale: 1,
+    spaceScale: 1,
+    navWidth: 228,
+    utilityPaneMinWidth: UTILITY_PANE_MIN_WIDTH,
+  };
+}
+
+function applyShellScaleVars() {
+  const userScale = normalizeContentScalePercent(state.contentScalePercent) / 100;
+  const profile = getViewportScaleProfile();
+  const userTypeBoost = 1 + Math.max(0, userScale - 1) * 0.5;
+  const userSpaceBoost = 1 + Math.max(0, userScale - 1) * 0.3;
+
+  document.documentElement.style.setProperty("--shell-user-scale", userScale.toFixed(3));
+  document.documentElement.style.setProperty("--shell-type-scale", (profile.typeScale * userTypeBoost).toFixed(3));
+  document.documentElement.style.setProperty("--shell-space-scale", (profile.spaceScale * userSpaceBoost).toFixed(3));
+  document.documentElement.style.setProperty("--shell-nav-width", `${profile.navWidth}px`);
+}
+
+function getUtilityPaneWidthBounds() {
+  const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0);
+  const profile = getViewportScaleProfile();
+  const min = Math.max(
+    UTILITY_PANE_MIN_WIDTH,
+    Math.min(profile.utilityPaneMinWidth, Math.max(UTILITY_PANE_MIN_WIDTH, viewportWidth - 720)),
+  );
+  const max = Math.max(
+    min,
+    Math.min(
+      UTILITY_PANE_MAX_WIDTH,
+      Math.round(viewportWidth * (viewportWidth >= 2200 ? 0.34 : viewportWidth >= 1700 ? 0.37 : 0.4)),
+    ),
+  );
+
+  return { min, max };
+}
+
+function getUtilityPaneWidthMode() {
+  if (window.matchMedia("(max-width: 1120px)").matches) {
+    return UTILITY_PANE_WIDTH_MODE.narrow;
+  }
+
+  const paneWidth = Math.round(dom.utilityPane?.getBoundingClientRect().width || state.utilityPaneWidth || 0);
+  if (paneWidth <= UTILITY_PANE_NARROW_MAX_WIDTH) {
+    return UTILITY_PANE_WIDTH_MODE.narrow;
+  }
+  if (paneWidth <= UTILITY_PANE_COMPACT_MAX_WIDTH) {
+    return UTILITY_PANE_WIDTH_MODE.compact;
+  }
+
+  return UTILITY_PANE_WIDTH_MODE.wide;
+}
+
+function syncUtilityPaneLayoutState() {
+  const widthMode = getUtilityPaneWidthMode();
+  if (dom.utilityPane) {
+    dom.utilityPane.dataset.widthMode = widthMode;
+    dom.utilityPane.dataset.utilityTab = state.activeUtilityTab;
+  }
+  if (dom.utilityContent) {
+    dom.utilityContent.dataset.widthMode = widthMode;
+    dom.utilityContent.dataset.utilityTab = state.activeUtilityTab;
+  }
+
+  return widthMode;
 }
 
 function getUtilitySubtitle() {
@@ -182,10 +340,27 @@ function getUtilitySubtitle() {
 
 function setActiveUtilityTab(tabId, options = {}) {
   state.activeUtilityTab = ["context", "logs", "inbox"].includes(tabId) ? tabId : "context";
+  state.displayMenuOpen = false;
+  if (!options.keepCollapsed) {
+    state.utilityPaneCollapsed = false;
+  }
   if (!options.silent) {
     persistShellUiState();
   }
   render();
+}
+
+function setUtilityPaneCollapsed(collapsed, options = {}) {
+  state.utilityPaneCollapsed = Boolean(collapsed);
+  state.displayMenuOpen = false;
+  if (!options.silent) {
+    persistShellUiState();
+  }
+  render();
+}
+
+function toggleUtilityPane(options = {}) {
+  setUtilityPaneCollapsed(!state.utilityPaneCollapsed, options);
 }
 
 function setActiveLogSource(logSourceId, options = {}) {
@@ -198,10 +373,21 @@ function setActiveLogSource(logSourceId, options = {}) {
 function persistShellUiState() {
   hostPost("shell.window_state.update", {
     utilityPaneWidth: state.utilityPaneWidth,
+    utilityPaneCollapsed: state.utilityPaneCollapsed,
     activeUtilityTab: state.activeUtilityTab,
     utilityPaneTab: state.activeUtilityTab,
     activeLogSourceId: state.activeLogSourceId,
+    contentScalePercent: state.contentScalePercent,
   });
+}
+
+function setContentScalePercent(percent, options = {}) {
+  state.contentScalePercent = normalizeContentScalePercent(percent);
+  applyShellScaleVars();
+  if (!options.silent) {
+    persistShellUiState();
+  }
+  render();
 }
 
 function getWorkspaceMeta(workspaceId = state.activeWorkspace) {
@@ -521,12 +707,12 @@ function getCompanionStatus() {
   }
   if (companion?.launchMode === "embedded_shell" || companion?.legacyClientRetired) {
     return {
-      label: companion?.brokerEnabled ? "Embedded in shell" : "Shell-only",
+      label: companion?.brokerEnabled ? "Integrated" : "Limited",
       tone: companion?.brokerEnabled ? "running" : "pending",
     };
   }
   if (!companion?.executableFound) {
-    return { label: "Missing executable", tone: "error" };
+    return { label: "Unavailable", tone: "error" };
   }
   if (companion?.running) {
     return {
@@ -616,14 +802,11 @@ function getRuntimeOwnershipSummary() {
 function getProviderStatus() {
   const broker = getOfficeBroker();
   const provider = getOfficeProviderState();
-  const label = provider.primaryProviderLabel || provider.activeProviderLabel || "Office provider";
+  const label = provider.primaryProviderLabel || provider.activeProviderLabel || "Local model support";
   if (provider.ready) {
-    return { text: broker.enabled && broker.healthy ? `${label} live` : `${label} ready`, tone: "running" };
+    return { text: broker.enabled && broker.healthy ? `${label} ready` : `${label} standby`, tone: "running" };
   }
-  if (broker.enabled && broker.healthy) {
-    return { text: `${label} needs models`, tone: "pending" };
-  }
-  return { text: `${label} missing`, tone: "pending" };
+  return { text: `${label} unavailable`, tone: "pending" };
 }
 
 function getOrderedServices() {
@@ -692,6 +875,7 @@ function setActiveWorkspace(workspaceId, viewId = null) {
   }
 
   state.activeWorkspace = workspaceId;
+  state.displayMenuOpen = false;
   if (viewId) {
     state.activeViews[workspaceId] = viewId;
   }
@@ -727,6 +911,12 @@ function executeAction(action) {
     return;
   }
 
+  if (action.confirmMessage && !window.confirm(action.confirmMessage)) {
+    return;
+  }
+
+  state.displayMenuOpen = false;
+
   switch (action.kind) {
     case "workspace":
       setActiveWorkspace(action.workspace, action.view);
@@ -741,6 +931,10 @@ function executeAction(action) {
         }
       } else if (action.action === "open_context") {
         setActiveUtilityTab("context");
+      } else if (action.action === "set_scale") {
+        setContentScalePercent(action.percent);
+      } else if (action.action === "toggle_utility_pane") {
+        toggleUtilityPane();
       } else {
         render();
       }
@@ -823,18 +1017,35 @@ function buildCommandActions() {
   const officeMemory = actionFromOfficePath("open-operator-memory");
 
   return [
-    { kind: "workspace", workspace: "office", view: "chat", label: "Go to Office Chat", description: "Open the live Office chat cockpit." },
+    { kind: "workspace", workspace: "office", view: "chat", label: "Go to Office Workspace", description: "Open the primary Office workspace." },
     { kind: "workspace", workspace: "office", view: "study", label: "Go to Office Study", description: "Open guided study and scoring workflow." },
     { kind: "workspace", workspace: "office", view: "library", label: "Go to Office Library", description: "Open live library and import lane." },
     { kind: "workspace", workspace: "runtime", view: "runtime", label: "Go to Runtime", description: "Open service health and bootstrap." },
     { kind: "workspace", workspace: "runtime", view: "projects", label: "Go to Projects / ACADE", description: "Open project and Autodesk reference lane." },
-    { kind: "message", type: "runtime.bootstrap_all", label: "Bootstrap local runtime", description: "Run the full runtime bootstrap." },
+    { kind: "message", type: "runtime.bootstrap_all", label: "Start runtime services", description: "Start the full local runtime stack." },
     { kind: "message", type: "runtime.start_all", label: "Start local services", description: "Start all runtime services." },
     { kind: "message", type: "runtime.stop_all", label: "Stop local services", description: "Stop all runtime services." },
+    {
+      kind: "message",
+      type: "runtime.reset_all",
+      label: "Reset runtime services",
+      description: "Stop and restart the local runtime stack without clearing data.",
+      confirmMessage: "Reset all local runtime services now? This keeps local data intact but will restart the runtime stack.",
+    },
     { kind: "message", type: "runtime.refresh", label: "Refresh runtime status", description: "Refresh the runtime snapshot." },
-    { kind: "message", type: "office.state.refresh", label: "Refresh Office state", description: "Refresh broker-backed Office state with snapshot fallback." },
-    { kind: "message", type: "office.broker.start", label: "Start Office broker", description: "Launch the local Office broker for live cubicle workflows." },
-    { kind: "message", type: "office.broker.restart", label: "Restart Office broker", description: "Restart the local Office broker if live Office actions are stale." },
+    {
+      kind: "local",
+      action: "toggle_utility_pane",
+      label: state.utilityPaneCollapsed ? "Show utility dock" : "Hide utility dock",
+      description: "Expand or collapse the docked context, logs, and inbox rail.",
+    },
+    { kind: "local", action: "set_scale", percent: 100, label: "Shell scale 100%", description: "Use the standard shell content scale." },
+    { kind: "local", action: "set_scale", percent: 110, label: "Shell scale 110%", description: "Use the balanced larger shell content scale." },
+    { kind: "local", action: "set_scale", percent: 125, label: "Shell scale 125%", description: "Use the roomier shell content scale." },
+    { kind: "local", action: "set_scale", percent: 140, label: "Shell scale 140%", description: "Use the largest preset shell content scale." },
+    { kind: "message", type: "office.state.refresh", label: "Refresh Office state", description: "Refresh Office workspace state." },
+    { kind: "message", type: "office.broker.start", label: "Start Office service", description: "Start the local Office service for live workspace routing." },
+    { kind: "message", type: "office.broker.restart", label: "Restart Office service", description: "Restart the local Office service if live actions are stale." },
     {
       kind: "message",
       type: "office.history.reset",
@@ -852,7 +1063,7 @@ function buildCommandActions() {
     { kind: "message", type: "office.inbox.list", label: "Refresh Office inbox", description: "Reload approvals, queue, and results from the Office broker." },
     { kind: "local", action: "open_inbox", label: "Open shared inbox", description: "Open the shared inbox for Office and Runtime actions." },
     { kind: "local", action: "open_logs", logSourceId: "transcript", label: "Open integrated logs", description: "Open the docked log console inside the shell." },
-    { kind: "workspace", workspace: "office", view: "chat", label: "Open Office cockpit", description: "Focus the combined Office cubicle inside the shared shell." },
+    { kind: "workspace", workspace: "office", view: "chat", label: "Open Office workspace", description: "Focus the main Office workspace inside the shared shell." },
     { kind: "companion", action: "open-folder", label: "Open Office folder", description: "Open the published Office folder." },
     officeKnowledge && { ...officeKnowledge, description: "Open the active knowledge library path." },
     officeTraining && { ...officeTraining, description: "Open the training history store." },
@@ -886,13 +1097,13 @@ function renderWorkspaceNav() {
   const broker = getOfficeBroker();
   const runtime = getRuntimeSnapshot();
 
-  dom.workspaceHeading.textContent = `${meta.label} Cubicle`;
+  dom.workspaceHeading.textContent = meta.shellTitle || `${meta.label} Workspace`;
   dom.workspaceSubheading.textContent = meta.heading;
   dom.workspaceSummary.textContent = state.activeWorkspace === "office"
     ? firstDefined(
       office.today?.objective,
       office.chat?.summary,
-      broker.healthy ? "Broker-backed Office state is live." : "Office is using snapshot fallback mode.",
+      broker.healthy ? "Office workspace is connected." : "Office workspace is using snapshot mode.",
       meta.summary,
     )
     : runtime.support?.text?.split("\n")[0] || meta.summary;
@@ -920,25 +1131,25 @@ function renderWorkspaceNav() {
 
   const pinnedActions = state.activeWorkspace === "office"
     ? [
-        { kind: "workspace", workspace: "office", view: "chat", label: "Open Chat cockpit" },
-        { kind: "message", type: "office.chat.list_threads", label: "Refresh threads" },
-        { kind: "message", type: "office.inbox.list", label: "Refresh inbox" },
-        { kind: "message", type: "office.workspace.reset", label: "Reset Office workspace" },
-        { kind: "workspace", workspace: "office", view: "chat", label: "Open Office cockpit" },
+        { kind: "workspace", workspace: "office", view: "chat", label: "Open Office workspace" },
         actionFromOfficePath("open-knowledge-library"),
         { kind: "message", type: "office.state.refresh", label: "Refresh Office state" },
       ]
     : [
         { kind: "message", type: "runtime.bootstrap_all", label: "Bootstrap All" },
-        { kind: "message", type: "runtime.refresh", label: "Refresh Runtime" },
+        {
+          kind: "message",
+          type: "runtime.reset_all",
+          label: "Reset All",
+          confirmMessage: "Reset all local runtime services now? This keeps local data intact but will restart the runtime stack.",
+        },
         { kind: "route", routeId: "watchdog", routePath: "/app/watchdog", routeTitle: "Watchdog", label: "Open Watchdog route" },
-        { kind: "path", path: "autodesk-project-flow-reference", label: "Open ACADE reference" },
       ];
 
   dom.workspaceActions.innerHTML = pinnedActions
     .filter(Boolean)
     .map((action) => renderActionButton(action.label, action, "nav-action-btn"))
-    .join("");
+    .join("") + `<p class="nav-helper">More actions live in Command Deck.</p>`;
 }
 
 function renderHeroPanel() {
@@ -954,50 +1165,57 @@ function renderHeroPanel() {
   const inbox = getOfficeInboxState();
   const companionStatus = getCompanionStatus();
   const activeView = getActiveView();
+  const startupOwner = getStartupOwner();
+  const runtimeOwnership = getRuntimeOwnershipSummary();
 
   if (state.activeWorkspace === "office") {
+    const heroHeadline = firstDefined(
+      office.today?.headline,
+      office.today?.objectiveTitle,
+      "Private operator desk",
+    );
+    const heroSummary = firstDefined(
+      office.today?.objective,
+      "Communication, study, reference, and follow-through in one private workspace.",
+    );
     const chips = [
-      `Broker | ${broker.enabled ? (broker.healthy ? "Live" : "Fallback") : "Disabled"}`,
-      `Route | ${chat.currentRouteTitle || chat.currentRoute || "default"}`,
-      `${provider.primaryProviderLabel || "Provider"} | ${provider.installedModelCount || 0} models`,
-      `Knowledge | ${library.totalDocuments || 0} docs`,
-      `Approvals | ${inbox.approvals.length || 0}`,
-      `Watchlists | ${growth.watchlists.length || 0}`,
       `Runtime | ${overall.text || STATUS_LABELS[overall.state] || "Unknown"}`,
+      `Reference | ${library.totalDocuments || 0} documents`,
+      `Watchlists | ${growth.watchlists.length || 0} active`,
     ];
+    const brokerStateLabel = broker.enabled
+      ? broker.healthy
+        ? "Connected"
+        : "Snapshot mode"
+      : "Disabled";
 
     dom.heroPanel.innerHTML = `
       <section class="hero-shell office-hero">
         <div class="hero-copy">
-          <div class="hero-kicker">Office cubicle</div>
-          <h1>${escapeHtml(firstDefined(office.today?.objective, "Live broker cockpit for Office workflows with safe snapshot fallback.") || "Office")}</h1>
-          <p>${escapeHtml(firstDefined(chat.routeReason, getWorkspaceMeta().views.find((view) => view.id === activeView)?.title, getWorkspaceMeta().summary) || "")}</p>
+          <div class="hero-kicker">Office workspace</div>
+          <h1>${escapeHtml(heroHeadline || "Private operator desk")}</h1>
+          <p>${escapeHtml(heroSummary || "")}</p>
           <div class="hero-chip-row">${chips.map((chip) => `<span class="hero-chip">${escapeHtml(chip)}</span>`).join("")}</div>
           <div class="hero-actions">
-            ${renderActionButton("Open Office", { kind: "workspace", workspace: "office", view: "chat", label: "Open Office cockpit" }, "action-btn primary")}
-            ${renderActionButton("Open Chat", { kind: "workspace", workspace: "office", view: "chat", label: "Open Chat cockpit" }, "action-btn")}
-            ${renderActionButton("Refresh state", { kind: "message", type: "office.state.refresh", label: "Refresh Office state" }, "action-btn subtle")}
+            ${renderActionButton("Open workspace", { kind: "workspace", workspace: "office", view: "chat", label: "Open Office workspace" }, "action-btn primary")}
+            ${renderActionButton("Refresh", { kind: "message", type: "office.state.refresh", label: "Refresh Office state" }, "action-btn subtle")}
           </div>
         </div>
         <div class="hero-side">
           <div class="hero-metric">
-            <span>Office service</span>
+            <span>Workspace mode</span>
             <strong>${escapeHtml(companionStatus.label)}</strong>
           </div>
           <div class="hero-metric">
-            <span>Broker</span>
-            <strong>${escapeHtml(broker.enabled ? (broker.healthy ? "Healthy" : "Fallback") : "Disabled")}</strong>
+            <span>Model support</span>
+            <strong>${escapeHtml(provider.ready ? "Ready" : "Unavailable")}</strong>
           </div>
           <div class="hero-metric">
-            <span>Provider</span>
-            <strong>${escapeHtml(provider.ready ? "Ready" : "Needs models")}</strong>
+            <span>Service state</span>
+            <strong>${escapeHtml(brokerStateLabel)}</strong>
           </div>
           <div class="hero-metric">
-            <span>Current route</span>
-            <strong>${escapeHtml(chat.currentRouteTitle || chat.currentRoute || "default")}</strong>
-          </div>
-          <div class="hero-metric">
-            <span>Last training write</span>
+            <span>Last recorded update</span>
             <strong>${escapeHtml(fmtDateTime(firstDefined(study.lastHistoryWriteAt, office.training?.lastWriteAt)))}</strong>
           </div>
         </div>
@@ -1006,38 +1224,54 @@ function renderHeroPanel() {
   }
 
   const chips = [
-    `${overall.text || STATUS_LABELS[overall.state] || "Unknown"} | ${overall.state || "booting"}`,
-    `Issues | ${doctor.actionableIssueCount || 0}`,
+    `Overall | ${overall.text || STATUS_LABELS[overall.state] || "Unknown"}`,
+    `Actionable | ${doctor.actionableIssueCount || 0} issues`,
     `Office | ${companionStatus.label}`,
-    `Broker | ${broker.enabled ? (broker.healthy ? "Live" : "Fallback") : "Disabled"}`,
-    `Workspace | ${getWorkspaceMeta().views.find((view) => view.id === activeView)?.label || "Runtime"}`,
   ];
+  const runtimeHeadline = firstDefined(
+    getRuntimeSnapshot().runtime?.headline,
+    "Runtime operations",
+  );
+  const runtimeSummary = firstDefined(
+    getRuntimeSnapshot().runtime?.lastBootstrap?.summary,
+    getWorkspaceMeta().summary,
+    "Monitor local service health, diagnostics, and project readiness from one control surface.",
+  );
 
   dom.heroPanel.innerHTML = `
     <section class="hero-shell runtime-hero">
       <div class="hero-copy">
-        <div class="hero-kicker">Suite Runtime cubicle</div>
-        <h1>${escapeHtml(getRuntimeSnapshot().runtime?.lastBootstrap?.summary || "Local runtime services, trust, and operator handoffs in one shell.")}</h1>
-        <p>${escapeHtml(getWorkspaceMeta().views.find((view) => view.id === activeView)?.title || getWorkspaceMeta().summary)}</p>
+        <div class="hero-kicker">Runtime control</div>
+        <h1>${escapeHtml(runtimeHeadline)}</h1>
+        <p>${escapeHtml(runtimeSummary)}</p>
         <div class="hero-chip-row">${chips.map((chip) => `<span class="hero-chip">${escapeHtml(chip)}</span>`).join("")}</div>
         <div class="hero-actions">
-          ${renderActionButton("Bootstrap All", { kind: "message", type: "runtime.bootstrap_all", label: "Bootstrap local runtime" }, "action-btn primary")}
-          ${renderActionButton("Refresh Runtime", { kind: "message", type: "runtime.refresh", label: "Refresh runtime" }, "action-btn")}
-          ${renderActionButton("Open Support", { kind: "workspace", workspace: "runtime", view: "support", label: "Open support lane" }, "action-btn subtle")}
+          ${renderActionButton("Start All", { kind: "message", type: "runtime.bootstrap_all", label: "Start runtime services" }, "action-btn primary")}
+          ${renderActionButton("Reset All", {
+            kind: "message",
+            type: "runtime.reset_all",
+            label: "Reset runtime services",
+            confirmMessage: "Reset all local runtime services now? This keeps local data intact but will restart the runtime stack.",
+          }, "action-btn")}
+          ${renderActionButton("Stop All", { kind: "message", type: "runtime.stop_all", label: "Stop runtime services" }, "action-btn warning")}
         </div>
       </div>
       <div class="hero-side">
         <div class="hero-metric">
-          <span>Doctor</span>
+          <span>Health</span>
           <strong>${escapeHtml(doctor.overallState || "booting")}</strong>
+        </div>
+        <div class="hero-metric">
+          <span>Workspace focus</span>
+          <strong>${escapeHtml(getWorkspaceMeta().views.find((view) => view.id === activeView)?.label || "Runtime")}</strong>
+        </div>
+        <div class="hero-metric">
+          <span>Runtime owner</span>
+          <strong>${escapeHtml(firstDefined(startupOwner.owner, runtimeOwnership.headline, "unknown"))}</strong>
         </div>
         <div class="hero-metric">
           <span>Last bootstrap</span>
           <strong>${escapeHtml(fmtDateTime(getRuntimeSnapshot().runtime?.lastBootstrap?.timestamp))}</strong>
-        </div>
-        <div class="hero-metric">
-          <span>Services observed</span>
-          <strong>${escapeHtml(String(getRuntimeServices().length))}</strong>
         </div>
       </div>
     </section>`;
@@ -1120,7 +1354,7 @@ function renderOfficeView() {
       : [{ id: chatState.currentThreadId || "default-thread", label: "Default thread" }];
     const transcriptRows = chatState.transcript.length
       ? chatState.transcript
-      : [{ role: "system", text: "No broker transcript yet. If broker is unavailable, snapshot fallback remains active." }];
+      : [{ role: "system", text: "No transcript is available yet. Snapshot mode remains available until the live service returns." }];
     const suiteSignals = [...new Set([
       chatState.suitePulse,
       chatState.suiteTrustSummary,
@@ -1133,24 +1367,24 @@ function renderOfficeView() {
         <article class="content-panel spotlight-panel">
           <div class="lane-header">
             <div>
-              <div class="panel-eyebrow">Live route</div>
+              <div class="panel-eyebrow">Active route</div>
               <h2>${escapeHtml(chatState.currentRouteTitle || chatState.currentRoute || "default")}</h2>
-              <p>${escapeHtml(chatState.routeReason || "Auto-route stays visible and can be overridden before send.")}</p>
+              <p>${escapeHtml(chatState.routeReason || "The current mode remains visible and can be adjusted before sending a message.")}</p>
             </div>
-            <span class="state-pill ${escapeHtml(broker.healthy ? "running" : "pending")}">${escapeHtml(broker.healthy ? "broker live" : "snapshot fallback")}</span>
+            <span class="state-pill ${escapeHtml(broker.healthy ? "running" : "pending")}">${escapeHtml(broker.healthy ? "connected" : "snapshot mode")}</span>
           </div>
           <div class="summary-pill-row">
-            ${renderSummaryPill("Mode", chatState.currentRouteTitle || chatState.currentRoute || "Default")}
             ${renderSummaryPill("Threads", String(chatState.threads.length || 0))}
             ${renderSummaryPill("Transcript", `${transcriptRows.length || 0} rows`)}
-            ${renderSummaryPill("Provider", provider.ready ? "Ready" : "Needs models", provider.ready ? "running" : "pending")}
+            ${renderSummaryPill("Pending review", `${inbox.approvals.length || 0} approvals`)}
+            ${renderSummaryPill("Model support", provider.ready ? "Ready" : "Unavailable", provider.ready ? "running" : "pending")}
           </div>
           <div class="transcript-stage">
             <div class="transcript-stage-head">
               <div>
-                <div class="panel-eyebrow">Active thread</div>
-                <strong>${escapeHtml(chatState.currentThreadTitle || "Live thread")}</strong>
-                <small>${escapeHtml(`${chatState.threads.length || 0} thread(s) available. Route override stays visible before send.`)}</small>
+                <div class="panel-eyebrow">Current thread</div>
+                <strong>${escapeHtml(chatState.currentThreadTitle || "Current thread")}</strong>
+                <small>${escapeHtml(`${chatState.threads.length || 0} thread(s) available. Routing remains visible before sending.`)}</small>
               </div>
               <div class="button-row">
                 <button type="button" class="action-btn subtle" data-office-message="office.chat.list_threads">Refresh threads</button>
@@ -1178,7 +1412,7 @@ function renderOfficeView() {
               </div>
             </div>
             <label for="office-chat-message">Message</label>
-            <textarea id="office-chat-message" data-office-bind="chatMessage" placeholder="Send a broker-backed Office message..." rows="4">${escapeHtml(state.officeDrafts.chatMessage || "")}</textarea>
+            <textarea id="office-chat-message" data-office-bind="chatMessage" placeholder="Send a message to the Office workspace..." rows="4">${escapeHtml(state.officeDrafts.chatMessage || "")}</textarea>
             <div class="button-row">
               <button type="submit" class="action-btn primary">Send</button>
               ${renderActionButton("Open Growth", { kind: "workspace", workspace: "office", view: "growth", label: "Open Growth lane" }, "action-btn")}
@@ -1187,42 +1421,42 @@ function renderOfficeView() {
           </form>
         </article>
         <div class="office-side-stack">
-          <article class="content-panel quiet rail-panel">
+          <article class="content-panel quiet rail-panel route-console-panel">
             <div class="lane-header compact">
               <div>
-                <div class="panel-eyebrow">Route control</div>
-                <h2>Manual override</h2>
+                <div class="panel-eyebrow">Routing controls</div>
+                <h2>Selection and context</h2>
               </div>
             </div>
             <form data-office-form="chat-route" class="office-form">
-              <label for="office-chat-route">Route override</label>
+              <label for="office-chat-route">Workspace mode</label>
               <select id="office-chat-route" data-office-bind="routeOverride">
                 ${routeOptions.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === chatState.currentRoute ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
               </select>
               <div class="inline-hint">${escapeHtml(firstDefined(
                 selectedRoute?.summary,
                 selectedRoute?.perspective,
-                "Choose a route explicitly or let the broker keep the current mode.",
+                "Choose a mode explicitly or keep the current selection.",
               ) || "")}</div>
               <div class="button-row">
-                <button type="submit" class="action-btn">Apply route</button>
+                <button type="submit" class="action-btn">Apply selection</button>
               </div>
             </form>
-          </article>
-          <article class="content-panel quiet rail-panel">
-            <div class="panel-eyebrow">Suite context</div>
-            <ul class="signal-list compact-list">${suiteSignals.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>No suite context was supplied by broker state.</li>"}</ul>
-          </article>
-          <article class="content-panel quiet rail-panel">
-            <div class="panel-eyebrow">Suggested moves</div>
-            <ul class="signal-list compact-list">${(chatState.suggestedMoves || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>Request suggested moves through broker chat routes.</li>"}</ul>
+            <div class="route-console-section">
+              <div class="panel-eyebrow">Current context</div>
+              <ul class="signal-list compact-list">${suiteSignals.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>No suite context was supplied by broker state.</li>"}</ul>
+            </div>
+            <div class="route-console-section">
+              <div class="panel-eyebrow">Recommended next actions</div>
+              <ul class="signal-list compact-list">${(chatState.suggestedMoves || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>Recommended next actions will appear here when available.</li>"}</ul>
+            </div>
           </article>
         </div>
       </section>
       <section class="content-grid insight-grid">
         ${renderMetricPanel("Study loop", `${training.practiceAttemptCount || 0}/${training.defenseAttemptCount || 0}`, studyState.stageSummary || "No study stage is active yet.")}
-        ${renderMetricPanel("Knowledge", `${libraryState.totalDocuments || 0} docs`, libraryState.profileSummary || "Knowledge library is ready for imports and follow-through briefs.")}
-        ${renderMetricPanel("Queue", `${inbox.approvals.length || 0} approvals`, growthState.watchlistSummary || "No watchlist summary was reported.")}
+        ${renderMetricPanel("Reference library", `${libraryState.totalDocuments || 0} docs`, libraryState.profileSummary || "Knowledge library is ready for imports and local reference work.")}
+        ${renderMetricPanel("Watchlists", `${growthState.watchlists.length || 0} active`, growthState.watchlistSummary || "No watchlist summary was reported.")}
       </section>`;
     return;
   }
@@ -1342,7 +1576,7 @@ function renderOfficeView() {
                 </label>`).join("")}
             </div>
             ${question?.resultText ? `<p class="study-result-text">${escapeHtml(question.resultText)}</p>` : ""}
-          </div>`).join("") || '<div class="empty-state">Generate practice to receive a live broker-backed question set.</div>'}
+          </div>`).join("") || '<div class="empty-state">Generate practice to receive a guided question set.</div>'}
       </section>
       <section class="content-grid role-grid">
         ${toArray(provider.roleModels).map((item) => `
@@ -1578,10 +1812,9 @@ function renderRuntimeView() {
     dom.workspaceContent.innerHTML = `
       <section class="content-grid runtime-summary-grid">
         ${renderMetricPanel("Services", `${runningCount}/${orderedServices.length || 0} running`, `${attentionCount} need attention, ${startingCount} are starting or booting.`)}
-        ${renderMetricPanel("Doctor", doctor.overallState || "booting", `${doctor.actionableIssueCount || 0} actionable checks are currently open.`)}
+        ${renderMetricPanel("Diagnostics", doctor.overallState || "booting", `${doctor.actionableIssueCount || 0} actionable checks are currently open.`)}
         ${renderMetricPanel("Shared shell", shell.status || "unknown", firstDefined(shell.detail, shell.statusMessage, shell.phase, "Shell health is not reported yet.") || "")}
-        ${renderMetricPanel("Office broker", broker.enabled ? (broker.healthy ? "Healthy" : "Fallback") : "Disabled", firstDefined(broker.lastError, `${broker.baseUrl || "http://127.0.0.1:57420"}${broker.statePath || "/state"}`) || "")}
-        ${renderMetricPanel("Office service", companionStatus.label, "Office now lives in the shared shell and uses the local broker instead of a separate standalone startup app.")}
+        ${renderMetricPanel("Office integration", companionStatus.label, broker.enabled ? (broker.healthy ? "Office is available through the live local service." : "Office is available in snapshot mode while the live service recovers.") : "Office service is disabled.")}
       </section>
       <section class="content-grid service-grid">
         ${orderedServices.map((item) => renderServiceCard(item)).join("")}
@@ -1620,7 +1853,7 @@ function renderRuntimeView() {
             <div>
               <div class="panel-eyebrow">ACADE reference</div>
               <h2>Project creation and activation stay ACADE-owned.</h2>
-              <p>Use the curated Autodesk project-flow reference while planning project creation, activation, and plugin behavior. This cubicle is the readiness surface, not the place where CAD automation is authored.</p>
+              <p>Use the curated Autodesk project-flow reference while planning project creation, activation, and plugin behavior. This workspace is the readiness surface, not the place where CAD automation is authored.</p>
             </div>
             <span class="state-pill ${escapeHtml(autocad?.state === "running" ? "running" : "pending")}">${escapeHtml(autocad?.state === "running" ? "collector live" : "collector not ready")}</span>
           </div>
@@ -1800,7 +2033,7 @@ function renderRuntimeView() {
           ${renderSummaryPill("Admin", adminContinuity.overall || "unknown", adminContinuity.overall === "ok" || adminContinuity.overall === "aligned" ? "running" : "pending")}
         </div>
         <div class="button-row">
-          ${renderActionButton("Open Office", { kind: "workspace", workspace: "office", view: "chat", label: "Open Office cockpit" }, "action-btn primary")}
+          ${renderActionButton("Open Office", { kind: "workspace", workspace: "office", view: "chat", label: "Open Office workspace" }, "action-btn primary")}
           ${renderActionButton("Open Office folder", { kind: "companion", action: "open-folder", label: "Open Office folder" }, "action-btn")}
           <button type="button" class="action-btn subtle" data-office-message="office.workspace.reset">Reset Office workspace</button>
         </div>
@@ -2376,7 +2609,7 @@ function buildLogsUtilityHtml() {
 
   return `
     <section class="utility-shell">
-      <article class="content-panel quiet">
+      <article class="content-panel quiet logs-utility-panel">
         <div class="lane-header compact">
           <div>
             <div class="panel-eyebrow">Integrated Logs</div>
@@ -2384,17 +2617,19 @@ function buildLogsUtilityHtml() {
             <p>${escapeHtml(selectedSource?.description || "Service and shell output stays inside the dock unless you explicitly open it externally.")}</p>
           </div>
         </div>
-        <div class="utility-toolbar">
+        <div class="utility-toolbar utility-toolbar-controls">
           <select data-log-source-select class="stretch">
             ${sources.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === selectedSource?.id ? "selected" : ""}>${escapeHtml(item.label)}</option>`).join("")}
           </select>
           <input type="search" data-log-filter class="stretch" placeholder="Filter log lines" value="${escapeHtml(state.logFilter)}">
+        </div>
+        <div class="utility-toolbar utility-toolbar-actions">
           <button type="button" class="top-btn small" data-log-autoscroll>${escapeHtml(`Auto-scroll ${state.autoScroll ? "ON" : "OFF"}`)}</button>
           <button type="button" class="top-btn small" data-office-message="office.state.refresh">Refresh</button>
           <button type="button" class="top-btn small" data-runtime-message="runtime.clear_log">Clear transcript</button>
-              <button type="button" class="top-btn small" data-copy-log-selected>Copy selected</button>
-              <button type="button" class="top-btn small" data-copy-log-scope="visible" data-copy-log-text="${escapeHtml(visibleCopyText)}">Copy visible</button>
-              <button type="button" class="top-btn small" data-copy-log-scope="all" data-copy-log-text="${escapeHtml(fullCopyText)}">Copy all</button>
+          <button type="button" class="top-btn small" data-copy-log-selected>Copy selected</button>
+          <button type="button" class="top-btn small" data-copy-log-scope="visible" data-copy-log-text="${escapeHtml(visibleCopyText)}">Copy visible</button>
+          <button type="button" class="top-btn small" data-copy-log-scope="all" data-copy-log-text="${escapeHtml(fullCopyText)}">Copy all</button>
           <button type="button" class="top-btn small" data-log-open-external>Open external</button>
         </div>
         <div class="log-meta">
@@ -2406,7 +2641,7 @@ function buildLogsUtilityHtml() {
             <span class="state-pill ${escapeHtml(getRuntimeSnapshot().snapshotStale ? "pending" : "running")}">${escapeHtml(getRuntimeSnapshot().snapshotStale ? "stale" : "live tail")}</span>
           </div>
         </div>
-        <div class="log-file-body" id="utility-log-body">
+        <div class="log-file-body ${escapeHtml(selectedSource?.id === "transcript" ? "is-transcript" : "is-raw")}" id="utility-log-body">
           ${selectedSource?.id === "transcript"
             ? transcriptEntries.map((entry) => `
               <div class="log-entry tone-${escapeHtml(entry.tone || "sys")}">
@@ -2423,12 +2658,18 @@ function buildLogsUtilityHtml() {
 function renderUtilityPane() {
   applyUtilityPaneWidth();
   dom.utilitySubtitle.textContent = getUtilitySubtitle();
-  dom.utilityContextBtn.classList.toggle("is-active", state.activeUtilityTab === "context");
-  dom.utilityLogsBtn.classList.toggle("is-active", state.activeUtilityTab === "logs");
-  dom.utilityInboxBtn.classList.toggle("is-active", state.activeUtilityTab === "inbox");
   dom.utilityTabRow.querySelectorAll("[data-utility-tab]").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.utilityTab === state.activeUtilityTab);
   });
+
+  syncShellChromeState();
+
+  if (state.utilityPaneCollapsed) {
+    dom.utilityContent.innerHTML = "";
+    dom.logBody = null;
+    syncUtilityPaneLayoutState();
+    return;
+  }
 
   if (state.activeUtilityTab === "logs") {
     dom.utilityContent.innerHTML = buildLogsUtilityHtml();
@@ -2438,10 +2679,22 @@ function renderUtilityPane() {
     dom.utilityContent.innerHTML = buildContextUtilityHtml();
   }
 
+  syncUtilityPaneLayoutState();
   dom.logBody = document.getElementById("utility-log-body");
   if (state.activeUtilityTab === "logs" && state.autoScroll && dom.logBody) {
     dom.logBody.scrollTop = dom.logBody.scrollHeight;
   }
+}
+
+function renderScaleControls() {
+  if (!dom.shellScaleControls) {
+    return;
+  }
+
+  dom.shellScaleControls.querySelectorAll("[data-scale-preset]").forEach((button) => {
+    const preset = Number(button.dataset.scalePreset);
+    button.classList.toggle("is-active", preset === state.contentScalePercent);
+  });
 }
 
 function renderHeaderPills() {
@@ -2451,6 +2704,8 @@ function renderHeaderPills() {
   dom.overallStatusPill.textContent = overall.text || STATUS_LABELS[overall.state] || "Booting";
   dom.providerStatusPill.className = `status-pill ${provider.tone}`;
   dom.providerStatusPill.textContent = provider.text;
+  renderScaleControls();
+  syncShellChromeState();
 }
 
 function render() {
@@ -2562,8 +2817,13 @@ function handleHostMessage(message) {
     case "shell.window_state":
     case "shell.preferences":
       state.utilityPaneWidth = Number(firstDefined(message.payload?.utilityPaneWidth, state.utilityPaneWidth)) || state.utilityPaneWidth;
+      state.utilityPaneCollapsed = Boolean(firstDefined(message.payload?.utilityPaneCollapsed, state.utilityPaneCollapsed));
       state.activeUtilityTab = firstDefined(message.payload?.activeUtilityTab, message.payload?.utilityPaneTab, state.activeUtilityTab) || "context";
       state.activeLogSourceId = firstDefined(message.payload?.activeLogSourceId, state.activeLogSourceId) || "transcript";
+      state.contentScalePercent = normalizeContentScalePercent(
+        firstDefined(message.payload?.contentScalePercent, state.contentScalePercent),
+      );
+      applyShellScaleVars();
       applyUtilityPaneWidth();
       break;
     case "runtime.log_sources":
@@ -2585,8 +2845,10 @@ function handleHostMessage(message) {
       if (message.payload?.utilityTab) {
         state.activeUtilityTab = message.payload.utilityTab;
       }
+      state.utilityPaneCollapsed = false;
       break;
     case "shell.utility_state":
+      state.utilityPaneCollapsed = Boolean(firstDefined(message.payload?.utilityPaneCollapsed, state.utilityPaneCollapsed));
       state.activeUtilityTab = firstDefined(message.payload?.activeUtilityTab, message.payload?.utilityTab, state.activeUtilityTab) || "context";
       state.activeLogSourceId = firstDefined(message.payload?.activeLogSourceId, message.payload?.sourceId, state.activeLogSourceId) || "transcript";
       break;
@@ -2829,16 +3091,18 @@ dom.workspaceSwitcher.addEventListener("click", (event) => {
   setActiveWorkspace(button.dataset.workspace);
 });
 
-dom.utilityContextBtn.addEventListener("click", () => {
-  setActiveUtilityTab("context");
+dom.utilityDockBtn?.addEventListener("click", () => {
+  toggleUtilityPane();
 });
 
-dom.utilityLogsBtn.addEventListener("click", () => {
-  setActiveUtilityTab("logs");
+dom.displayMenuButton?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  state.displayMenuOpen = !state.displayMenuOpen;
+  renderHeaderPills();
 });
 
-dom.utilityInboxBtn.addEventListener("click", () => {
-  setActiveUtilityTab("inbox");
+dom.displayMenu?.addEventListener("click", (event) => {
+  event.stopPropagation();
 });
 
 dom.utilityTabRow.addEventListener("click", (event) => {
@@ -2848,6 +3112,30 @@ dom.utilityTabRow.addEventListener("click", (event) => {
   }
 
   setActiveUtilityTab(button.dataset.utilityTab || "context");
+});
+
+dom.shellScaleControls?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-scale-preset]");
+  if (!button) {
+    return;
+  }
+
+  state.displayMenuOpen = false;
+  setContentScalePercent(button.dataset.scalePreset);
+});
+
+document.addEventListener("click", (event) => {
+  if (!state.displayMenuOpen) {
+    return;
+  }
+
+  const target = event.target;
+  if (dom.displayMenu?.contains(target) || dom.displayMenuButton?.contains(target)) {
+    return;
+  }
+
+  state.displayMenuOpen = false;
+  renderHeaderPills();
 });
 
 dom.commandInput.addEventListener("input", (event) => {
@@ -2878,7 +3166,8 @@ dom.utilityResizer.addEventListener("pointerdown", (event) => {
 
   const onMove = (moveEvent) => {
     const delta = startX - moveEvent.clientX;
-    state.utilityPaneWidth = Math.max(320, Math.min(640, startWidth + delta));
+    const bounds = getUtilityPaneWidthBounds();
+    state.utilityPaneWidth = Math.max(bounds.min, Math.min(bounds.max, startWidth + delta));
     applyUtilityPaneWidth();
   };
 
@@ -2896,7 +3185,13 @@ dom.utilityResizer.addEventListener("pointerdown", (event) => {
   dom.utilityResizer.addEventListener("pointercancel", onUp);
 });
 
+window.addEventListener("resize", () => {
+  applyShellScaleVars();
+  applyUtilityPaneWidth();
+});
+
 setInterval(tickClock, 1000);
 tickClock();
+applyShellScaleVars();
 applyUtilityPaneWidth();
 render();

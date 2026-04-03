@@ -9,3 +9,10 @@ Date captured: March 10, 2026
 Notes:
 - These values were captured from local development tooling and are directional.
 - Optimization work is deferred to a dedicated performance pass with production-like profiling.
+
+## Browser Timing Workflow
+
+- Bootstrap auth state for protected routes with `npm run auth:playwright:bootstrap`.
+- Run `npm run test:e2e:dashboard:perf` for the current dashboard timing pass.
+- The Playwright run prints and attaches `dashboard-performance.json`.
+- Dashboard stage timings are recorded in `window.__suiteDashboardPerf` by `src/components/apps/dashboard/dashboardPerf.ts`.

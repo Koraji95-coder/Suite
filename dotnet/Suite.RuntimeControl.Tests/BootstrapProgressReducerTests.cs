@@ -92,6 +92,21 @@ public sealed class BootstrapProgressReducerTests
         Assert.Equal("error", result.StatusState);
     }
 
+    [Fact]
+    public void Reduce_IgnoresUnknownCompletedStepsWhenComputingPercent()
+    {
+        var state = CreateState(
+            running: true,
+            completedStepIds: new[] { "docker-ready", "runtime-core-up" },
+            percent: 0);
+
+        var result = BootstrapProgressReducer.Reduce(state);
+
+        Assert.Equal(15, result.Percent);
+        Assert.Contains("runtime-core-up", result.CompletedStepIds);
+        Assert.Equal("starting", result.StatusState);
+    }
+
     private static BootstrapProgressState CreateState(
         bool running,
         bool done = false,

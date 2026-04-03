@@ -4,9 +4,9 @@ import {
 	mapFetchErrorMessage,
 	parseResponseErrorMessage,
 } from "@/lib/fetchWithTimeout";
+import type { TitleBlockSyncProfile } from "@/features/project-setup/types";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
-import type { TitleBlockSyncProfile } from "@/services/titleBlockSyncService";
 import type {
 	ProjectDrawingProgramPlan,
 	ProjectDrawingProgramRecord,

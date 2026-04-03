@@ -222,6 +222,34 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
             "repo://docs/development/autocad-electrical-2026-project-flow",
             resource_by_uri,
         )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-autolisp-api-reference",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-reference-pack",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-installation-context",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-installation-context-yaml",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-lookup-index",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-regression-fixtures",
+            resource_by_uri,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-suite-integration-playbook",
+            resource_by_uri,
+        )
         resource = resource_by_uri[
             "repo://docs/development/autocad-electrical-2026-project-flow"
         ]
@@ -230,6 +258,62 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
             "AutoCAD Electrical 2026 Project Flow Reference",
         )
         self.assertEqual(resource.get("mimeType"), "text/markdown")
+        api_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-autolisp-api-reference"
+        ]
+        self.assertEqual(
+            api_resource.get("name"),
+            "AutoCAD Electrical 2026 AutoLISP Reference API Documentation",
+        )
+        self.assertEqual(api_resource.get("mimeType"), "text/markdown")
+        pack_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-reference-pack"
+        ]
+        self.assertEqual(
+            pack_resource.get("name"),
+            "AutoCAD Electrical 2026 Local Reference Pack",
+        )
+        self.assertEqual(pack_resource.get("mimeType"), "text/markdown")
+        install_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-installation-context"
+        ]
+        self.assertEqual(
+            install_resource.get("name"),
+            "AutoCAD Electrical 2026 Installation Context Reference",
+        )
+        self.assertEqual(install_resource.get("mimeType"), "text/markdown")
+        install_yaml_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-installation-context-yaml"
+        ]
+        self.assertEqual(
+            install_yaml_resource.get("name"),
+            "AutoCAD Electrical 2026 Installation Context Inventory (YAML)",
+        )
+        self.assertEqual(install_yaml_resource.get("mimeType"), "application/yaml")
+        lookup_index_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-lookup-index"
+        ]
+        self.assertEqual(
+            lookup_index_resource.get("name"),
+            "AutoCAD Electrical 2026 Lookup Index",
+        )
+        self.assertEqual(lookup_index_resource.get("mimeType"), "application/json")
+        regression_fixture_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-regression-fixtures"
+        ]
+        self.assertEqual(
+            regression_fixture_resource.get("name"),
+            "AutoCAD Electrical 2026 Regression Fixtures",
+        )
+        self.assertEqual(regression_fixture_resource.get("mimeType"), "text/markdown")
+        playbook_resource = resource_by_uri[
+            "repo://docs/development/autocad-electrical-2026-suite-integration-playbook"
+        ]
+        self.assertEqual(
+            playbook_resource.get("name"),
+            "AutoCAD Electrical 2026 Suite Integration Playbook",
+        )
+        self.assertEqual(playbook_resource.get("mimeType"), "text/markdown")
 
     def test_resources_read_returns_autodesk_project_flow_markdown(self) -> None:
         with _McpServerProcess() as server:
@@ -255,6 +339,175 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
             "GetProjectFilePath / SetProjectFilePath are not ACADE project-creation APIs",
             text,
         )
+
+    def test_resources_read_returns_autodesk_autolisp_api_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-autolisp-api-reference",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-autolisp-api-reference",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("AutoCAD Electrical 2026 API entry point list", text)
+        self.assertIn("ace_get_wnum", text)
+        self.assertIn("wd_putwn", text)
+
+    def test_resources_read_returns_autodesk_reference_pack_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-reference-pack",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-reference-pack",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("## Source Map", text)
+        self.assertIn("## Usage Guidance", text)
+        self.assertIn("repo://docs/development/autocad-electrical-2026-project-flow", text)
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-autolisp-api-reference",
+            text,
+        )
+        self.assertIn(
+            "repo://docs/development/autocad-electrical-2026-installation-context",
+            text,
+        )
+
+    def test_resources_read_returns_autodesk_installation_context_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-installation-context",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-installation-context",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("## User Support Payload", text)
+        self.assertIn("## Support Script Surface", text)
+        self.assertIn("## Lookup Database Inventory", text)
+
+    def test_resources_read_returns_autodesk_installation_context_yaml(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-installation-context-yaml",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-installation-context-yaml",
+        )
+        self.assertEqual(content.get("mimeType"), "application/yaml")
+        text = str(content.get("text") or "")
+        self.assertIn("schemaVersion: suite.autodesk.acade.installation-context.v1", text)
+        self.assertIn("userSupport:", text)
+        self.assertIn("lookupDatabases:", text)
+
+    def test_resources_read_returns_autodesk_lookup_index_json(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-lookup-index",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-lookup-index",
+        )
+        self.assertEqual(content.get("mimeType"), "application/json")
+        text = str(content.get("text") or "")
+        self.assertIn('"schemaVersion": "suite.autodesk.acade.lookup-index.v1"', text)
+        self.assertIn('"recommendedDefaults"', text)
+        self.assertIn('"default_cat"', text)
+
+    def test_resources_read_returns_autodesk_regression_fixtures_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-regression-fixtures",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-regression-fixtures",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("## Primary Fixtures", text)
+        self.assertIn("wddemo-project", text)
+        self.assertIn("fixtures:autodesk:stage", text)
+
+    def test_resources_read_returns_autodesk_integration_playbook_markdown(self) -> None:
+        with _McpServerProcess() as server:
+            server.initialize()
+            response = server.request(
+                "resources/read",
+                {
+                    "uri": "repo://docs/development/autocad-electrical-2026-suite-integration-playbook",
+                },
+            )
+
+        contents = response.get("result", {}).get("contents", [])
+        self.assertTrue(contents)
+        content = contents[0] if isinstance(contents[0], dict) else {}
+        self.assertEqual(
+            content.get("uri"),
+            "repo://docs/development/autocad-electrical-2026-suite-integration-playbook",
+        )
+        self.assertEqual(content.get("mimeType"), "text/markdown")
+        text = str(content.get("text") or "")
+        self.assertIn("## Standards and Symbol Surface", text)
+        self.assertIn("## Automation Surface That Matters Most", text)
+        self.assertIn("## Recommended Suite Feature Opportunities", text)
 
     def test_tool_call_repo_search_returns_text(self) -> None:
         with _McpServerProcess() as server:

@@ -6,10 +6,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Mapping, Tuple
 
+from backend.runtime_paths import (
+    is_absolute_path_value,
+    normalize_runtime_path,
+    resolve_runtime_directory,
+)
+
 
 def normalize_path(path_value: str) -> str:
-    resolved = Path(path_value).expanduser().resolve(strict=False)
-    return os.path.normcase(os.path.normpath(str(resolved)))
+    return normalize_runtime_path(path_value)
 
 
 def relative_posix(path_value: str, root_value: str) -> str:
@@ -199,11 +204,16 @@ def ensure_absolute_roots(raw_roots: list[str], *, allow_missing: bool) -> list[
         root_value = str(raw_root or "").strip()
         if not root_value:
             continue
-        root_path = Path(root_value).expanduser()
-        if not root_path.is_absolute():
+        if not is_absolute_path_value(root_value):
             raise ValueError(f"Root path must be absolute: {root_value}")
 
-        normalized = str(root_path.resolve(strict=False))
+        if allow_missing:
+            normalized = normalize_path(root_value)
+        else:
+            runtime_directory = resolve_runtime_directory(root_value)
+            if runtime_directory is None:
+                raise ValueError(f"Root path does not exist or is not a directory: {root_value}")
+            normalized = str(runtime_directory)
         if not allow_missing and not os.path.isdir(normalized):
             raise ValueError(f"Root path does not exist or is not a directory: {root_value}")
 

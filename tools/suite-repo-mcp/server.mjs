@@ -22,6 +22,62 @@ const AUTODESK_PROJECT_FLOW_RESOURCE_PATH = path.join(
 	"development",
 	"autocad-electrical-2026-project-flow-reference.md",
 );
+const AUTODESK_AUTOLISP_API_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-autolisp-api-reference";
+const AUTODESK_AUTOLISP_API_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"AutoCAD Electrical 2026 AutoLISP Reference API Documentation.md",
+);
+const AUTODESK_REFERENCE_PACK_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-reference-pack";
+const AUTODESK_REFERENCE_PACK_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-reference-pack.md",
+);
+const AUTODESK_INSTALL_CONTEXT_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-installation-context";
+const AUTODESK_INSTALL_CONTEXT_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-installation-context-reference.md",
+);
+const AUTODESK_INSTALL_CONTEXT_YAML_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-installation-context-yaml";
+const AUTODESK_INSTALL_CONTEXT_YAML_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-installation-context.generated.yaml",
+);
+const AUTODESK_LOOKUP_INDEX_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-lookup-index";
+const AUTODESK_LOOKUP_INDEX_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-lookup-index.generated.json",
+);
+const AUTODESK_REGRESSION_FIXTURES_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-regression-fixtures";
+const AUTODESK_REGRESSION_FIXTURES_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-regression-fixtures.md",
+);
+const AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_URI =
+	"repo://docs/development/autocad-electrical-2026-suite-integration-playbook";
+const AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_PATH = path.join(
+	REPO_ROOT,
+	"docs",
+	"development",
+	"autocad-electrical-2026-suite-integration-playbook.md",
+);
 const STATIC_RESOURCES = [
 	{
 		uri: AUTODESK_PROJECT_FLOW_RESOURCE_URI,
@@ -30,6 +86,62 @@ const STATIC_RESOURCES = [
 			"Curated AutoCAD Electrical project-flow reference generated from Autodesk offline help.",
 		mimeType: "text/markdown",
 		filePath: AUTODESK_PROJECT_FLOW_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_AUTOLISP_API_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 AutoLISP Reference API Documentation",
+		description:
+			"Generated AutoCAD Electrical AutoLISP/API reference derived from the local Autodesk CHM and ACADE install assets.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_AUTOLISP_API_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_REFERENCE_PACK_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Local Reference Pack",
+		description:
+			"Combined local ACADE reference pack that consolidates project-flow and AutoLISP/API docs for agent use.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_REFERENCE_PACK_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_INSTALL_CONTEXT_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Installation Context Reference",
+		description:
+			"Generated local install-context reference for ACADE UserSupport menus, support scripts, lookup databases, and sample/demo payloads.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_INSTALL_CONTEXT_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_INSTALL_CONTEXT_YAML_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Installation Context Inventory (YAML)",
+		description:
+			"Structured YAML companion for the local ACADE install-context inventory, including menu catalogs, support scripts, lookup databases, and sample/demo payloads.",
+		mimeType: "application/yaml",
+		filePath: AUTODESK_INSTALL_CONTEXT_YAML_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_LOOKUP_INDEX_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Lookup Index",
+		description:
+			"Generated structured lookup-database index for the local ACADE install, covering catalog, PLC, via-component, and optional footprint MDB payloads.",
+		mimeType: "application/json",
+		filePath: AUTODESK_LOOKUP_INDEX_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_REGRESSION_FIXTURES_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Regression Fixtures",
+		description:
+			"Generated local fixture plan for copied Autodesk demo projects and sample drawings that Suite should use for regression validation.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_REGRESSION_FIXTURES_RESOURCE_PATH,
+	},
+	{
+		uri: AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_URI,
+		name: "AutoCAD Electrical 2026 Suite Integration Playbook",
+		description:
+			"Generated Suite-facing playbook that turns the local ACADE menus, scripts, lookup databases, and sample projects into integration guidance.",
+		mimeType: "text/markdown",
+		filePath: AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_PATH,
 	},
 ];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";

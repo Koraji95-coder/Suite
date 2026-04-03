@@ -34,6 +34,23 @@
 	color: var(--text-muted);
 }
 
+.nativeReviewStatus {
+	font-size: 0.75rem;
+	line-height: 1.45;
+}
+
+.nativeReviewStatusLoading {
+	color: var(--text-muted);
+}
+
+.nativeReviewStatusReady {
+	color: var(--success);
+}
+
+.nativeReviewStatusNeedsAttention {
+	color: var(--warning);
+}
+
 .blockTitle {
 	font-size: 0.75rem;
 	font-weight: 600;

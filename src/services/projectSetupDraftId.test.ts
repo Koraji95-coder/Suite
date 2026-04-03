@@ -26,7 +26,13 @@ import { projectTitleBlockProfileService } from "./projectTitleBlockProfileServi
 
 describe("draft project setup ids", () => {
 	beforeEach(() => {
-		localStorage.clear();
+		if (
+			typeof window !== "undefined" &&
+			window.localStorage &&
+			typeof window.localStorage.clear === "function"
+		) {
+			window.localStorage.clear();
+		}
 		vi.clearAllMocks();
 		getUserMock.mockResolvedValue({
 			data: { user: { id: "user-1" } },

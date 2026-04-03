@@ -15,12 +15,6 @@ import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { logger } from "../lib/logger";
 import { hasAdminClaim } from "../lib/roles";
-import { agentService } from "../services/agentService";
-import { agentTaskManager } from "../services/agentTaskManager";
-import {
-	logAuthMethodTelemetry,
-	logSecurityEvent,
-} from "../services/securityEventService";
 import {
 	type EmailAuthRequestOptions,
 	requestEmailAuthLink,
@@ -72,6 +66,67 @@ const SHOULD_UNPAIR_ON_SIGN_OUT = readBooleanEnv(
 	import.meta.env.VITE_AGENT_SIGNOUT_UNPAIR,
 	true,
 );
+
+let agentRuntimePromise:
+	| Promise<{
+			agentService: (typeof import("../services/agentService"))["agentService"];
+			agentTaskManager: (typeof import("../services/agentTaskManager"))["agentTaskManager"];
+	  }>
+	| null = null;
+
+function getAgentRuntime() {
+	if (!agentRuntimePromise) {
+		agentRuntimePromise = Promise.all([
+			import("../services/agentService"),
+			import("../services/agentTaskManager"),
+		]).then(([agentServiceModule, agentTaskManagerModule]) => ({
+			agentService: agentServiceModule.agentService,
+			agentTaskManager: agentTaskManagerModule.agentTaskManager,
+		}));
+	}
+	return agentRuntimePromise;
+}
+
+async function logAuthMethodTelemetryDeferred(
+	method: "email_link" | "passkey",
+	event:
+		| "sign_in_link_requested"
+		| "sign_up_link_requested"
+		| "sign_in_request_failed"
+		| "sign_up_request_failed"
+		| "sign_in_completed"
+		| "sign_in_started"
+		| "sign_in_redirected"
+		| "sign_in_failed"
+		| "enroll_started"
+		| "enroll_redirected"
+		| "enroll_failed"
+		| "enroll_completed",
+	description: string,
+) {
+	const securityEventModule = await import("../services/securityEventService");
+	return securityEventModule.logAuthMethodTelemetry(method, event, description);
+}
+
+async function logSecurityEventDeferred(
+	type:
+		| "auth_sign_in_success"
+		| "auth_sign_up_success"
+		| "auth_sign_out"
+		| "auth_sign_out_global"
+		| "agent_pair_success"
+		| "agent_pair_failed"
+		| "agent_restore_success"
+		| "agent_restore_failed"
+		| "agent_unpair"
+		| "agent_task_blocked_non_admin"
+		| "agent_webhook_secret_rejected"
+		| "agent_request_unauthorized",
+	description: string,
+) {
+	const securityEventModule = await import("../services/securityEventService");
+	return securityEventModule.logSecurityEvent(type, description);
+}
 
 function isUserAdmin(authUser: User | null): boolean {
 	return hasAdminClaim(authUser);
@@ -145,6 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			context: "rehydrate" | "auth-change",
 		): Promise<void> => {
 			try {
+				const { agentService } = await getAgentRuntime();
 				const result = await agentService.restorePairingForActiveUser();
 				logger.debug("Agent pairing restore evaluated", "AuthContext", {
 					context,
@@ -165,12 +221,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		): string => {
 			const sessionKey = buildSessionAuthKey(currentUser?.id, sessionExpiresAt);
 			setUser(currentUser);
-			agentService.setActiveUser(
-				currentUser?.id ?? null,
-				currentUser?.email ?? null,
-				isUserAdmin(currentUser),
-			);
-			agentTaskManager.setScope(currentUser?.id ?? null);
+			if (currentUser || agentRuntimePromise) {
+				void getAgentRuntime()
+					.then(({ agentService, agentTaskManager }) => {
+						agentService.setActiveUser(
+							currentUser?.id ?? null,
+							currentUser?.email ?? null,
+							isUserAdmin(currentUser),
+						);
+						agentTaskManager.setScope(currentUser?.id ?? null);
+					})
+					.catch((error) => {
+						logger.warn(
+							"Failed to sync agent runtime scope with auth session",
+							"AuthContext",
+							{ error, userId: currentUser?.id ?? null },
+						);
+					});
+			}
 
 			if (currentUser) {
 				const restoredMethod = readSessionAuthMethod(sessionKey);
@@ -278,7 +346,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 					const key = `${currentUser.id}:${sessionIssuedAt}`;
 					if (lastSignedInTelemetryKeyRef.current !== key) {
 						lastSignedInTelemetryKeyRef.current = key;
-						void logAuthMethodTelemetry(
+						void logAuthMethodTelemetryDeferred(
 							method,
 							"sign_in_completed",
 							method === "passkey"
@@ -305,12 +373,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 	const signIn = async (email: string, options?: EmailAuthRequestOptions) => {
 		await requestEmailAuthLink(email, "signin", options);
-		await logAuthMethodTelemetry(
+		await logAuthMethodTelemetryDeferred(
 			"email_link",
 			"sign_in_link_requested",
 			"Sign-in email-link authentication requested.",
 		);
-		await logSecurityEvent(
+		await logSecurityEventDeferred(
 			"auth_sign_in_success",
 			"Sign-in email link requested.",
 		);
@@ -318,12 +386,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 	const signUp = async (email: string, options?: EmailAuthRequestOptions) => {
 		await requestEmailAuthLink(email, "signup", options);
-		await logAuthMethodTelemetry(
+		await logAuthMethodTelemetryDeferred(
 			"email_link",
 			"sign_up_link_requested",
 			"Sign-up email-link authentication requested.",
 		);
-		await logSecurityEvent(
+		await logSecurityEventDeferred(
 			"auth_sign_up_success",
 			"Sign-up email link requested.",
 		);
@@ -332,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const signOut = async () => {
 		if (SHOULD_UNPAIR_ON_SIGN_OUT) {
 			try {
+				const { agentService } = await getAgentRuntime();
 				await agentService.unpair();
 			} catch (error) {
 				logger.warn(
@@ -352,7 +421,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		const { error } = await supabase.auth.signOut();
 		if (error) throw error;
 		clearSessionAuthMarkers();
-		await logSecurityEvent("auth_sign_out", "User signed out current session.");
+		await logSecurityEventDeferred(
+			"auth_sign_out",
+			"User signed out current session.",
+		);
 	};
 
 	const updateProfile = async (

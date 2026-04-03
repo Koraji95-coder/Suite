@@ -181,7 +181,7 @@ function Get-TrackerStateSummary {
             exists = $false
             healthy = $false
             path = $null
-            reason = "No tracker-state path resolved."
+            reason = "No tracker-state path resolved yet."
         }
     }
 
@@ -191,7 +191,7 @@ function Get-TrackerStateSummary {
             exists = $false
             healthy = $false
             path = $resolvedPath
-            reason = "tracker-state.json was not found."
+            reason = "tracker-state.json was not found yet. This is expected until AutoCAD is opened on this workstation."
         }
     }
 
@@ -236,7 +236,7 @@ function Get-TrackerStateSummary {
     if ($effectiveAgeMs -gt $FreshnessMs) {
         $trackerAgeMinutes = [Math]::Round(($effectiveAgeMs / 60000.0), 1)
         $trackerThresholdMinutes = [Math]::Round(($FreshnessMs / 60000.0), 1)
-        $trackerReason = "tracker-state.json is stale ($trackerAgeMinutes min old; threshold $trackerThresholdMinutes min)."
+        $trackerReason = "tracker-state.json is not fresh yet ($trackerAgeMinutes min old; threshold $trackerThresholdMinutes min). This is expected until AutoCAD reports again on this workstation."
     }
 
     $currentSession = Get-OptionalObjectPropertyValue -InputObject $payload -PropertyName "currentSession"
@@ -283,7 +283,7 @@ function Get-CollectorStateSummary {
             exists = $false
             healthy = $false
             path = $null
-            reason = "No collector config path resolved."
+            reason = "No collector config path resolved yet."
         }
     }
 
@@ -411,7 +411,7 @@ function Get-CollectorStateSummary {
         $collectorReason = "Collector local state.json is missing snapshot metadata."
     }
     elseif (-not $sourceAvailable) {
-        $collectorReason = "Collector snapshot does not report a live tracker source."
+        $collectorReason = "Collector is waiting for a live tracker source from AutoCAD."
     }
     elseif ($null -eq $lastCheckedAgeMs) {
         $collectorReason = "Collector snapshot does not include a valid lastCheckedAt timestamp."
@@ -685,9 +685,22 @@ else {
     "ready"
 }
 
+$passiveAutoCadWait =
+    ($status -eq "awaiting_autocad" -or $status -eq "awaiting_collector_sync") -and
+    $startup.healthy -and
+    $plugin.ok -and
+    $backend.healthy
+$guidance = if ($passiveAutoCadWait) {
+    "AutoCAD appears installed and the local collector path is healthy. Open AutoCAD on this workstation when you need live tracker telemetry."
+}
+else {
+    $null
+}
+
 $result = [ordered]@{
     ok = $true
     status = $status
+    guidance = $guidance
     workstationId = $identity.WorkstationId
     startup = $startup
     plugin = $plugin
@@ -702,6 +715,7 @@ $result = [ordered]@{
         trackerStateHealthy = [bool]$trackerState.healthy
         collectorStateHealthy = [bool]$collectorState.healthy
         backendStartupHealthy = [bool]($backendStartup.healthy)
+        passiveAutoCadWait = [bool]$passiveAutoCadWait
         readyForTelemetry = ($status -eq "ready")
     }
 }
@@ -728,5 +742,8 @@ else {
     }
     if ($collectorState.reason) {
         Write-Host "Collector reason: $($collectorState.reason)"
+    }
+    if ($guidance) {
+        Write-Host "Guidance: $guidance"
     }
 }

@@ -60,7 +60,7 @@ vi.mock("@/services/watchdogService", () => ({
 	},
 }));
 
-vi.mock("@/services/projectIssueSetService", () => ({
+vi.mock("@/features/project-workflow/issueSetService", () => ({
 	projectIssueSetService: {
 		fetchIssueSet: mockFetchIssueSet,
 	},
@@ -397,7 +397,7 @@ describe("WatchdogRoutePage", () => {
 		expect(await screen.findAllByText("Recent activity")).toBeTruthy();
 		expect(screen.queryByText("Technical stream")).toBeNull();
 		expect(screen.queryByText("Operator view")).toBeNull();
-		expect(screen.queryByText("Filesystem • Modified")).toBeNull();
+		expect(screen.queryByText("Filesystem â€¢ Modified")).toBeNull();
 		expect(screen.getAllByText("Saved drawing").length).toBeGreaterThanOrEqual(1);
 	});
 

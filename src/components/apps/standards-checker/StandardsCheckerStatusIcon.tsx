@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import styles from "./StandardsChecker.module.css";
-import type { CheckResult } from "./standardsCheckerModels";
+import type { CheckResult } from "@/features/standards-checker/standardsCheckerModels";
 
 interface StandardsCheckerStatusIconProps {
 	status: CheckResult["status"];

@@ -1,29 +1,45 @@
 import { Play } from "lucide-react";
+import {
+	categories,
+	type StandardsCategory,
+	type StandardsCheckerMode,
+} from "@/features/standards-checker/standardsCheckerModels";
 import { Button } from "@/components/primitives/Button";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsChecker.module.css";
 import { StandardsCheckerModeTabs } from "./StandardsCheckerModeTabs";
-import { categories, type StandardsCategory } from "./standardsCheckerModels";
-import type { StandardsCheckerMode } from "./standardsCheckerModels";
 
 interface StandardsCheckerHeaderPanelProps {
 	activeCategory: StandardsCategory;
 	availableCount: number;
+	cadFamilyOptions: Array<{
+		id: string;
+		label: string;
+		kind: string;
+	}>;
+	cadReferenceSummary: string | null;
 	failCount: number;
 	loadingProjects: boolean;
+	loadingProjectProfile: boolean;
 	mode: StandardsCheckerMode;
+	onCadFamilyChange: (cadFamilyId: string) => void;
 	onModeChange: (mode: StandardsCheckerMode) => void;
 	selectedCount: number;
 	onProjectChange: (projectId: string) => void;
 	onCategoryChange: (category: StandardsCategory) => void;
 	onRunChecks: () => void;
+	onSaveProjectDefaults: () => void;
 	passCount: number;
+	projectProfileStatus: string | null;
+	reviewStatus: string | null;
 	projectOptions: Array<{
 		id: string;
 		name: string;
 	}>;
 	resultsCount: number;
 	running: boolean;
+	savingProjectProfile: boolean;
+	selectedCadFamilyId: string;
 	selectedProjectId: string;
 	warningCount: number;
 }
@@ -31,18 +47,27 @@ interface StandardsCheckerHeaderPanelProps {
 export function StandardsCheckerHeaderPanel({
 	activeCategory,
 	availableCount,
+	cadFamilyOptions,
+	cadReferenceSummary,
 	failCount,
 	loadingProjects,
+	loadingProjectProfile,
 	mode,
+	onCadFamilyChange,
 	onModeChange,
 	selectedCount,
 	onProjectChange,
 	onCategoryChange,
 	onRunChecks,
+	onSaveProjectDefaults,
 	passCount,
+	projectProfileStatus,
+	reviewStatus,
 	projectOptions,
 	resultsCount,
 	running,
+	savingProjectProfile,
+	selectedCadFamilyId,
 	selectedProjectId,
 	warningCount,
 }: StandardsCheckerHeaderPanelProps) {
@@ -52,7 +77,7 @@ export function StandardsCheckerHeaderPanel({
 			: `${availableCount} available in this family`;
 	const resultsSummary =
 		resultsCount > 0
-			? `${passCount} pass • ${warningCount} warning • ${failCount} blocker${failCount === 1 ? "" : "s"}`
+			? `${passCount} pass / ${warningCount} warning / ${failCount} blocker${failCount === 1 ? "" : "s"}`
 			: null;
 
 	return (
@@ -98,8 +123,38 @@ export function StandardsCheckerHeaderPanel({
 							onClick={onRunChecks}
 							disabled={!selectedProjectId || selectedCount === 0 || running}
 						>
-							{running ? "Running review…" : "Run review"}
+							{running ? "Running review..." : "Run review"}
 						</Button>
+						<Button
+							type="button"
+							size="sm"
+							variant="outline"
+							onClick={onSaveProjectDefaults}
+							disabled={
+								!selectedProjectId || loadingProjectProfile || savingProjectProfile
+							}
+						>
+							{savingProjectProfile ? "Saving defaults..." : "Save defaults"}
+						</Button>
+					</div>
+
+					<div className={styles.headerCategoryRow}>
+						<span className={styles.headerFieldLabel}>CAD family</span>
+						<select
+							className={styles.headerSelect}
+							value={selectedCadFamilyId}
+							onChange={(event) => onCadFamilyChange(event.target.value)}
+							disabled={!selectedProjectId || loadingProjectProfile}
+							aria-label="CAD family"
+						>
+							<option value="">Select a CAD family</option>
+							{cadFamilyOptions.map((family) => (
+								<option key={family.id} value={family.id}>
+									{family.label}
+									{family.kind ? ` (${family.kind})` : ""}
+								</option>
+							))}
+						</select>
 					</div>
 
 					<div className={styles.headerCategoryRow}>
@@ -123,6 +178,16 @@ export function StandardsCheckerHeaderPanel({
 							})}
 						</div>
 					</div>
+
+					{projectProfileStatus ? (
+						<div className={styles.headerNote}>{projectProfileStatus}</div>
+					) : null}
+					{reviewStatus ? (
+						<div className={styles.headerNote}>{reviewStatus}</div>
+					) : null}
+					{cadReferenceSummary ? (
+						<div className={styles.headerNote}>{cadReferenceSummary}</div>
+					) : null}
 				</>
 			) : (
 				<div className={styles.headerNote}>

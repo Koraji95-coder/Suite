@@ -1,0 +1,1210 @@
+{
+	"schemaVersion": "suite.autodesk.acade.menu-index.v1",
+	"generatedAt": "2026-04-02T16:45:27.301Z",
+	"source": {
+		"installationContext": "docs/development/autocad-electrical-2026-installation-context-reference.md",
+		"installationContextYaml": "docs/development/autocad-electrical-2026-installation-context.generated.yaml",
+		"integrationPlaybook": "docs/development/autocad-electrical-2026-suite-integration-playbook.md"
+	},
+	"counts": {
+		"menus": 24,
+		"families": 17,
+		"standards": 9,
+		"byKind": {
+			"schematic": 10,
+			"panel": 9,
+			"process": 4,
+			"utility": 1,
+			"other": 0
+		}
+	},
+	"availableKinds": [
+		"panel",
+		"process",
+		"schematic",
+		"utility"
+	],
+	"families": [
+		{
+			"id": "iec_60617",
+			"label": "IEC 60617",
+			"kind": "panel",
+			"menuCount": 2,
+			"totalEntryCount": 1284,
+			"totalSymbolInsertCount": 824,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors"
+			],
+			"fileNames": [
+				"ACE_IEC-60617_MENU.DAT",
+				"ACE_PANEL_MENU_IEC-60617.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "legacy_panel",
+			"label": "Legacy Panel",
+			"kind": "panel",
+			"menuCount": 1,
+			"totalEntryCount": 135,
+			"totalSymbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/Temperature",
+				"Flow/Level Switches",
+				"Other Switches",
+				"Timers"
+			],
+			"fileNames": [
+				"wd_pmenu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "panel_layout",
+			"label": "Panel Layout",
+			"kind": "panel",
+			"menuCount": 7,
+			"totalEntryCount": 934,
+			"totalSymbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			],
+			"fileNames": [
+				"ACE_PANEL_MENU_AS.DAT",
+				"ACE_PANEL_MENU_GB.DAT",
+				"ACE_PANEL_MENU_IEC.DAT",
+				"ACE_PANEL_MENU_IEEE.DAT",
+				"ACE_PANEL_MENU_JIS.DAT",
+				"ACE_PANEL_MENU_NFPA.DAT",
+				"ACE_PANEL_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "hydraulic",
+			"label": "Hydraulic",
+			"kind": "process",
+			"menuCount": 1,
+			"totalEntryCount": 223,
+			"totalSymbolInsertCount": 198,
+			"topCategories": [
+				"Filters",
+				"General Valves",
+				"Pressure Relief Valves",
+				"2 Way Valves",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Cylinders",
+				"Pressure Switches"
+			],
+			"fileNames": [
+				"ACE_HYD_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "legacy_pneumatic",
+			"label": "Legacy Pneumatic",
+			"kind": "process",
+			"menuCount": 1,
+			"totalEntryCount": 177,
+			"totalSymbolInsertCount": 148,
+			"topCategories": [
+				"Left Operators",
+				"Right Operators",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Flow Paths",
+				"Filters",
+				"Regulators",
+				"Cylinders"
+			],
+			"fileNames": [
+				"wd_pneu_menu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "pid",
+			"label": "P&ID",
+			"kind": "process",
+			"menuCount": 1,
+			"totalEntryCount": 273,
+			"totalSymbolInsertCount": 244,
+			"topCategories": [
+				"Equipment",
+				"Tanks and Vessels",
+				"Nozzles",
+				"Pumps",
+				"Fittings",
+				"Valves",
+				"Actuators",
+				"Logic Functions"
+			],
+			"fileNames": [
+				"ACE_PID_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "pneumatic",
+			"label": "Pneumatic",
+			"kind": "process",
+			"menuCount": 1,
+			"totalEntryCount": 176,
+			"totalSymbolInsertCount": 148,
+			"topCategories": [
+				"Left Operators",
+				"Right Operators",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Flow Paths",
+				"Filters",
+				"Regulators",
+				"Cylinders"
+			],
+			"fileNames": [
+				"ACE_PNEU_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "as",
+			"label": "AS",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_AS_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "gb",
+			"label": "GB",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_GB_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "iec",
+			"label": "IEC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_IEC_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "ieee",
+			"label": "IEEE",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1149,
+			"totalSymbolInsertCount": 817,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_IEEE_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "jic",
+			"label": "JIC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 555,
+			"totalSymbolInsertCount": 429,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			],
+			"fileNames": [
+				"ACE_JIC_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "jis",
+			"label": "JIS",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_JIS_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "legacy_iec",
+			"label": "Legacy IEC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 642,
+			"totalSymbolInsertCount": 503,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Timers",
+				"Pressure/Temperature",
+				"Proximity Switches",
+				"Miscellaneous Switches"
+			],
+			"fileNames": [
+				"iec_menu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "legacy_jic",
+			"label": "Legacy JIC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 535,
+			"totalSymbolInsertCount": 423,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Pressure/Temperature",
+				"Flow/Level Switches",
+				"Miscellaneous Switches",
+				"Timers"
+			],
+			"fileNames": [
+				"wd_menu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "nfpa",
+			"label": "NFPA",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 559,
+			"totalSymbolInsertCount": 433,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			],
+			"fileNames": [
+				"ACE_NFPA_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "location_symbols",
+			"label": "Location Symbols",
+			"kind": "utility",
+			"menuCount": 1,
+			"totalEntryCount": 9,
+			"totalSymbolInsertCount": 8,
+			"topCategories": [
+				"Filled Triangle",
+				"Filled Square",
+				"Filled Diamond",
+				"Filled Circle",
+				"1/2 Filled Triangle",
+				"1/2 Filled Square",
+				"1/2 Filled Diamond",
+				"1/2 Filled Circle"
+			],
+			"fileNames": [
+				"wd_locs.dat"
+			],
+			"includesLegacy": false
+		}
+	],
+	"standards": [
+		{
+			"id": "as",
+			"label": "AS",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_AS_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "gb",
+			"label": "GB",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_GB_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "iec",
+			"label": "IEC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_IEC_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "ieee",
+			"label": "IEEE",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1149,
+			"totalSymbolInsertCount": 817,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_IEEE_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "jic",
+			"label": "JIC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 555,
+			"totalSymbolInsertCount": 429,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			],
+			"fileNames": [
+				"ACE_JIC_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "jis",
+			"label": "JIS",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 1118,
+			"totalSymbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			],
+			"fileNames": [
+				"ACE_JIS_MENU.DAT"
+			],
+			"includesLegacy": false
+		},
+		{
+			"id": "legacy_iec",
+			"label": "Legacy IEC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 642,
+			"totalSymbolInsertCount": 503,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Timers",
+				"Pressure/Temperature",
+				"Proximity Switches",
+				"Miscellaneous Switches"
+			],
+			"fileNames": [
+				"iec_menu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "legacy_jic",
+			"label": "Legacy JIC",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 535,
+			"totalSymbolInsertCount": 423,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Pressure/Temperature",
+				"Flow/Level Switches",
+				"Miscellaneous Switches",
+				"Timers"
+			],
+			"fileNames": [
+				"wd_menu.dat"
+			],
+			"includesLegacy": true
+		},
+		{
+			"id": "nfpa",
+			"label": "NFPA",
+			"kind": "schematic",
+			"menuCount": 1,
+			"totalEntryCount": 559,
+			"totalSymbolInsertCount": 433,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			],
+			"fileNames": [
+				"ACE_NFPA_MENU.DAT"
+			],
+			"includesLegacy": false
+		}
+	],
+	"recommendedDefaults": {
+		"schematic": [
+			"jic",
+			"nfpa",
+			"iec_60617",
+			"iec"
+		],
+		"panel": [
+			"panel_layout",
+			"legacy_panel"
+		],
+		"process": [
+			"pid",
+			"hydraulic",
+			"pneumatic"
+		],
+		"utility": [
+			"location_symbols"
+		]
+	},
+	"menus": [
+		{
+			"id": "ace-panel-menu-iec-60617-dat",
+			"fileName": "ACE_PANEL_MENU_IEC-60617.DAT",
+			"kind": "panel",
+			"familyId": "iec_60617",
+			"familyLabel": "IEC 60617",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "wd-pmenu-dat",
+			"fileName": "wd_pmenu.dat",
+			"kind": "panel",
+			"familyId": "legacy_panel",
+			"familyLabel": "Legacy Panel",
+			"isLegacy": true,
+			"title": "INSERT FOOTPRINT: PANEL LAYOUT SYMBOLS",
+			"pageCount": 18,
+			"totalEntryCount": 135,
+			"submenuCount": 20,
+			"commandActionCount": 115,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/Temperature",
+				"Flow/Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-as-dat",
+			"fileName": "ACE_PANEL_MENU_AS.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-gb-dat",
+			"fileName": "ACE_PANEL_MENU_GB.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-iec-dat",
+			"fileName": "ACE_PANEL_MENU_IEC.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-ieee-dat",
+			"fileName": "ACE_PANEL_MENU_IEEE.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-jis-dat",
+			"fileName": "ACE_PANEL_MENU_JIS.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 128,
+			"submenuCount": 16,
+			"commandActionCount": 112,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-nfpa-dat",
+			"fileName": "ACE_PANEL_MENU_NFPA.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 18,
+			"totalEntryCount": 147,
+			"submenuCount": 17,
+			"commandActionCount": 130,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-panel-menu-dat",
+			"fileName": "ACE_PANEL_MENU.DAT",
+			"kind": "panel",
+			"familyId": "panel_layout",
+			"familyLabel": "Panel Layout",
+			"isLegacy": false,
+			"title": "Panel Layout Symbols",
+			"pageCount": 18,
+			"totalEntryCount": 147,
+			"submenuCount": 17,
+			"commandActionCount": 130,
+			"symbolInsertCount": 0,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays",
+				"Pressure/ Temperature Switches",
+				"Flow/ Level Switches",
+				"Other Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-hyd-menu-dat",
+			"fileName": "ACE_HYD_MENU.DAT",
+			"kind": "process",
+			"familyId": "hydraulic",
+			"familyLabel": "Hydraulic",
+			"isLegacy": false,
+			"title": "Hydraulic Symbols",
+			"pageCount": 26,
+			"totalEntryCount": 223,
+			"submenuCount": 25,
+			"commandActionCount": 0,
+			"symbolInsertCount": 198,
+			"topCategories": [
+				"Filters",
+				"General Valves",
+				"Pressure Relief Valves",
+				"2 Way Valves",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Cylinders",
+				"Pressure Switches"
+			]
+		},
+		{
+			"id": "wd-pneu-menu-dat",
+			"fileName": "wd_pneu_menu.dat",
+			"kind": "process",
+			"familyId": "legacy_pneumatic",
+			"familyLabel": "Legacy Pneumatic",
+			"isLegacy": true,
+			"title": "INSERT COMPONENT: PNEUMATIC SYMBOLS",
+			"pageCount": 18,
+			"totalEntryCount": 177,
+			"submenuCount": 16,
+			"commandActionCount": 13,
+			"symbolInsertCount": 148,
+			"topCategories": [
+				"Left Operators",
+				"Right Operators",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Flow Paths",
+				"Filters",
+				"Regulators",
+				"Cylinders"
+			]
+		},
+		{
+			"id": "ace-pid-menu-dat",
+			"fileName": "ACE_PID_MENU.DAT",
+			"kind": "process",
+			"familyId": "pid",
+			"familyLabel": "P&ID",
+			"isLegacy": false,
+			"title": "Piping and Instrumentation Symbols",
+			"pageCount": 30,
+			"totalEntryCount": 273,
+			"submenuCount": 29,
+			"commandActionCount": 0,
+			"symbolInsertCount": 244,
+			"topCategories": [
+				"Equipment",
+				"Tanks and Vessels",
+				"Nozzles",
+				"Pumps",
+				"Fittings",
+				"Valves",
+				"Actuators",
+				"Logic Functions"
+			]
+		},
+		{
+			"id": "ace-pneu-menu-dat",
+			"fileName": "ACE_PNEU_MENU.DAT",
+			"kind": "process",
+			"familyId": "pneumatic",
+			"familyLabel": "Pneumatic",
+			"isLegacy": false,
+			"title": "Pneumatic Symbols",
+			"pageCount": 17,
+			"totalEntryCount": 176,
+			"submenuCount": 15,
+			"commandActionCount": 13,
+			"symbolInsertCount": 148,
+			"topCategories": [
+				"Left Operators",
+				"Right Operators",
+				"3 Way Valves",
+				"4 Way Valves",
+				"Flow Paths",
+				"Filters",
+				"Regulators",
+				"Cylinders"
+			]
+		},
+		{
+			"id": "ace-as-menu-dat",
+			"fileName": "ACE_AS_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "as",
+			"familyLabel": "AS",
+			"isLegacy": false,
+			"title": "AS: Schematic Symbols",
+			"pageCount": 104,
+			"totalEntryCount": 1118,
+			"submenuCount": 102,
+			"commandActionCount": 221,
+			"symbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "ace-gb-menu-dat",
+			"fileName": "ACE_GB_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "gb",
+			"familyLabel": "GB",
+			"isLegacy": false,
+			"title": "GB: Schematic Symbols",
+			"pageCount": 104,
+			"totalEntryCount": 1118,
+			"submenuCount": 102,
+			"commandActionCount": 221,
+			"symbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "ace-iec-menu-dat",
+			"fileName": "ACE_IEC_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "iec",
+			"familyLabel": "IEC",
+			"isLegacy": false,
+			"title": "IEC: Schematic Symbols",
+			"pageCount": 104,
+			"totalEntryCount": 1118,
+			"submenuCount": 102,
+			"commandActionCount": 221,
+			"symbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "ace-iec-60617-menu-dat",
+			"fileName": "ACE_IEC-60617_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "iec_60617",
+			"familyLabel": "IEC 60617",
+			"isLegacy": false,
+			"title": "IEC 60617: Schematic Symbols",
+			"pageCount": 108,
+			"totalEntryCount": 1156,
+			"submenuCount": 106,
+			"commandActionCount": 224,
+			"symbolInsertCount": 824,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "ace-ieee-menu-dat",
+			"fileName": "ACE_IEEE_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "ieee",
+			"familyLabel": "IEEE",
+			"isLegacy": false,
+			"title": "IEEE: Schematic Symbols",
+			"pageCount": 108,
+			"totalEntryCount": 1149,
+			"submenuCount": 106,
+			"commandActionCount": 224,
+			"symbolInsertCount": 817,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "ace-jic-menu-dat",
+			"fileName": "ACE_JIC_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "jic",
+			"familyLabel": "JIC",
+			"isLegacy": false,
+			"title": "JIC: Schematic Symbols",
+			"pageCount": 55,
+			"totalEntryCount": 555,
+			"submenuCount": 57,
+			"commandActionCount": 68,
+			"symbolInsertCount": 429,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			]
+		},
+		{
+			"id": "ace-jis-menu-dat",
+			"fileName": "ACE_JIS_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "jis",
+			"familyLabel": "JIS",
+			"isLegacy": false,
+			"title": "JIS: Schematic Symbols",
+			"pageCount": 104,
+			"totalEntryCount": 1118,
+			"submenuCount": 102,
+			"commandActionCount": 221,
+			"symbolInsertCount": 793,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Breakers/ Disconnects",
+				"Fuses/ Transfomers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights"
+			]
+		},
+		{
+			"id": "iec-menu-dat",
+			"fileName": "iec_menu.dat",
+			"kind": "schematic",
+			"familyId": "legacy_iec",
+			"familyLabel": "Legacy IEC",
+			"isLegacy": true,
+			"title": "INSERT COMPONENT: IEC SCHEMATIC SYMBOLS",
+			"pageCount": 57,
+			"totalEntryCount": 642,
+			"submenuCount": 55,
+			"commandActionCount": 83,
+			"symbolInsertCount": 503,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Timers",
+				"Pressure/Temperature",
+				"Proximity Switches",
+				"Miscellaneous Switches"
+			]
+		},
+		{
+			"id": "wd-menu-dat",
+			"fileName": "wd_menu.dat",
+			"kind": "schematic",
+			"familyId": "legacy_jic",
+			"familyLabel": "Legacy JIC",
+			"isLegacy": true,
+			"title": "INSERT COMPONENT: JIC SCHEMATIC SYMBOLS",
+			"pageCount": 48,
+			"totalEntryCount": 535,
+			"submenuCount": 51,
+			"commandActionCount": 60,
+			"symbolInsertCount": 423,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Limit Switches",
+				"Relays/Contacts",
+				"Pressure/Temperature",
+				"Flow/Level Switches",
+				"Miscellaneous Switches",
+				"Timers"
+			]
+		},
+		{
+			"id": "ace-nfpa-menu-dat",
+			"fileName": "ACE_NFPA_MENU.DAT",
+			"kind": "schematic",
+			"familyId": "nfpa",
+			"familyLabel": "NFPA",
+			"isLegacy": false,
+			"title": "NFPA: Schematic Symbols",
+			"pageCount": 57,
+			"totalEntryCount": 559,
+			"submenuCount": 59,
+			"commandActionCount": 67,
+			"symbolInsertCount": 433,
+			"topCategories": [
+				"Push Buttons",
+				"Selector Switches",
+				"Fuses/ Circuit Breakers/ Transformers/ Reactors",
+				"Relays/ Contacts",
+				"Timers",
+				"Motor Control",
+				"Pilot Lights",
+				"PLC I/O"
+			]
+		},
+		{
+			"id": "wd-locs-dat",
+			"fileName": "wd_locs.dat",
+			"kind": "utility",
+			"familyId": "location_symbols",
+			"familyLabel": "Location Symbols",
+			"isLegacy": false,
+			"title": "INSERT LOCATION SYMBOLS:",
+			"pageCount": 2,
+			"totalEntryCount": 9,
+			"submenuCount": 1,
+			"commandActionCount": 0,
+			"symbolInsertCount": 8,
+			"topCategories": [
+				"Filled Triangle",
+				"Filled Square",
+				"Filled Diamond",
+				"Filled Circle",
+				"1/2 Filled Triangle",
+				"1/2 Filled Square",
+				"1/2 Filled Diamond",
+				"1/2 Filled Circle"
+			]
+		}
+	]
+}

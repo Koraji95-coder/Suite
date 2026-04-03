@@ -9,14 +9,17 @@ $ErrorActionPreference = "Stop"
 
 function Get-DefaultBundleRoot {
     $candidates = New-Object System.Collections.Generic.List[string]
+    if ($env:APPDATA) {
+        $candidates.Add((Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
+    if ($env:USERPROFILE) {
+        $candidates.Add((Join-Path $env:USERPROFILE "AppData\Roaming\Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
+    }
     if ($env:ProgramFiles) {
         $candidates.Add((Join-Path $env:ProgramFiles "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
     }
     if (${env:ProgramFiles(x86)}) {
         $candidates.Add((Join-Path ${env:ProgramFiles(x86)} "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
-    }
-    if ($env:APPDATA) {
-        $candidates.Add((Join-Path $env:APPDATA "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
     }
     if ($env:ProgramData) {
         $candidates.Add((Join-Path $env:ProgramData "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
@@ -24,20 +27,21 @@ function Get-DefaultBundleRoot {
     if ($env:ALLUSERSPROFILE) {
         $candidates.Add((Join-Path $env:ALLUSERSPROFILE "Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
     }
-    if ($env:USERPROFILE) {
-        $candidates.Add((Join-Path $env:USERPROFILE "AppData\Roaming\Autodesk\ApplicationPlugins\SuiteWatchdogCadTracker.bundle"))
-    }
 
-    foreach ($candidate in $candidates) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) {
-            continue
-        }
+    $normalizedCandidates = @(
+        $candidates |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            ForEach-Object { [System.IO.Path]::GetFullPath($_) } |
+            Select-Object -Unique
+    )
+
+    foreach ($candidate in $normalizedCandidates) {
         if (Test-Path $candidate) {
             return $candidate
         }
     }
 
-    return $candidates[0]
+    return $normalizedCandidates[0]
 }
 
 function Get-AutoCadTrustedBundlePaths {

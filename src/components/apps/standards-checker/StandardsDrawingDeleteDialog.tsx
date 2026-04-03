@@ -6,7 +6,7 @@ import {
 	DialogTitle,
 } from "@/components/apps/ui/dialog";
 import styles from "./StandardsDrawingDialogs.module.css";
-import type { DrawingAnnotation } from "./standardsDrawingModels";
+import type { DrawingAnnotation } from "@/features/standards-checker/standardsDrawingModels";
 
 interface StandardsDrawingDeleteDialogProps {
 	pendingDeleteDrawing: DrawingAnnotation | null;

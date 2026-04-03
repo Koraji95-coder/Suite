@@ -16,6 +16,14 @@ import {
 } from "@/components/apps/ui/TrustStateBadge";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { Badge } from "@/components/primitives/Badge";
+import { projectSetupActionService } from "@/features/project-setup/actionService";
+import type {
+	TitleBlockEditableFields,
+	TitleBlockSyncArtifacts,
+	TitleBlockSyncProfile,
+	TitleBlockSyncRow,
+	TitleBlockSyncSummary,
+} from "@/features/project-setup/types";
 import {
 	buildProjectDetailHref,
 	buildProjectScopedAppHref,
@@ -27,7 +35,7 @@ import {
 	normalizeTitleBlockSyncRows,
 	type ProjectDocumentMetadataRow,
 	parseAcadeDocumentReportFile,
-} from "@/services/projectDocumentMetadataService";
+} from "@/features/project-documents";
 import { projectDrawingProgramService } from "@/services/projectDrawingProgramService";
 import {
 	type DrawingRevisionRegisterRow,
@@ -36,17 +44,9 @@ import {
 import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
-} from "@/services/projectIssueSetService";
+} from "@/features/project-workflow/issueSetService";
 import { projectReviewDecisionService } from "@/services/projectReviewDecisionService";
 import { projectTitleBlockProfileService } from "@/services/projectTitleBlockProfileService";
-import {
-	type TitleBlockEditableFields,
-	type TitleBlockSyncArtifacts,
-	type TitleBlockSyncProfile,
-	type TitleBlockSyncRow,
-	type TitleBlockSyncSummary,
-	titleBlockSyncService,
-} from "@/services/titleBlockSyncService";
 import { supabase } from "@/supabase/client";
 import styles from "./DrawingListManager.module.css";
 import { buildWorkbook, type DrawingEntry } from "./drawingListManagerModels";
@@ -156,7 +156,7 @@ function resolveDrawingControlStage(args: {
 	} = args;
 	const projectLabel = selectedProjectName ?? "this project";
 	const deliveryLabel = packageLabel
-		? `${projectLabel} • ${packageLabel}`
+		? `${projectLabel} â€¢ ${packageLabel}`
 		: projectLabel;
 
 	if (loading) {
@@ -665,7 +665,7 @@ export function DrawingListManager({
 		setMessage(null);
 		try {
 			await saveProfile();
-			const response = await titleBlockSyncService.scan(buildPayload([]));
+			const response = await projectSetupActionService.scan(buildPayload([]));
 			if (!response.success || !response.data) {
 				throw new Error(response.message || "Title block scan failed.");
 			}
@@ -706,7 +706,7 @@ export function DrawingListManager({
 		setPreviewing(true);
 		setMessage(null);
 		try {
-			const response = await titleBlockSyncService.preview(buildPayload());
+			const response = await projectSetupActionService.preview(buildPayload());
 			if (!response.success || !response.data) {
 				throw new Error(response.message || "Title block preview failed.");
 			}
@@ -729,7 +729,7 @@ export function DrawingListManager({
 		setApplying(true);
 		setMessage(null);
 		try {
-			const response = await titleBlockSyncService.apply(buildPayload());
+			const response = await projectSetupActionService.apply(buildPayload());
 			if (!response.success || !response.data) {
 				throw new Error(response.message || "Title block apply failed.");
 			}
@@ -948,7 +948,7 @@ export function DrawingListManager({
 			? [
 					{
 						label: "Package scope",
-						value: `${preferredIssueSet.issueTag} • ${
+						value: `${preferredIssueSet.issueTag} â€¢ ${
 							preferredIssueSet.selectedDrawingPaths.length
 						} drawing${
 							preferredIssueSet.selectedDrawingPaths.length === 1 ? "" : "s"
@@ -985,7 +985,7 @@ export function DrawingListManager({
 			label: "Revision register",
 			ready: !loadingProjectData && revisionEntries.length > 0,
 			value: loadingProjectData
-				? "Loading project revision rows…"
+				? "Loading project revision rowsâ€¦"
 				: revisionEntries.length > 0
 					? `${revisionEntries.length} revision register entr${
 							revisionEntries.length === 1 ? "y" : "ies"
@@ -1053,7 +1053,7 @@ export function DrawingListManager({
 							disabled={!canRun || scanning}
 						>
 							<RefreshCw size={14} />
-							{scanning ? "Scanning…" : "Scan Project"}
+							{scanning ? "Scanningâ€¦" : "Scan Project"}
 						</button>
 						{showPreviewActions ? (
 							<>
@@ -1064,7 +1064,7 @@ export function DrawingListManager({
 									disabled={!canRun || rows.length === 0 || previewing}
 								>
 									<Sparkles size={14} />
-									{previewing ? "Previewing…" : "Preview Sync"}
+									{previewing ? "Previewingâ€¦" : "Preview Sync"}
 								</button>
 								<button
 									type="button"
@@ -1073,7 +1073,7 @@ export function DrawingListManager({
 									disabled={!canRun || rows.length === 0 || applying}
 								>
 									<Wand2 size={14} />
-									{applying ? "Applying…" : "Apply Sync"}
+									{applying ? "Applyingâ€¦" : "Apply Sync"}
 								</button>
 							</>
 						) : null}
@@ -1213,7 +1213,7 @@ export function DrawingListManager({
 									disabled={!selectedProjectId || savingProfile}
 								>
 									<Save size={14} />
-									{savingProfile ? "Saving…" : "Save defaults"}
+									{savingProfile ? "Savingâ€¦" : "Save defaults"}
 								</button>
 							) : null}
 						</div>
@@ -1436,13 +1436,13 @@ export function DrawingListManager({
 										row.drawingNumber ||
 										row.currentAttributes.DWGNO ||
 										row.filenameDrawingNumber ||
-										"—";
+										"â€”";
 									const drawingTitle =
 										metadataRow?.title ||
 										row.drawingTitle ||
 										row.currentAttributes.TITLE3 ||
 										row.filenameTitle ||
-										"—";
+										"â€”";
 									return (
 										<tr key={row.id}>
 											<td>
@@ -1461,7 +1461,7 @@ export function DrawingListManager({
 											</td>
 											<td>{drawingNumber}</td>
 											<td>{drawingTitle}</td>
-											<td>{row.layoutName || "—"}</td>
+											<td>{row.layoutName || "â€”"}</td>
 											<td>
 												<div className={styles.issueList}>
 													{acceptedForPackage ? (
@@ -1591,7 +1591,7 @@ export function DrawingListManager({
 													<div className={styles.writeMeta}>
 														{row.pendingSuiteWrites.length} Suite write
 														{row.pendingSuiteWrites.length === 1 ? "" : "s"}
-														{" • "}
+														{" â€¢ "}
 														{row.pendingAcadeWrites.length} ACADE write
 														{row.pendingAcadeWrites.length === 1 ? "" : "s"}
 													</div>
@@ -1631,14 +1631,14 @@ export function DrawingListManager({
 																key={`${row.id}-revision-${index}`}
 																className={styles.revisionItem}
 															>
-																<strong>{revisionRow.revision || "—"}</strong>
+																<strong>{revisionRow.revision || "â€”"}</strong>
 																<span>
 																	{revisionRow.description || "No description"}
 																</span>
 																<small>
-																	{revisionRow.by || "—"} /{" "}
-																	{revisionRow.checkedBy || "—"} /{" "}
-																	{revisionRow.date || "—"}
+																	{revisionRow.by || "â€”"} /{" "}
+																	{revisionRow.checkedBy || "â€”"} /{" "}
+																	{revisionRow.date || "â€”"}
 																</small>
 															</div>
 														))

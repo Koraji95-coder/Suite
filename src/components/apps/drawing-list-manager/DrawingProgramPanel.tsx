@@ -1,6 +1,7 @@
 import { RefreshCw, Upload, Wand2 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
+import type { TitleBlockSyncProfile } from "@/features/project-setup/types";
 import { logger } from "@/lib/logger";
 import {
 	type ProjectDrawingProgramPlan,
@@ -11,7 +12,6 @@ import {
 	projectDrawingProgramService,
 } from "@/services/projectDrawingProgramService";
 import { projectDrawingProgramRuntimeService } from "@/services/projectDrawingProgramRuntimeService";
-import type { TitleBlockSyncProfile } from "@/services/titleBlockSyncService";
 import { watchdogService, type WatchdogCollectorEvent } from "@/services/watchdogService";
 import styles from "./DrawingListManager.module.css";
 

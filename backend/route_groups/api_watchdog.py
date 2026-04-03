@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 from typing import Any, Callable, Dict
 
@@ -16,43 +15,6 @@ from .api_watchdog_service import WatchdogMonitorService
 Decorator = Callable[[Callable[..., Any]], Callable[..., Any]]
 
 
-def _pick_directory_dialog(initial_path: str | None = None) -> str | None:
-    """Open a native folder picker and return an absolute directory path."""
-    # Import lazily so headless/server environments can still import the module.
-    import tkinter as tk
-    from tkinter import filedialog
-
-    candidate = str(initial_path or "").strip()
-    if candidate and os.path.isdir(candidate):
-        initial_dir = candidate
-    else:
-        initial_dir = os.path.expanduser("~")
-
-    root = tk.Tk()
-    root.withdraw()
-    root.update_idletasks()
-    try:
-        root.attributes("-topmost", True)
-    except Exception:
-        # Not all window managers support topmost.
-        pass
-
-    try:
-        selected = filedialog.askdirectory(
-            parent=root,
-            initialdir=initial_dir,
-            mustexist=True,
-            title="Select Watchdog Root Folder",
-        )
-    finally:
-        root.destroy()
-
-    selected_path = str(selected or "").strip()
-    if not selected_path:
-        return None
-    return os.path.abspath(selected_path)
-
-
 def create_watchdog_blueprint(
     *,
     require_autocad_auth: Decorator,
@@ -63,7 +25,6 @@ def create_watchdog_blueprint(
     supabase_url: str = "",
     supabase_api_key: str = "",
     time_module: Any = time,
-    pick_directory_fn: Callable[[str | None], str | None] = _pick_directory_dialog,
     requests_module: Any = requests,
 ) -> Blueprint:
     """Create watchdog routes under /api/watchdog."""
@@ -230,62 +191,6 @@ def create_watchdog_blueprint(
                     }
                 ),
                 500,
-            )
-
-    @bp.route("/pick-root", methods=["POST"])
-    @require_autocad_auth
-    @limiter.limit("240 per hour")
-    def api_watchdog_pick_root():
-        payload = request.get_json(silent=True) if request.is_json else {}
-        if payload is None:
-            payload = {}
-
-        initial_path_raw = payload.get("initialPath")
-        initial_path = str(initial_path_raw).strip() if initial_path_raw is not None else ""
-        if initial_path and not os.path.isdir(initial_path):
-            initial_path = ""
-
-        try:
-            selected_path = pick_directory_fn(initial_path or None)
-            if not selected_path:
-                return jsonify({"ok": True, "cancelled": True, "path": None}), 200
-
-            if not os.path.isdir(selected_path):
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "cancelled": False,
-                            "error": "Selected path is not a valid directory.",
-                            "code": "WATCHDOG_PICKER_INVALID",
-                        }
-                    ),
-                    400,
-                )
-
-            return (
-                jsonify(
-                    {
-                        "ok": True,
-                        "cancelled": False,
-                        "path": os.path.abspath(selected_path),
-                    }
-                ),
-                200,
-            )
-        except Exception as exc:
-            logger.exception("Failed to open watchdog folder picker.")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "cancelled": False,
-                        "error": "Folder picker is unavailable in this environment.",
-                        "code": "WATCHDOG_PICKER_UNAVAILABLE",
-                        "message": str(exc),
-                    }
-                ),
-                503,
             )
 
     @bp.route("/collectors/register", methods=["POST"])
@@ -530,6 +435,47 @@ def create_watchdog_blueprint(
                         "ok": False,
                         "error": "Failed to build watchdog overview",
                         "code": "WATCHDOG_OVERVIEW_FAILED",
+                        "message": str(exc),
+                    }
+                ),
+                500,
+            )
+
+    @bp.route("/dashboard", methods=["GET"])
+    @require_autocad_auth
+    @limiter.limit("3600 per hour")
+    def api_watchdog_dashboard():
+        user_key = _watchdog_user_key()
+        try:
+            payload = service.dashboard_snapshot(
+                user_key,
+                project_id=request.args.get("projectId"),
+                collector_id=request.args.get("collectorId"),
+                time_window_ms=_parse_query_int("timeWindowMs", 24 * 60 * 60 * 1000)
+                or 24 * 60 * 60 * 1000,
+                events_limit=_parse_query_int("eventsLimit", 8) or 8,
+                sessions_limit=_parse_query_int("sessionsLimit", 8) or 8,
+            )
+            return jsonify({"ok": True, **payload}), 200
+        except ValueError as exc:
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "code": "WATCHDOG_DASHBOARD_INVALID_QUERY",
+                    }
+                ),
+                400,
+            )
+        except Exception as exc:
+            logger.exception("Failed to build watchdog dashboard snapshot (user=%s)", user_key)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "Failed to build watchdog dashboard snapshot",
+                        "code": "WATCHDOG_DASHBOARD_FAILED",
                         "message": str(exc),
                     }
                 ),

@@ -11,6 +11,7 @@ import {
 	loadDashboardOverviewFromBackend,
 	primeCachedDashboardOverviewPayload,
 } from "./dashboardOverviewService";
+import { startDashboardPerfSpan } from "./dashboardPerf";
 
 export interface DashboardProject {
 	id: string;
@@ -43,6 +44,13 @@ interface FileSize {
 }
 
 const FALLBACK_START_PROGRESS = 12;
+
+function describeLoadError(error: unknown): string {
+	if (error instanceof Error && error.message.trim()) {
+		return error.message;
+	}
+	return String(error);
+}
 
 export function useDashboardOverviewData() {
 	const [projects, setProjects] = useState<DashboardProject[]>([]);
@@ -304,6 +312,7 @@ export function useDashboardOverviewData() {
 
 	useEffect(() => {
 		let cancelled = false;
+		const overallLoadPerf = startDashboardPerfSpan("dashboard.overview.load");
 
 		const updateProgress = (progress: DashboardLoadProgress) => {
 			if (cancelled) return;
@@ -327,9 +336,17 @@ export function useDashboardOverviewData() {
 				setLoadMessage("Dashboard ready.");
 				setLoadProgress(100);
 				setIsLoading(false);
+				overallLoadPerf.finish({
+					activityCount: cachedPayload.activities.length,
+					projectCount: cachedPayload.projects.length,
+					source: "session-cache",
+				});
 				return;
 			}
 
+			const backendLoadPerf = startDashboardPerfSpan(
+				"dashboard.overview.backend",
+			);
 			try {
 				const backendPayload =
 					await loadDashboardOverviewFromBackend(updateProgress);
@@ -338,8 +355,20 @@ export function useDashboardOverviewData() {
 				setLoadStage("complete");
 				setLoadMessage("Dashboard ready.");
 				setLoadProgress(100);
+				backendLoadPerf.finish({
+					activityCount: backendPayload.activities.length,
+					projectCount: backendPayload.projects.length,
+				});
+				overallLoadPerf.finish({
+					activityCount: backendPayload.activities.length,
+					projectCount: backendPayload.projects.length,
+					source: "backend-progress",
+				});
 				return;
 			} catch (backendError) {
+				backendLoadPerf.fail({
+					message: describeLoadError(backendError),
+				});
 				logger.warn(
 					"MainDashboard",
 					"Backend dashboard progress unavailable. Falling back to direct Supabase queries.",
@@ -351,6 +380,9 @@ export function useDashboardOverviewData() {
 				setUsingBackendProgress(false);
 			}
 
+			const fallbackLoadPerf = startDashboardPerfSpan(
+				"dashboard.overview.fallback",
+			);
 			try {
 				setLoadStage("fallback");
 				setLoadMessage("Loading dashboard data...");
@@ -402,7 +434,23 @@ export function useDashboardOverviewData() {
 					setLoadMessage("Dashboard ready.");
 					setLoadProgress(100);
 				}
+				fallbackLoadPerf.finish({
+					activityCount: activitiesData.length,
+					projectCount: projectsData.length,
+					resolvedProjectCount: projectMap.size,
+				});
+				overallLoadPerf.finish({
+					activityCount: activitiesData.length,
+					projectCount: projectsData.length,
+					source: "supabase-fallback",
+				});
 			} catch (error) {
+				const message = describeLoadError(error);
+				fallbackLoadPerf.fail({ message });
+				overallLoadPerf.fail({
+					message,
+					source: "supabase-fallback",
+				});
 				logger.critical(
 					"MainDashboard",
 					"Critical error loading dashboard data",
@@ -428,6 +476,7 @@ export function useDashboardOverviewData() {
 		void run();
 		return () => {
 			cancelled = true;
+			overallLoadPerf.cancel({ reason: "effect-cleanup" });
 		};
 	}, [
 		applyBackendPayload,

@@ -41,7 +41,8 @@ import {
 import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
-} from "@/services/projectIssueSetService";
+} from "@/features/project-workflow/issueSetService";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { openRuntimeControlShell } from "@/services/runtimeControlService";
 import {
 	type WatchdogCollector,
@@ -106,7 +107,7 @@ function getTimelineMetaLabel(row: DashboardSessionTimelineRow): string {
 		`Tracker ${formatRelativeTime(row.trackerAt)}`,
 	]
 		.filter(Boolean)
-		.join(" • ");
+		.join(" â€¢ ");
 }
 
 function getSessionTone(
@@ -123,12 +124,10 @@ function getSessionTone(
 }
 
 async function loadProjectOptions(): Promise<WatchdogProjectOption[]> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-
-	if (error || !user) {
+	let userId: string | null = null;
+	try {
+		userId = await getCurrentSupabaseUserId();
+	} catch (error) {
 		logger.warn(
 			"WatchdogRoutePage",
 			"Unable to resolve project options for Watchdog.",
@@ -136,11 +135,14 @@ async function loadProjectOptions(): Promise<WatchdogProjectOption[]> {
 		);
 		return [];
 	}
+	if (!userId) {
+		return [];
+	}
 
 	const { data, error: projectError } = await supabase
 		.from("projects")
 		.select("id, name")
-		.eq("user_id", user.id)
+		.eq("user_id", userId)
 		.order("name", { ascending: true });
 
 	if (projectError) {
@@ -790,7 +792,7 @@ export default function WatchdogRoutePage() {
 																	card.session.projectId,
 																	projectNameMap,
 																)}{" "}
-																• {card.session.workstationId}
+																â€¢ {card.session.workstationId}
 															</div>
 														</div>
 														<div className={styles.sessionBadges}>
@@ -871,7 +873,7 @@ export default function WatchdogRoutePage() {
 																{row.drawingLabel}
 															</div>
 															<div className={styles.rowMeta}>
-																{row.projectLabel} •{" "}
+																{row.projectLabel} â€¢{" "}
 																{row.workstationIds.join(", ") ||
 																	"Unknown workstation"}
 															</div>
@@ -1055,7 +1057,7 @@ export default function WatchdogRoutePage() {
 													</div>
 													<div className={styles.rowMeta}>
 														Started {formatRelativeTime(row.session.startedAt)}{" "}
-														• {row.session.commandCount} command(s)
+														â€¢ {row.session.commandCount} command(s)
 													</div>
 												</div>
 											))
@@ -1338,8 +1340,8 @@ export default function WatchdogRoutePage() {
 													</div>
 													<div className={styles.rowMeta}>
 														{entry.drawingCount} drawing
-														{entry.drawingCount === 1 ? "" : "s"} •{" "}
-														{formatDuration(entry.totalDurationMs)} tracked •{" "}
+														{entry.drawingCount === 1 ? "" : "s"} â€¢{" "}
+														{formatDuration(entry.totalDurationMs)} tracked â€¢{" "}
 														{entry.activeDrawingCount} live
 													</div>
 													<div className={styles.rowMeta}>
@@ -1374,7 +1376,7 @@ export default function WatchdogRoutePage() {
 															</div>
 														</div>
 														<div className={styles.rowMeta}>
-															{row.roleLabels.join(" • ")}
+															{row.roleLabels.join(" â€¢ ")}
 														</div>
 													</div>
 													<Badge
@@ -1402,7 +1404,7 @@ export default function WatchdogRoutePage() {
 												</div>
 												{row.projectLabels.length > 0 ? (
 													<div className={styles.rowMeta}>
-														{row.projectLabels.slice(0, 2).join(" • ")}
+														{row.projectLabels.slice(0, 2).join(" â€¢ ")}
 													</div>
 												) : null}
 											</div>

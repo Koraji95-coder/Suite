@@ -1,8 +1,8 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { PageFrame } from "@/components/apps/ui/PageFrame";
 import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
-import { ProjectManager } from "../components/apps/projects/ProjectManager";
-import type { ViewMode } from "../components/apps/projects/projectmanagertypes";
+import { ProjectManager } from "@/features/project-manager";
+import type { ViewMode } from "@/features/project-core";
 
 const VALID_VIEW_MODES = new Set<ViewMode>([
 	"setup",

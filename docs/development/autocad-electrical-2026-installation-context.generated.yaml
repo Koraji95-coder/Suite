@@ -1,0 +1,3239 @@
+schemaVersion: suite.autodesk.acade.installation-context.v1
+generatedAt: 2026-04-03T08:30:40.731Z
+roots:
+  acade: C:/Program Files/Autodesk/AutoCAD 2026/Acade
+  userSupport: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport
+  samples: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample
+  demoProjects: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj
+outputs:
+  markdown: docs/development/autocad-electrical-2026-installation-context-reference.md
+  yaml: docs/development/autocad-electrical-2026-installation-context.generated.yaml
+counts:
+  userSupportFiles: 78
+  menuCatalogs: 24
+  supportScripts: 2
+  lookupDatabases: 4
+  sampleDrawings: 13
+  demoProjectRoots: 10
+userSupport:
+  rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport
+  files:
+    - name: _default_rslogix.wdf
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/_default_rslogix.wdf
+    - name: acade.cuix
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/acade.cuix
+    - name: acade.fmp
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/acade.fmp
+    - name: acade.lin
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/acade.lin
+    - name: acadepidshp.shx
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/acadepidshp.shx
+    - name: acadSynonymsGlobalDB.pgp
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/acadSynonymsGlobalDB.pgp
+    - name: AcCommandWeight.xml
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/AcCommandWeight.xml
+    - name: ACE_AS_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_AS_MENU.DAT
+    - name: ace_as.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ace_as.dll
+    - name: ace_as.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ace_as.slb
+    - name: ACE_GB_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_GB_MENU.DAT
+    - name: ACE_GB.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_GB.dll
+    - name: ACE_GB.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_GB.slb
+    - name: ACE_HYD_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_HYD_MENU.DAT
+    - name: ace_hyd.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ace_hyd.dll
+    - name: ace_hyd.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ace_hyd.slb
+    - name: ACE_IEC_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEC_MENU.DAT
+    - name: ACE_IEC-60617_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEC-60617_MENU.DAT
+    - name: ACE_IEEE_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEEE_MENU.DAT
+    - name: ACE_JIC_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIC_MENU.DAT
+    - name: ACE_JIS_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIS_MENU.DAT
+    - name: ACE_JIS.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIS.dll
+    - name: ACE_JIS.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIS.slb
+    - name: ACE_NFPA_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_NFPA_MENU.DAT
+    - name: ACE_PANEL_MENU_AS.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_AS.DAT
+    - name: ACE_PANEL_MENU_GB.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_GB.DAT
+    - name: ACE_PANEL_MENU_IEC-60617.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEC-60617.DAT
+    - name: ACE_PANEL_MENU_IEC.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEC.DAT
+    - name: ACE_PANEL_MENU_IEEE.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEEE.DAT
+    - name: ACE_PANEL_MENU_JIS.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_JIS.DAT
+    - name: ACE_PANEL_MENU_NFPA.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_NFPA.DAT
+    - name: ACE_PANEL_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU.DAT
+    - name: ACE_PID_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PID_MENU.DAT
+    - name: ACE_PID.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PID.dll
+    - name: ace_pid.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ace_pid.slb
+    - name: ACE_PNEU_MENU.DAT
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PNEU_MENU.DAT
+    - name: Allen-Bradley.pnl
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/Allen-Bradley.pnl
+    - name: App.config
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/App.config
+    - name: bb.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/bb.slb
+    - name: cblcolor.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/cblcolor.dat
+    - name: default.ww1
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/default.ww1
+    - name: generic_papersizes.txt
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/generic_papersizes.txt
+    - name: H_SYMTBL_BOX.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/H_SYMTBL_BOX.dwg
+    - name: iec_menu.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/iec_menu.dat
+    - name: iec1.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/iec1.dll
+    - name: iec1.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/iec1.slb
+    - name: iec60617.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/iec60617.dll
+    - name: ieee.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ieee.dll
+    - name: loc2.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/loc2.slb
+    - name: NFPA.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/NFPA.dll
+    - name: pn0.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn0.dll
+    - name: pn0.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn0.slb
+    - name: pn1.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn1.dll
+    - name: pn1.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn1.slb
+    - name: pn2.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn2.dll
+    - name: pn2.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn2.slb
+    - name: pn3.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn3.dll
+    - name: pn3.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pn3.slb
+    - name: pnl.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pnl.dll
+    - name: pnl.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pnl.slb
+    - name: pnl2.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pnl2.dll
+    - name: pnl2.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/pnl2.slb
+    - name: s1.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/s1.dll
+    - name: s1.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/s1.slb
+    - name: s2.dll
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/s2.dll
+    - name: s2.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/s2.slb
+    - name: symlistreport.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/symlistreport.dat
+    - name: TableStyle.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/TableStyle.dwg
+    - name: wd_desc.wdd
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_desc.wdd
+    - name: wd_locs.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_locs.dat
+    - name: wd_menu.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_menu.dat
+    - name: wd_pmenu.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_pmenu.dat
+    - name: wd_pneu_menu.dat
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_pneu_menu.dat
+    - name: wd_ratings.wdr
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_ratings.wdr
+    - name: wdmbblks.bsf
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wdmbblks.bsf
+    - name: wdsrcdst.wdd
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wdsrcdst.wdd
+    - name: wdviacmp.mdb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wdviacmp.mdb
+    - name: Ww.slb
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/Ww.slb
+  fileTypeMix:
+    - extension: .dat
+      count: 26
+    - extension: .dll
+      count: 17
+    - extension: .slb
+      count: 17
+    - extension: .dwg
+      count: 2
+    - extension: .wdd
+      count: 2
+    - extension: .bsf
+      count: 1
+    - extension: .config
+      count: 1
+    - extension: .cuix
+      count: 1
+    - extension: .fmp
+      count: 1
+    - extension: .lin
+      count: 1
+    - extension: .mdb
+      count: 1
+    - extension: .pgp
+      count: 1
+    - extension: .pnl
+      count: 1
+    - extension: .shx
+      count: 1
+    - extension: .txt
+      count: 1
+    - extension: .wdf
+      count: 1
+    - extension: .wdr
+      count: 1
+    - extension: .ww1
+      count: 1
+    - extension: .xml
+      count: 1
+  menuCatalogs:
+    - fileName: ACE_AS_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_AS_MENU.DAT
+      firstPageTitle: "AS: Schematic Symbols"
+      pageCount: 104
+      totalEntryCount: 1118
+      submenuCount: 102
+      commandActionCount: 221
+      symbolInsertCount: 793
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_as(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_as(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: ace_as(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: ace_as(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: ace_as(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: ace_as(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: ace_as(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: ace_as(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: ace_as(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: ace_as(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: ace_as(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: ace_as(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_GB_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_GB_MENU.DAT
+      firstPageTitle: "GB: Schematic Symbols"
+      pageCount: 104
+      totalEntryCount: 1118
+      submenuCount: 102
+      commandActionCount: 221
+      symbolInsertCount: 793
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_gb(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_gb(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: ace_gb(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: ace_gb(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: ace_gb(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: ace_gb(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: ace_gb(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: ace_gb(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: ace_gb(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: ace_gb(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: ace_gb(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: ace_gb(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_HYD_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_HYD_MENU.DAT
+      firstPageTitle: Hydraulic Symbols
+      pageCount: 26
+      totalEntryCount: 223
+      submenuCount: 25
+      commandActionCount: 0
+      symbolInsertCount: 198
+      topLevelEntries:
+        - label: Filters
+          icon: ace_hyd(shy_filter)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: General Valves
+          icon: ace_hyd(shy_general_valves)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Pressure Relief Valves
+          icon: ace_hyd(shy_prv)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: 2 Way Valves
+          icon: ace_hyd(shy_2way_valves)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: 3 Way Valves
+          icon: ace_hyd(spn_3way_valves)
+          actionType: submenu
+          action: $S=M7
+          submenuId: M7
+        - label: 4 Way Valves
+          icon: ace_hyd(spn_4way_valves)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Cylinders
+          icon: ace_hyd(spn_cylinder)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pressure Switches
+          icon: ace_hyd(shy_pressure_switch)
+          actionType: submenu
+          action: $S=M17
+          submenuId: M17
+        - label: Motors & Pumps
+          icon: ace_hyd(shy_motors)
+          actionType: submenu
+          action: $S=M18
+          submenuId: M18
+        - label: Meters
+          icon: ace_hyd(spn_meter)
+          actionType: submenu
+          action: $S=M21
+          submenuId: M21
+        - label: Restrictors
+          icon: ace_hyd(shy_restrictors)
+          actionType: submenu
+          action: $S=M22
+          submenuId: M22
+        - label: Quick Disconnects
+          icon: ace_hyd(spn_qd)
+          actionType: submenu
+          action: $S=M23
+          submenuId: M23
+    - fileName: ACE_IEC_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEC_MENU.DAT
+      firstPageTitle: "IEC: Schematic Symbols"
+      pageCount: 104
+      totalEntryCount: 1118
+      submenuCount: 102
+      commandActionCount: 221
+      symbolInsertCount: 793
+      topLevelEntries:
+        - label: Push Buttons
+          icon: iec1(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: iec1(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: iec1(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: iec1(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: iec1(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: iec1(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: iec1(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: iec1(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: iec1(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: iec1(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: iec1(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: iec1(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_IEC-60617_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEC-60617_MENU.DAT
+      firstPageTitle: "IEC 60617: Schematic Symbols"
+      pageCount: 108
+      totalEntryCount: 1156
+      submenuCount: 106
+      commandActionCount: 224
+      symbolInsertCount: 824
+      topLevelEntries:
+        - label: Push Buttons
+          icon: iec60617(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: iec60617(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: iec60617(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: iec60617(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: iec60617(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: iec60617(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: iec60617(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: iec60617(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: iec60617(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: iec60617(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: iec60617(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: iec60617(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_IEEE_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_IEEE_MENU.DAT
+      firstPageTitle: "IEEE: Schematic Symbols"
+      pageCount: 108
+      totalEntryCount: 1149
+      submenuCount: 106
+      commandActionCount: 224
+      symbolInsertCount: 817
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ieee(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ieee(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: ieee(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: ieee(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: ieee(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: ieee(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: ieee(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: ieee(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: ieee(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: ieee(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: ieee(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: ieee(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_JIC_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIC_MENU.DAT
+      firstPageTitle: "JIC: Schematic Symbols"
+      pageCount: 55
+      totalEntryCount: 555
+      submenuCount: 57
+      commandActionCount: 68
+      symbolInsertCount: 429
+      topLevelEntries:
+        - label: Push Buttons
+          icon: s2(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: s2(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Fuses/ Circuit Breakers/ Transformers
+          icon: s2(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: s2(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: s2(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: s2(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: s2(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: s2(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: s2(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: s2(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: s2(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: s2(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+    - fileName: ACE_JIS_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_JIS_MENU.DAT
+      firstPageTitle: "JIS: Schematic Symbols"
+      pageCount: 104
+      totalEntryCount: 1118
+      submenuCount: 102
+      commandActionCount: 221
+      symbolInsertCount: 793
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_jis(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_jis(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Breakers/ Disconnects
+          icon: ace_jis(s_cb_ds)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Fuses/ Transfomers/ Reactors
+          icon: ace_jis(s_fu_xf)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: ace_jis(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: ace_jis(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: ace_jis(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: ace_jis(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: ace_jis(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: ace_jis(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: ace_jis(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: ace_jis(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+    - fileName: ACE_NFPA_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_NFPA_MENU.DAT
+      firstPageTitle: "NFPA: Schematic Symbols"
+      pageCount: 57
+      totalEntryCount: 559
+      submenuCount: 59
+      commandActionCount: 67
+      symbolInsertCount: 433
+      topLevelEntries:
+        - label: Push Buttons
+          icon: nfpa(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: nfpa(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Fuses/ Circuit Breakers/ Transformers/ Reactors
+          icon: nfpa(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Relays/ Contacts
+          icon: nfpa(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: nfpa(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Motor Control
+          icon: nfpa(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+        - label: Pilot Lights
+          icon: nfpa(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: PLC I/O
+          icon: nfpa(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Terminals/ Connectors
+          icon: nfpa(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Limit Switches
+          icon: nfpa(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Pressure/ Temperature Switches
+          icon: nfpa(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: nfpa(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+    - fileName: ACE_PANEL_MENU_AS.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_AS.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_as(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_as(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: ace_as(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: ace_as(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: ace_as(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: ace_as(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: ace_as(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: ace_as(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: ace_as(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: ace_as(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: ace_as(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: ace_as(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_GB.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_GB.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_gb(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_gb(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: ace_gb(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: ace_gb(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: ace_gb(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: ace_gb(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: ace_gb(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: ace_gb(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: ace_gb(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: ace_gb(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: ace_gb(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: ace_gb(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_IEC-60617.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEC-60617.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: IEC60617(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: IEC60617(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: IEC60617(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: IEC60617(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: IEC60617(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: IEC60617(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: IEC60617(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: IEC60617(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: IEC60617(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: IEC60617(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: IEC60617(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: IEC60617(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_IEC.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEC.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: IEC60617(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: IEC60617(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: IEC60617(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: IEC60617(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: IEC60617(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: IEC60617(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: IEC60617(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: IEC60617(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: IEC60617(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: IEC60617(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: IEC60617(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: IEC60617(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_IEEE.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_IEEE.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ieee(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ieee(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: ieee(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: ieee(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: ieee(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: ieee(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: ieee(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: ieee(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: ieee(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: ieee(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: ieee(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: ieee(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_JIS.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_JIS.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 17
+      totalEntryCount: 128
+      submenuCount: 16
+      commandActionCount: 112
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: ace_jis(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: ace_jis(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: ace_jis(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: ace_jis(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: ace_jis(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: ace_jis(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: ace_jis(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: ace_jis(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: ace_jis(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: ace_jis(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: ace_jis(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: ace_jis(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU_NFPA.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU_NFPA.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 18
+      totalEntryCount: 147
+      submenuCount: 17
+      commandActionCount: 130
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: s2(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: s2(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: s2(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: s2(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: s2(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: s2(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: s2(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: s2(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: s2(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: s2(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: s2(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: s2(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PANEL_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PANEL_MENU.DAT
+      firstPageTitle: Panel Layout Symbols
+      pageCount: 18
+      totalEntryCount: 147
+      submenuCount: 17
+      commandActionCount: 130
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: s2(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: s2(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: s2(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: s2(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/ Temperature Switches
+          icon: s2(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/ Level Switches
+          icon: s2(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: s2(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: s2(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: s2(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: s2(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/ Circuit Breakers
+          icon: s2(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: s2(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: ACE_PID_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PID_MENU.DAT
+      firstPageTitle: Piping and Instrumentation Symbols
+      pageCount: 30
+      totalEntryCount: 273
+      submenuCount: 29
+      commandActionCount: 0
+      symbolInsertCount: 244
+      topLevelEntries:
+        - label: Equipment
+          icon: ace_pid(spi_equipment)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Tanks and Vessels
+          icon: ace_pid(spi_tank)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Nozzles
+          icon: ace_pid(spi_nozzles)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Pumps
+          icon: ace_pid(spi_pumps)
+          actionType: submenu
+          action: $S=M5
+          submenuId: M5
+        - label: Fittings
+          icon: ace_pid(spi_fittings)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Valves
+          icon: ace_pid(spi_valves)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Actuators
+          icon: ace_pid(spi_actuators)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Logic Functions
+          icon: ace_pid(spi_functions)
+          actionType: submenu
+          action: $S=M12
+          submenuId: M12
+        - label: Instrumentation
+          icon: ace_pid(spi_instrumentation)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Flow
+          icon: ace_pid(spi_flow)
+          actionType: submenu
+          action: $S=M18
+          submenuId: M18
+        - label: Flow Arrows
+          icon: ace_pid(spi_arrow)
+          actionType: submenu
+          action: $S=M19
+          submenuId: M19
+    - fileName: ACE_PNEU_MENU.DAT
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/ACE_PNEU_MENU.DAT
+      firstPageTitle: Pneumatic Symbols
+      pageCount: 17
+      totalEntryCount: 176
+      submenuCount: 15
+      commandActionCount: 13
+      symbolInsertCount: 148
+      topLevelEntries:
+        - label: Left Operators
+          icon: pn0(spn_left_operators)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Right Operators
+          icon: pn0(spn_right_operators)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: 3 Way Valves
+          icon: pn0(spn_3way_valves)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: 4 Way Valves
+          icon: pn0(spn_4way_valves)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Flow Paths
+          icon: pn0(spn_flow_paths)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Filters
+          icon: pn0(spn_filter)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Regulators
+          icon: pn0(spn_regulator)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Cylinders
+          icon: pn0(spn_cylinder)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Meters
+          icon: pn0(spn_meter)
+          actionType: submenu
+          action: $S=M100
+          submenuId: M100
+        - label: Motors
+          icon: pn0(spn_motors)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Quick Disconnects
+          icon: pn0(spn_qd)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Mufflers
+          icon: pn0(spn_mufflers)
+          actionType: submenu
+          action: $S=M102
+          submenuId: M102
+    - fileName: iec_menu.dat
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/iec_menu.dat
+      firstPageTitle: "INSERT COMPONENT: IEC SCHEMATIC SYMBOLS"
+      pageCount: 57
+      totalEntryCount: 642
+      submenuCount: 55
+      commandActionCount: 83
+      symbolInsertCount: 503
+      topLevelEntries:
+        - label: Push Buttons
+          icon: iec1(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: iec1(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: iec1(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays/Contacts
+          icon: iec1(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Timers
+          icon: iec1(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Pressure/Temperature
+          icon: iec1(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Proximity Switches
+          icon: iec1(s_px)
+          actionType: submenu
+          action: $s=M7
+          submenuId: M7
+        - label: Miscellaneous Switches
+          icon: iec1(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Terminals/Connectors
+          icon: iec1(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: DOT
+          icon: iec1(shdot)
+          actionType: command
+          action: $C=wd_repeat WDDOT
+          command: wd_repeat WDDOT
+        - label: PLC I/O
+          icon: iec1(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Pilot Lights
+          icon: iec1(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+    - fileName: wd_locs.dat
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_locs.dat
+      firstPageTitle: "INSERT LOCATION SYMBOLS:"
+      pageCount: 2
+      totalEntryCount: 9
+      submenuCount: 1
+      commandActionCount: 0
+      symbolInsertCount: 8
+      topLevelEntries:
+        - label: Filled Triangle
+          icon: loc2(s_wdxxt)
+          actionType: symbol_insert
+          action: wdxxt
+        - label: Filled Square
+          icon: loc2(s_wdxxs)
+          actionType: symbol_insert
+          action: wdxxs
+        - label: Filled Diamond
+          icon: loc2(s_wdxxd)
+          actionType: symbol_insert
+          action: wdxxd
+        - label: Filled Circle
+          icon: loc2(s_wdxxc)
+          actionType: symbol_insert
+          action: wdxxc
+        - label: 1/2 Filled Triangle
+          icon: loc2(s_wdxxt2)
+          actionType: symbol_insert
+          action: wdxxt2
+        - label: 1/2 Filled Square
+          icon: loc2(s_wdxxs2)
+          actionType: symbol_insert
+          action: wdxxs2
+        - label: 1/2 Filled Diamond
+          icon: loc2(s_wdxxd2)
+          actionType: symbol_insert
+          action: wdxxd2
+        - label: 1/2 Filled Circle
+          icon: loc2(s_wdxxc2)
+          actionType: symbol_insert
+          action: wdxxc2
+        - label: more
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+    - fileName: wd_menu.dat
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_menu.dat
+      firstPageTitle: "INSERT COMPONENT: JIC SCHEMATIC SYMBOLS"
+      pageCount: 48
+      totalEntryCount: 535
+      submenuCount: 51
+      commandActionCount: 60
+      symbolInsertCount: 423
+      topLevelEntries:
+        - label: Push Buttons
+          icon: s2(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: s2(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: s2(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays/Contacts
+          icon: s2(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/Temperature
+          icon: s2(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/Level Switches
+          icon: s2(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Miscellaneous Switches
+          icon: s2(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: s2(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Terminals/Connectors
+          icon: s2(s_trm_cn)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: DOT
+          icon: s1(shdot)
+          actionType: command
+          action: $C=wd_repeat WDDOT
+          command: wd_repeat WDDOT
+        - label: PLC I/O
+          icon: s2(s_io)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Pilot Lights
+          icon: s2(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+    - fileName: wd_pmenu.dat
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_pmenu.dat
+      firstPageTitle: "INSERT FOOTPRINT: PANEL LAYOUT SYMBOLS"
+      pageCount: 18
+      totalEntryCount: 135
+      submenuCount: 20
+      commandActionCount: 115
+      symbolInsertCount: 0
+      topLevelEntries:
+        - label: Push Buttons
+          icon: s2(s_pb)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Selector Switches
+          icon: s2(s_ss)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: Limit Switches
+          icon: s2(s_zs)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: Relays
+          icon: s2(s_cr)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Pressure/Temperature
+          icon: s2(s_ps_ts)
+          actionType: submenu
+          action: $S=M9
+          submenuId: M9
+        - label: Flow/Level Switches
+          icon: s2(s_fs_ls)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Other Switches
+          icon: s2(s_msc_sw)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Timers
+          icon: s2(s_td)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: PLC I/O
+          icon: s2(s_io)
+          actionType: command
+          action: $C=wd_infpx "PLCIO"
+          command: wd_infpx "PLCIO"
+        - label: Pilot Lights
+          icon: s2(s_lt)
+          actionType: submenu
+          action: $S=M4
+          submenuId: M4
+        - label: Fuses/Circuit Breakers
+          icon: s2(s_cb_fu)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Motor Control
+          icon: s2(s_mcc)
+          actionType: submenu
+          action: $S=M15
+          submenuId: M15
+    - fileName: wd_pneu_menu.dat
+      filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wd_pneu_menu.dat
+      firstPageTitle: "INSERT COMPONENT: PNEUMATIC SYMBOLS"
+      pageCount: 18
+      totalEntryCount: 177
+      submenuCount: 16
+      commandActionCount: 13
+      symbolInsertCount: 148
+      topLevelEntries:
+        - label: Left Operators
+          icon: pn0(spn_left_operators)
+          actionType: submenu
+          action: $S=M3
+          submenuId: M3
+        - label: Right Operators
+          icon: pn0(spn_right_operators)
+          actionType: submenu
+          action: $S=M6
+          submenuId: M6
+        - label: 3 Way Valves
+          icon: pn0(spn_3way_valves)
+          actionType: submenu
+          action: $S=M8
+          submenuId: M8
+        - label: 4 Way Valves
+          icon: pn0(spn_4way_valves)
+          actionType: submenu
+          action: $S=M1
+          submenuId: M1
+        - label: Flow Paths
+          icon: pn0(spn_flow_paths)
+          actionType: submenu
+          action: $S=M13
+          submenuId: M13
+        - label: Filters
+          icon: pn0(spn_filter)
+          actionType: submenu
+          action: $S=M10
+          submenuId: M10
+        - label: Regulators
+          icon: pn0(spn_regulator)
+          actionType: submenu
+          action: $S=M2
+          submenuId: M2
+        - label: Cylinders
+          icon: pn0(spn_cylinder)
+          actionType: submenu
+          action: $S=M14
+          submenuId: M14
+        - label: Meters
+          icon: pn0(spn_meter)
+          actionType: submenu
+          action: $S=M100
+          submenuId: M100
+        - label: Motors
+          icon: pn0(spn_motors)
+          actionType: submenu
+          action: $S=M27
+          submenuId: M27
+        - label: Quick Disconnects
+          icon: pn0(spn_qd)
+          actionType: submenu
+          action: $S=M16
+          submenuId: M16
+        - label: Mufflers
+          icon: pn0(spn_mufflers)
+          actionType: submenu
+          action: $S=M102
+          submenuId: M102
+supportScripts:
+  - fileName: wd_load.lsp
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/wd_load.lsp
+    defuns:
+      - forceload
+      - DoIt
+      - wd_load
+    referencedFiles:
+      - acade_demandload.fas
+      - wd.env
+      - AeData\\wd.env
+      - wdhelp.dcl
+      - support/acade_demandload.fas
+      - "*.lsp"
+      - "*.vlx"
+      - \nOUT:wd_load.lsp
+    globalVariables:
+      - GBL_wd_1
+      - GBL_wd_DocSetBase
+      - GBL_wd_DocSetWDBase
+      - GBL_wd_BaseInstall
+      - GBL_wd_BaseLibs
+      - GBL_wd_DocSetAllUsersBase
+      - GBL_wd_rightclickoff
+  - fileName: wdio.lsp
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Support/en-US/Shared/wdio.lsp
+    defuns:
+      - user_settings
+      - wdio_err
+      - wdio_chk4_longfname
+      - calc_spacing_factor_total
+      - c:wdio
+      - c:wdio_autorun
+      - wdio_main
+      - read_xls_mdb_csv_file
+      - chk4_prototype_use
+      - wdio_autorun_set_settings
+      - wd_wdio_main_dialog
+      - do_module_spacing
+      - disable_line_ref
+      - wdio_setfnam_editbox
+      - browse_setup_button
+      - read_setfnam_editbox
+      - wdio_startfnam_editbox
+      - start_fn_toggle
+      - start_fnam_editbox
+      - sfn_browse_button
+      - wdio_main_set_tile_module_placement
+      - wd_wdio_ladder_setup
+      - do_x
+      - do_y
+      - dovertsp
+      - wdio_do_plcscl_editbox
+      - do_refs_radio_buttons
+      - wdio_ldr_img
+      - template_editbox_display
+      - template_editbox_typeit
+      - template_browse
+      - reset_global_variables
+      - save_global_variables
+      - wd_get_nearby_line
+      - figure_how_many_empty_rungs_left
+      - wdio_read_xls_or_mdb_data
+      - wdio_get_tabnam
+      - c:wdio_doit
+      - will_next_module_fit
+      - wdio_look4_plcpost_utils
+      - wdio_find_closest_wirecon_2_this_taga_attr
+      - figure_in_or_out
+      - determine_in_or_out
+      - wdio_anno_desc1
+      - ladder_cleanup
+      - chk2_del_wire
+      - wd_wdio_do_tag_attr
+      - wdio_accum_extra_attr_data
+      - wdio_write_out_accum_extra_attr_data
+      - wdio_annotate_inserted_symbol
+      - wd_get_attr_val_nam_en
+      - wdio_1_strchr
+      - wdio_cdrlst
+      - wdio_lst_to_delim_str
+      - wdio_1_get_attr_val_nam_en
+      - wd_wdio_all_slashes_forward
+      - wd_wdio_move_attrib
+      - wd_wdio_chg_desc_just
+      - wd_wdio_get_descattrs
+      - wd_wdiob_csv_dlg
+      - fill_dlg
+      - build_str
+      - preset_ix_nums
+      - preset_dev_ix_nums
+      - do_devices
+      - do_devices_more
+      - wd_wdio_save_wdi_button
+      - wdio_rtos_add_leading_zero
+      - wd_wdio_read_settings_data
+      - wd_wdio_read_settings
+    commandEntryPoints:
+      - c:wdio
+      - c:wdio_autorun
+      - c:wdio_doit
+    referencedFiles:
+      - wdio.lsp
+      - ACAD_ELECTRICAL.dwt
+      - wdio.dcl
+      - demoplc.xls
+      - "*.lsp"
+      - "*.vlx"
+      - demoplc.wdi
+    globalVariables:
+      - GBL_wdio_cfg_fnam
+      - GBL_wd_wdio_cfg_fnam
+      - GBL_wd_scl_plc_borderonly
+      - GBL_wdio_new_dwgs_created
+      - GBL_wd_scl_plcbld
+      - GBL_wd_
+      - GBL_wd_wdio_
+      - GBL_wd_wdio_autorun
+      - GBL_wd_m
+      - GBL_wd_iflg
+      - GBL_wd_PLC_autobreak
+      - GBL_wd_wdio_add2proj
+      - GBL_wd_wdio_start_fnam
+      - GBL_wd_prj
+      - GBL_wd_sup
+      - GBL_wd_usr
+      - GBL_wd_scl
+      - GBL_wd_rslogix_xls
+      - GBL_wd_wdio_ss_fnam_save
+      - GBL_prev_dwg_unit_scale
+      - GBL_prev_dwg_feature_scale
+      - GBL_wdio_ff
+      - GBL_wd_lib
+      - GBL_wd_trp
+lookupDatabases:
+  - fileName: ace_plc.mdb
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/ace_plc.mdb
+    tableCount: 4
+    tables:
+      - name: MFG_Alias
+        type: TABLE
+        columnCount: 2
+        columns:
+          - MANUFACTURER
+          - ALIAS
+      - name: PLC_Manufacturer
+        type: TABLE
+        columnCount: 4
+        columns:
+          - MANUFACTURER
+          - SERIES
+          - TYPE
+          - TABLE_NAME
+      - name: PLC_MSG
+        type: TABLE
+        columnCount: 3
+        columns:
+          - ID
+          - FIND
+          - WD_MSG_CODE
+      - name: PLC_Styles
+        type: TABLE
+        columnCount: 13
+        columns:
+          - STYLE
+          - BOX_RIGHT
+          - BOX_LEFT
+          - BOX_TOP
+          - BOX_BOTTOM
+          - BOX_SPLIT_BOTTOM
+          - BOX_SPLIT_TOP
+          - METRIC_BOX_RIGHT
+  - fileName: default_cat.mdb
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/default_cat.mdb
+    tableCount: 63
+    tables:
+      - name: _FAMILY_DESCRIPTION
+        type: TABLE
+        columnCount: 3
+        columns:
+          - RECNUM
+          - FAMILY
+          - DESC
+      - name: _LISTBOX_DEF
+        type: TABLE
+        columnCount: 18
+        columns:
+          - TABLENAME
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - COIL/VOLTAGE/STYLE
+          - MISCELLANEOUS1/CONTACTS
+          - MISCELLANEOUS2
+      - name: _PINLIST
+        type: TABLE
+        columnCount: 8
+        columns:
+          - RECNUM
+          - MANUFACTURER
+          - CATALOG
+          - ASSEMBLYCODE
+          - COILPINS
+          - PINLIST
+          - PEER_COILPINS
+          - PEER_PINLIST
+      - name: _TERMPROPS
+        type: TABLE
+        columnCount: 10
+        columns:
+          - RECNUM
+          - MANUFACTURER
+          - CATALOG
+          - ASSEMBLYCODE
+          - LEVELS
+          - LEVELDESCRIPTION
+          - TPINL
+          - TPINR
+      - name: _W0_CBLWIRES
+        type: TABLE
+        columnCount: 5
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - CONDUCTOR
+          - GAUGE
+          - RECNUM
+      - name: _XREF_GRAPHICS
+        type: TABLE
+        columnCount: 5
+        columns:
+          - RECNUM
+          - SEARCHORDER
+          - SYMBOL
+          - GRAPHIC
+          - COMMENTS
+      - name: AM
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: AN
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: C0
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - PINS
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: CA
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - POWER
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: CB
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: CR
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - COIL
+          - CONTACTS
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: DI
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - DIMENSION
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: DN
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: DO
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: DR
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - HP
+          - ENCLOSURE
+          - KW_HP
+          - ASSEMBLYCODE
+      - name: DS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: EN
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: FM
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RANGE
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: FS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: FT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - CONTACTS
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: FU
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - RATING
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: LR
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - COIL
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: LS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - ACTION_AND
+          - CONTACTS
+          - ASSEMBLYCODE
+      - name: LT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: MISC_CAT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: MO
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - HP
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - ASSEMBLYCODE
+      - name: MS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: NP
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - COLOR_AND_
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: OL
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PB
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - CONTACTS
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PE
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PLCIO
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - SERIES
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PM
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-ACT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-ALU
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - THREAD
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-CYL
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - FORCE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-FLC
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - PRESSURE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-FLT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - FLOW
+          - THREAD
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-MET
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RANGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-MFL
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - NOISE LEVEL
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-MNF
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - THREAD
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-MOT
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - HP
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - ASSEMBLYCODE
+      - name: PNEU-NOZ
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - THREAD
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-OPR
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-PMP
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VACUUM FLOW
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-TNK
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - VOLUME
+          - THREAD
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-VAC
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PNEU-VLV
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - PRESSURE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - PRESSURE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PW
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: PX
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: RE
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: SS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - STYLE
+          - CONTACTS
+          - MISCELLANEOUS1
+          - ASSEMBLYCODE
+      - name: SU
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: SW
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - VOLTAGE
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: TD
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - COIL
+          - CONTACTS
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: TRMS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: TS
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - CONTACTS
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: VM
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - RATING
+          - TYPE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: W0
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - GAUGE
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: WW
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - DUCT SIZE W x H
+          - TYPE
+          - STYLE
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+      - name: XF
+        type: TABLE
+        columnCount: 19
+        columns:
+          - CATALOG
+          - MANUFACTURER
+          - DESCRIPTION
+          - TYPE
+          - RATING
+          - MISCELLANEOUS1
+          - MISCELLANEOUS2
+          - ASSEMBLYCODE
+  - fileName: footprint_lookup.mdb
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/en-US/DB/footprint_lookup.mdb
+    tableCount: 0
+  - fileName: wdviacmp.mdb
+    filePath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/en-US/Electrical/UserSupport/wdviacmp.mdb
+    tableCount: 3
+    tables:
+      - name: ATTRMAP
+        type: TABLE
+        columnCount: 3
+        columns:
+          - VIA_ATTR
+          - WD_ATTR
+          - RECNUM
+      - name: COMPSWAP
+        type: TABLE
+        columnCount: 4
+        columns:
+          - VIACOMP
+          - WDCOMP
+          - XYOFFSET
+          - Recnum
+      - name: IOATTRMAP
+        type: TABLE
+        columnCount: 3
+        columns:
+          - VIA_ATTR
+          - WD_ATTR
+          - RECNUM
+samples:
+  shippedSampleDrawings:
+    - name: 3-phase motor control, Control circuit.DWG
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/3-phase motor control, Control circuit.DWG
+    - name: Control Schematic.DWG
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Control Schematic.DWG
+    - name: Control Wiring.DWG
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Control Wiring.DWG
+    - name: Emergency Stop Circuit.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Emergency Stop Circuit.dwg
+    - name: Main Cabinet Layout.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Main Cabinet Layout.dwg
+    - name: Main Control Panel layout.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Main Control Panel layout.dwg
+    - name: Main Drive.DWG
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Main Drive.DWG
+    - name: Operator Station layout 1.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Operator Station layout 1.dwg
+    - name: Operator Station layout 2.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Operator Station layout 2.dwg
+    - name: P&ID Diagram.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/P&ID Diagram.dwg
+    - name: PLC IO Rack Arrangement (1746-A7).DWG
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/PLC IO Rack Arrangement (1746-A7).DWG
+    - name: Point to Point.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Point to Point.dwg
+    - name: Safety Circuit.dwg
+      path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Safety Circuit.dwg
+  demoProjects:
+    - name: Aegs
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs
+      drawingFiles:
+        - name: AEGS01.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS01.DWG
+        - name: AEGS02.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS02.DWG
+        - name: AEGS03.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS03.DWG
+        - name: AEGS04.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS04.DWG
+        - name: AEGS05.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS05.DWG
+        - name: AEGS06.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS06.DWG
+        - name: AEGS07.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS07.DWG
+        - name: AEGS08.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS08.DWG
+        - name: AEGS09.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS09.DWG
+        - name: AEGS10.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Aegs/AEGS10.DWG
+    - name: Demo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo
+      projectFiles:
+        - name: wddemo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/wddemo.wdp
+      drawingFiles:
+        - name: DEMO01.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO01.DWG
+        - name: DEMO02.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO02.DWG
+        - name: DEMO03.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO03.DWG
+        - name: DEMO04.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO04.DWG
+        - name: DEMO05.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO05.DWG
+        - name: DEMO06.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO06.DWG
+        - name: DEMO07.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO07.DWG
+        - name: DEMO08.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO08.DWG
+        - name: DEMO09.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/DEMO09.DWG
+      sidecarFiles:
+        - name: wddemo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/wddemo.wdt
+        - name: wddemo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo/wddemo_wdtitle.wdl
+    - name: Extra Library Demo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo
+      projectFiles:
+        - name: Extra Library Demo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/Extra Library Demo.wdp
+      drawingFiles:
+        - name: Demo01.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/Demo01.dwg
+        - name: Demo02.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/Demo02.dwg
+        - name: Demo03.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/Demo03.dwg
+      sidecarFiles:
+        - name: extra library demo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/extra library demo.wdt
+        - name: extra library demo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Extra Library Demo/extra library demo_wdtitle.wdl
+    - name: GbDemo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo
+      projectFiles:
+        - name: Gbdemo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/Gbdemo.wdp
+      drawingFiles:
+        - name: 001.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/001.dwg
+        - name: 002.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/002.dwg
+        - name: 003.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/003.dwg
+        - name: 004.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/004.dwg
+        - name: 005.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/005.dwg
+        - name: 006.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/006.dwg
+        - name: 007.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/007.dwg
+        - name: 008.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/008.dwg
+        - name: 009.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/009.dwg
+        - name: 010.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/010.dwg
+        - name: 011.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/011.dwg
+        - name: 012.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/012.dwg
+        - name: 013.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/013.dwg
+        - name: 014.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/014.dwg
+        - name: 015.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/015.dwg
+        - name: 016.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/016.dwg
+        - name: 017.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/017.dwg
+        - name: 018.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/018.dwg
+        - name: 019.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/019.dwg
+        - name: 020.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/020.dwg
+        - name: 021.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/021.dwg
+        - name: 022.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/022.dwg
+        - name: 023.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/023.dwg
+        - name: 024.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/024.dwg
+        - name: 025.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/025.dwg
+      sidecarFiles:
+        - name: Gbdemo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/Gbdemo.wdt
+        - name: Gbdemo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/GbDemo/Gbdemo_wdtitle.wdl
+    - name: Iec60617Demo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo
+      projectFiles:
+        - name: Iec60617Demo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/Iec60617Demo.wdp
+      drawingFiles:
+        - name: 001.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/001.dwg
+        - name: 002.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/002.dwg
+        - name: 003.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/003.dwg
+        - name: 004.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/004.dwg
+        - name: 005.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/005.dwg
+        - name: 006.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/006.dwg
+        - name: 007.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/007.dwg
+        - name: 008.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/008.dwg
+        - name: 009.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/009.dwg
+        - name: 010.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/010.dwg
+        - name: 011.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/011.dwg
+        - name: 012.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/012.dwg
+        - name: 013.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/013.dwg
+        - name: 014.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/014.dwg
+        - name: 015.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/015.dwg
+        - name: 016.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/016.dwg
+        - name: 017.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/017.dwg
+        - name: 018.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/018.dwg
+        - name: 019.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/019.dwg
+        - name: 020.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/020.dwg
+        - name: 021.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/021.dwg
+        - name: 022.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/022.dwg
+        - name: 023.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/023.dwg
+        - name: 024.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/024.dwg
+        - name: 025.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/025.dwg
+      sidecarFiles:
+        - name: Iec60617Demo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/Iec60617Demo.wdt
+        - name: Iec60617Demo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Iec60617Demo/Iec60617Demo_wdtitle.wdl
+    - name: IecDemo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo
+      projectFiles:
+        - name: iecdemo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/iecdemo.wdp
+      drawingFiles:
+        - name: 001.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/001.dwg
+        - name: 002.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/002.dwg
+        - name: 003.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/003.dwg
+        - name: 004.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/004.dwg
+        - name: 005.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/005.dwg
+        - name: 006.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/006.dwg
+        - name: 007.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/007.dwg
+        - name: 008.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/008.dwg
+        - name: 009.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/009.dwg
+        - name: 010.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/010.dwg
+        - name: 011.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/011.dwg
+        - name: 012.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/012.dwg
+        - name: 013.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/013.dwg
+        - name: 014.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/014.DWG
+        - name: 015.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/015.DWG
+        - name: 016.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/016.dwg
+        - name: 017.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/017.dwg
+        - name: 018.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/018.dwg
+        - name: 019.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/019.dwg
+        - name: 020.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/020.dwg
+        - name: 021.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/021.dwg
+        - name: 022.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/022.DWG
+        - name: 023.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/023.DWG
+        - name: 024.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/024.DWG
+        - name: 025.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/025.DWG
+      sidecarFiles:
+        - name: iecdemo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/iecdemo.wdt
+        - name: iecdemo_wdtitle.wdL
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IecDemo/iecdemo_wdtitle.wdL
+    - name: IeeeDemo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo
+      projectFiles:
+        - name: Ieeedemo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/Ieeedemo.wdp
+      drawingFiles:
+        - name: 001.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/001.dwg
+        - name: 002.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/002.dwg
+        - name: 003.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/003.dwg
+        - name: 004.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/004.dwg
+        - name: 005.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/005.dwg
+        - name: 006.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/006.dwg
+        - name: 007.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/007.dwg
+        - name: 008.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/008.dwg
+        - name: 009.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/009.dwg
+        - name: 010.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/010.dwg
+        - name: 011.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/011.dwg
+        - name: 012.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/012.dwg
+        - name: 013.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/013.dwg
+        - name: 014.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/014.dwg
+        - name: 015.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/015.dwg
+        - name: 016.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/016.dwg
+        - name: 017.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/017.dwg
+        - name: 018.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/018.dwg
+        - name: 019.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/019.dwg
+        - name: 020.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/020.dwg
+        - name: 021.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/021.dwg
+        - name: 022.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/022.dwg
+        - name: 023.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/023.dwg
+        - name: 024.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/024.dwg
+        - name: 025.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/025.dwg
+      sidecarFiles:
+        - name: Ieeedemo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/Ieeedemo.wdt
+        - name: IEEEdemo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/IeeeDemo/IEEEdemo_wdtitle.wdl
+    - name: JisDemo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo
+      projectFiles:
+        - name: Jisdemo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/Jisdemo.wdp
+      drawingFiles:
+        - name: 001.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/001.dwg
+        - name: 002.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/002.dwg
+        - name: 003.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/003.dwg
+        - name: 004.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/004.dwg
+        - name: 005.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/005.dwg
+        - name: 006.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/006.dwg
+        - name: 007.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/007.dwg
+        - name: 008.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/008.dwg
+        - name: 009.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/009.dwg
+        - name: 010.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/010.dwg
+        - name: 011.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/011.dwg
+        - name: 012.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/012.dwg
+        - name: 013.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/013.dwg
+        - name: 014.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/014.dwg
+        - name: 015.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/015.dwg
+        - name: 016.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/016.dwg
+        - name: 017.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/017.dwg
+        - name: 018.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/018.dwg
+        - name: 019.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/019.dwg
+        - name: 020.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/020.dwg
+        - name: 021.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/021.dwg
+        - name: 022.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/022.dwg
+        - name: 023.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/023.dwg
+        - name: 024.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/024.dwg
+        - name: 025.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/025.dwg
+      sidecarFiles:
+        - name: Jisdemo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/Jisdemo.wdt
+        - name: Jisdemo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/JisDemo/Jisdemo_wdtitle.wdl
+    - name: NfpaDemo
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo
+      projectFiles:
+        - name: Nfpademo.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/Nfpademo.wdp
+      drawingFiles:
+        - name: DEMO01.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO01.DWG
+        - name: DEMO02.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO02.DWG
+        - name: DEMO03.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO03.DWG
+        - name: DEMO04.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO04.DWG
+        - name: DEMO05.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO05.DWG
+        - name: DEMO06.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO06.DWG
+        - name: DEMO07.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO07.DWG
+        - name: DEMO08.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO08.DWG
+        - name: DEMO09.DWG
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/DEMO09.DWG
+      sidecarFiles:
+        - name: Nfpademo.wdt
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/Nfpademo.wdt
+        - name: Nfpademo_wdtitle.wdl
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/NfpaDemo/Nfpademo_wdtitle.wdl
+    - name: Point2Point
+      rootPath: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Point2Point
+      projectFiles:
+        - name: Point2Point.wdp
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Point2Point/Point2Point.wdp
+      drawingFiles:
+        - name: Connector.dwg
+          path: C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Point2Point/Connector.dwg
+practicalImplications:
+  - The *_MENU.DAT catalogs are Autodesk's shipped insert taxonomy. They are a better source for standards-aware command discovery than ad-hoc web examples.
+  - wd_load.lsp shows startup and search-path behavior, which matters for any plugin, patch, or demand-load integration work.
+  - wdio.lsp exposes the spreadsheet-to-PLC automation surface and is the strongest local reference for PLC-generation workflows.
+  - The .mdb files are canonical lookup sources for catalog, footprint, PLC, and via/component relationships. Treat them as read-first assets unless there is a controlled migration story.
+  - The shipped sample drawings and demo .wdp projects are strong regression fixtures for future Suite automation features that need realistic ACADE content.

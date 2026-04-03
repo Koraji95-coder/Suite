@@ -53,7 +53,7 @@ vi.mock("@/services/projectReviewDecisionService", () => ({
 	},
 }));
 
-vi.mock("@/services/projectIssueSetService", () => ({
+vi.mock("@/features/project-workflow/issueSetService", () => ({
 	projectIssueSetService: {
 		fetchIssueSet: mockFetchIssueSet,
 	},
@@ -66,8 +66,8 @@ vi.mock("./DrawingProgramPanel", () => ({
 	},
 }));
 
-vi.mock("@/services/titleBlockSyncService", () => ({
-	titleBlockSyncService: {
+vi.mock("@/features/project-setup/actionService", () => ({
+	projectSetupActionService: {
 		scan: mockTitleBlockScan,
 		preview: mockTitleBlockPreview,
 		apply: mockTitleBlockApply,

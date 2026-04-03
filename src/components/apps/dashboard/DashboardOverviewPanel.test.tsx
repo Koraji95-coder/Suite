@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardOverviewPanel } from "./DashboardOverviewPanel";
 
+const mockGetDashboardSnapshot = vi.hoisted(() => vi.fn());
 const mockGetOverview = vi.hoisted(() => vi.fn());
 const mockListEvents = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
@@ -32,6 +33,7 @@ vi.mock("@/auth/useAuth", () => ({
 
 vi.mock("@/services/watchdogService", () => ({
 	watchdogService: {
+		getDashboardSnapshot: mockGetDashboardSnapshot,
 		getOverview: mockGetOverview,
 		listEvents: mockListEvents,
 		listSessions: mockListSessions,
@@ -223,7 +225,8 @@ describe("DashboardOverviewPanel", () => {
 			},
 		});
 
-		mockGetOverview.mockResolvedValue({
+		const overviewPayload = {
+			ok: true,
 			generatedAt: Date.now(),
 			timeWindowMs: 4 * 60 * 60 * 1000,
 			projectId: "project-1",
@@ -242,8 +245,13 @@ describe("DashboardOverviewPanel", () => {
 			},
 			projects: { top: [{ projectId: "project-1", eventCount: 2 }] },
 			trendBuckets: [{ bucketStartMs: Date.now(), eventCount: 2 }],
-		});
-		mockListEvents.mockResolvedValue({
+		};
+		const eventsPayload = {
+			ok: true,
+			count: 2,
+			afterEventId: 0,
+			lastEventId: 2,
+			nextEventId: 3,
 			events: [
 				{
 					eventId: 1,
@@ -270,8 +278,9 @@ describe("DashboardOverviewPanel", () => {
 					metadata: {},
 				},
 			],
-		});
-		mockListSessions.mockResolvedValue({
+		};
+		const sessionsPayload = {
+			ok: true,
 			count: 1,
 			generatedAt: Date.now(),
 			timeWindowMs: 4 * 60 * 60 * 1000,
@@ -302,8 +311,9 @@ describe("DashboardOverviewPanel", () => {
 					trackerUpdatedAt: Date.now(),
 				},
 			],
-		});
-		mockListCollectors.mockResolvedValue({
+		};
+		const collectorsPayload = {
+			ok: true,
 			count: 2,
 			collectors: [
 				{
@@ -343,6 +353,21 @@ describe("DashboardOverviewPanel", () => {
 					lastSequence: 5,
 				},
 			],
+		};
+		mockGetOverview.mockResolvedValue(overviewPayload);
+		mockListEvents.mockResolvedValue(eventsPayload);
+		mockListSessions.mockResolvedValue(sessionsPayload);
+		mockListCollectors.mockResolvedValue(collectorsPayload);
+		mockGetDashboardSnapshot.mockResolvedValue({
+			ok: true,
+			generatedAt: Date.now(),
+			timeWindowMs: 4 * 60 * 60 * 1000,
+			projectId: "project-1",
+			collectorId: "collector-cad",
+			overview: overviewPayload,
+			events: eventsPayload,
+			sessions: sessionsPayload,
+			collectors: collectorsPayload,
 		});
 		mockLoadMemories.mockResolvedValue([
 			{
@@ -476,11 +501,53 @@ describe("DashboardOverviewPanel", () => {
 		);
 
 		await waitFor(() => {
-			expect(mockGetOverview).toHaveBeenCalledWith({
+			expect(mockGetDashboardSnapshot).toHaveBeenCalledWith({
 				projectId: "project-1",
+				collectorId: "collector-cad",
 				timeWindowMs: 4 * 60 * 60 * 1000,
+				eventsLimit: 8,
+				sessionsLimit: 8,
 			});
 		});
+		await waitFor(() => {
+			expect(scrollIntoViewMock).toHaveBeenCalled();
+		});
+
+		expect(mockGetOverview).not.toHaveBeenCalled();
+		expect(mockListEvents).not.toHaveBeenCalled();
+		expect(mockListSessions).not.toHaveBeenCalled();
+		expect(mockListCollectors).not.toHaveBeenCalled();
+		expect(screen.getByText("Watchdog summary")).toBeTruthy();
+		expect(screen.getByText("Delivery board")).toBeTruthy();
+		expect(screen.getByText("Live CAD sessions")).toBeTruthy();
+		expect(screen.getByText("Session timeline")).toBeTruthy();
+		expect(screen.getByText("Seq 1")).toBeTruthy();
+		expect(screen.getAllByText("Project rollup").length).toBeGreaterThan(0);
+		expect(screen.queryByText("Work Ledger")).toBeNull();
+		expect(screen.queryByText("Worktale ready")).toBeNull();
+		expect(screen.queryByText("Open latest receipt")).toBeNull();
+		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
+	});
+
+	it("falls back to legacy watchdog requests when the dashboard snapshot route is unavailable", async () => {
+		mockGetDashboardSnapshot.mockRejectedValueOnce(
+			new Error(
+				"Watchdog route is unavailable. Restart the backend so it matches the current repo routes.",
+			),
+		);
+
+		render(
+			<MemoryRouter
+				initialEntries={[
+					"/app/dashboard?focus=watchdog&project=project-1&collector=collector-cad&window=4",
+				]}
+			>
+				<Routes>
+					<Route path="/app/dashboard" element={<DashboardOverviewPanel />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
 		await waitFor(() => {
 			expect(mockListEvents).toHaveBeenCalled();
 		});
@@ -492,25 +559,7 @@ describe("DashboardOverviewPanel", () => {
 				timeWindowMs: 4 * 60 * 60 * 1000,
 			});
 		});
-		await waitFor(() => {
-			expect(scrollIntoViewMock).toHaveBeenCalled();
-		});
-
-		expect(mockListEvents.mock.calls[0]?.[0]).toMatchObject({
-			projectId: "project-1",
-			collectorId: "collector-cad",
-			limit: 8,
-		});
 		expect(screen.getByText("Watchdog summary")).toBeTruthy();
-		expect(screen.getByText("Delivery board")).toBeTruthy();
-		expect(screen.getByText("Live CAD sessions")).toBeTruthy();
-		expect(screen.getByText("Session timeline")).toBeTruthy();
-		expect(screen.getByText("Seq 1")).toBeTruthy();
-		expect(screen.getAllByText("Project rollup").length).toBeGreaterThan(0);
-		expect(screen.queryByText("Work Ledger")).toBeNull();
-		expect(screen.queryByText("Worktale ready")).toBeNull();
-		expect(screen.queryByText("Open latest receipt")).toBeNull();
-		expect(screen.getAllByText("Drawing1.dwg").length).toBeGreaterThan(0);
 	});
 
 	it("keeps developer-only ledger and publisher state out of the dashboard even for dev users", async () => {

@@ -216,22 +216,7 @@ function Get-PortOwningProcessId {
 function Test-SupabaseOutputIndicatesReady {
     param([string]$Text)
 
-    if ([string]::IsNullOrWhiteSpace($Text)) {
-        return $false
-    }
-
-    if (
-        $Text -match "(?im)\bcontainer is not ready\b" -or
-        $Text -match "(?im)\bfailed to inspect\b" -or
-        $Text -match "(?im)\btry rerunning the command with --debug\b"
-    ) {
-        return $false
-    }
-
-    return (
-        $Text -match "(?im)\bsupabase local development setup is running\b" -or
-        $Text -match "(?im)\bProject URL\b"
-    )
+    return (Test-SuiteSupabaseStatusReady -Text $Text -RepoRoot $resolvedRepoRoot)
 }
 
 function Get-ProcessUptimeSeconds {
@@ -389,17 +374,20 @@ $services = @()
 $supabaseStatusResult = Invoke-ExternalCommand -FilePath "node" -Arguments @((Join-Path $resolvedRepoRoot "scripts\run-supabase-cli.mjs"), "status") -WorkingDirectory $resolvedRepoRoot
 $supabasePorts = Get-SuiteSupabaseLocalPorts -RepoRoot $resolvedRepoRoot
 $supabaseStatusReady = $supabaseStatusResult.Ok -and (Test-SupabaseOutputIndicatesReady -Text $supabaseStatusResult.OutputText)
+$supabaseMissingExpectedServices = @(Get-SuiteSupabaseMissingExpectedServices -RepoRoot $resolvedRepoRoot -StatusText $supabaseStatusResult.OutputText)
+$supabaseHasMissingExpectedServices = ($supabaseMissingExpectedServices.Count -gt 0)
 $supabaseApiListening = Test-PortListening -Port $supabasePorts.api
 $supabaseDbListening = Test-PortListening -Port $supabasePorts.db
 $supabaseStudioListening = Test-PortListening -Port $supabasePorts.studio
 $supabaseProcessId = Get-PortOwningProcessId -Port $supabasePorts.api
-$supabaseState = if ($supabaseStatusReady -or ($supabaseApiListening -and $supabaseDbListening)) {
+$supabaseState = if ($supabaseStatusReady -or ($supabaseApiListening -and $supabaseDbListening -and -not $supabaseHasMissingExpectedServices)) {
     "running"
 }
 elseif (
     $supabaseApiListening -or
     $supabaseDbListening -or
-    ($supabaseStatusResult.OutputText -match "(?im)\bcontainer is not ready\b")
+    ($supabaseStatusResult.OutputText -match "(?im)\bcontainer is not ready\b") -or
+    $supabaseHasMissingExpectedServices
 ) {
     "starting"
 }
@@ -417,6 +405,9 @@ $supabaseDetails = if ($supabaseState -eq "running" -and $supabaseStudioListenin
 }
 elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
     "Supabase CLI reports the local stack is running."
+}
+elseif ($supabaseState -eq "starting" -and $supabaseHasMissingExpectedServices) {
+    "Waiting for expected services: $([string]::Join(', ', $supabaseMissingExpectedServices))."
 }
 elseif ($supabaseState -eq "starting") {
     "API $($supabasePorts.api): $supabaseApiListening. DB $($supabasePorts.db): $supabaseDbListening."
@@ -439,6 +430,16 @@ elseif ($supabaseState -eq "running" -and $supabaseStatusReady) {
     $supabaseNotes += [pscustomobject]@{
         label = "Status"
         value = "Supabase CLI reports the local stack is healthy even though port probes are still catching up."
+    }
+}
+elseif ($supabaseState -eq "starting" -and $supabaseHasMissingExpectedServices) {
+    $supabaseNotes += [pscustomobject]@{
+        label = "Waiting On"
+        value = [string]::Join(", ", $supabaseMissingExpectedServices)
+    }
+    $supabaseNotes += [pscustomobject]@{
+        label = "Readiness"
+        value = "API $($supabasePorts.api) listening: $supabaseApiListening. DB $($supabasePorts.db) listening: $supabaseDbListening."
     }
 }
 elseif ($supabaseState -eq "starting") {

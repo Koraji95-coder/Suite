@@ -1,5 +1,9 @@
 import { logger } from "@/lib/logger";
 import {
+	projectSetupBackendService,
+	projectSetupCompanionService,
+} from "@/features/project-setup";
+import {
 	FetchRequestError,
 	fetchWithTimeout,
 	mapFetchErrorMessage,
@@ -247,6 +251,18 @@ export interface WatchdogSessionsResponse {
 	sessions: WatchdogSessionSummary[];
 }
 
+export interface WatchdogDashboardSnapshotResponse {
+	ok: boolean;
+	generatedAt: number;
+	timeWindowMs: number;
+	projectId?: string | null;
+	collectorId?: string | null;
+	collectors: WatchdogCollectorsListResponse;
+	overview: WatchdogOverviewResponse;
+	events: WatchdogEventsResponse;
+	sessions: WatchdogSessionsResponse;
+}
+
 export interface WatchdogProjectRulesSyncResponse {
 	ok: boolean;
 	rules: WatchdogProjectRule[];
@@ -279,6 +295,38 @@ function buildQueryString(
 	}
 	const serialized = params.toString();
 	return serialized ? `?${serialized}` : "";
+}
+
+const dashboardSnapshotInFlight = new Map<
+	string,
+	Promise<WatchdogDashboardSnapshotResponse>
+>();
+
+export type WatchdogFolderPickerAvailability =
+	| "unknown"
+	| "available"
+	| "unavailable";
+
+const WATCHDOG_FOLDER_PICKER_BACKEND_MESSAGE =
+	"Folder picker is unavailable in this environment.";
+
+export const WATCHDOG_FOLDER_PICKER_UNAVAILABLE_MESSAGE =
+	"Folder browsing requires Suite Runtime Control on this workstation. Make sure it is running, then try again. You can still paste the Windows path manually.";
+
+let watchdogFolderPickerAvailability: WatchdogFolderPickerAvailability =
+	"unknown";
+
+export function getWatchdogFolderPickerAvailability(): WatchdogFolderPickerAvailability {
+	return watchdogFolderPickerAvailability;
+}
+
+export function isWatchdogFolderPickerUnavailableError(error: unknown): boolean {
+	const message =
+		error instanceof Error ? error.message : String(error ?? "").trim();
+	return (
+		message.includes(WATCHDOG_FOLDER_PICKER_BACKEND_MESSAGE) ||
+		message.includes(WATCHDOG_FOLDER_PICKER_UNAVAILABLE_MESSAGE)
+	);
 }
 
 class WatchdogService {
@@ -412,16 +460,33 @@ class WatchdogService {
 	async pickRoot(
 		initialPath?: string | null,
 	): Promise<WatchdogPickRootResponse> {
-		return this.requestJson<WatchdogPickRootResponse>(
-			"/api/watchdog/pick-root",
-			{
-				method: "POST",
-				body: {
-					initialPath: initialPath ?? null,
-				},
-				timeoutMs: 120_000,
-			},
-		);
+		try {
+			const ticket = await projectSetupBackendService.issueTicket({
+				action: "pick-root",
+			});
+			const bridgeResult = await projectSetupCompanionService.pickRoot(ticket, {
+				initialPath: initialPath ?? null,
+				title: "Select Watchdog Root Folder",
+			});
+			if (bridgeResult.success && bridgeResult.data) {
+				watchdogFolderPickerAvailability = "available";
+				return {
+					ok: true,
+					cancelled: Boolean(bridgeResult.data.cancelled),
+					path: bridgeResult.data.path ?? null,
+				};
+			}
+			if (bridgeResult.message) {
+				throw new Error(bridgeResult.message);
+			}
+			throw new Error(WATCHDOG_FOLDER_PICKER_UNAVAILABLE_MESSAGE);
+		} catch (error) {
+			if (isWatchdogFolderPickerUnavailableError(error)) {
+				watchdogFolderPickerAvailability = "unavailable";
+				throw new Error(WATCHDOG_FOLDER_PICKER_UNAVAILABLE_MESSAGE);
+			}
+			throw error;
+		}
 	}
 
 	async registerCollector(
@@ -499,6 +564,35 @@ class WatchdogService {
 		return this.requestJson<WatchdogOverviewResponse>(
 			`/api/watchdog/overview${query}`,
 		);
+	}
+
+	async getDashboardSnapshot(options?: {
+		projectId?: string;
+		collectorId?: string;
+		timeWindowMs?: number;
+		eventsLimit?: number;
+		sessionsLimit?: number;
+	}): Promise<WatchdogDashboardSnapshotResponse> {
+		const query = buildQueryString({
+			projectId: options?.projectId,
+			collectorId: options?.collectorId,
+			timeWindowMs: options?.timeWindowMs,
+			eventsLimit: options?.eventsLimit,
+			sessionsLimit: options?.sessionsLimit,
+		});
+		const cacheKey = query || "default";
+		const existingRequest = dashboardSnapshotInFlight.get(cacheKey);
+		if (existingRequest) {
+			return existingRequest;
+		}
+
+		const request = this.requestJson<WatchdogDashboardSnapshotResponse>(
+			`/api/watchdog/dashboard${query}`,
+		).finally(() => {
+			dashboardSnapshotInFlight.delete(cacheKey);
+		});
+		dashboardSnapshotInFlight.set(cacheKey, request);
+		return request;
 	}
 
 	async getProjectOverview(

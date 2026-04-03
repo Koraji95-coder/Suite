@@ -30,6 +30,7 @@ $normalizedWorkstationProfile = [pscustomobject]@{
 	matchSource = [string]$workstationProfile.MatchSource
 }
 $runtimeStatusScript = Join-Path $PSScriptRoot "get-suite-runtime-status.ps1"
+$worktaleDoctorScript = Join-Path $PSScriptRoot "check-worktale-readiness.mjs"
 $codexConfigPath = Join-Path $env:USERPROFILE ".codex\config.toml"
 $skillsRoot = Join-Path $env:USERPROFILE ".codex\skills"
 $mirrorRoot = Join-Path $env:USERPROFILE "Dropbox\SuiteLocalStateMirror"
@@ -73,6 +74,46 @@ function Invoke-JsonPowerShellScript {
 	}
 }
 
+function Invoke-JsonNodeScript {
+	param(
+		[Parameter(Mandatory = $true)][string]$ScriptPath,
+		[string[]]$Arguments = @()
+	)
+
+	$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+	if ($null -eq $nodeCommand) {
+		return [pscustomobject]@{
+			Ok = $false
+			OutputText = "node is not available on PATH."
+			Payload = $null
+		}
+	}
+
+	$rawOutput = & $nodeCommand.Source $ScriptPath @Arguments 2>&1
+	$exitCode = if (Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue) { [int]$LASTEXITCODE } else { 0 }
+	$outputText = [string]::Join(
+		[Environment]::NewLine,
+		@(
+			$rawOutput | ForEach-Object {
+				if ($null -eq $_) { "" } else { $_.ToString() }
+			}
+		)
+	).Trim()
+
+	try {
+		$payload = if ([string]::IsNullOrWhiteSpace($outputText)) { $null } else { $outputText | ConvertFrom-Json }
+	}
+	catch {
+		$payload = $null
+	}
+
+	[pscustomobject]@{
+		Ok = ($exitCode -eq 0)
+		OutputText = $outputText
+		Payload = $payload
+	}
+}
+
 $runtimeStatus = if ($SkipRuntimeStatus) {
 	$null
 }
@@ -85,6 +126,33 @@ $envDrift = Get-SuiteEnvDriftSummary -RepoRoot $resolvedRepoRoot -MirroredManife
 $mcpInventory = @(Get-SuiteCodexMcpInventory -CodexConfigPath $codexConfigPath)
 $skillInventory = @(Get-SuiteSkillInventory -SkillsRoot $skillsRoot)
 $adminContinuity = Get-SuiteAdminContinuitySummary -RepoRoot $resolvedRepoRoot
+$worktaleStatus = if (Test-Path -LiteralPath $worktaleDoctorScript -PathType Leaf) {
+	Invoke-JsonNodeScript -ScriptPath $worktaleDoctorScript -Arguments @("--json")
+}
+else {
+	[pscustomobject]@{
+		Ok = $false
+		OutputText = "Worktale doctor script missing."
+		Payload = $null
+	}
+}
+$worktale = if ($worktaleStatus.Payload) {
+	$worktaleStatus.Payload
+}
+else {
+	[pscustomobject]@{
+		ready = $false
+		issues = @(
+			if ([string]::IsNullOrWhiteSpace($worktaleStatus.OutputText)) {
+				"Worktale readiness could not be evaluated."
+			}
+			else {
+				$worktaleStatus.OutputText
+			}
+		)
+		nextStep = "npm run worktale:bootstrap"
+	}
+}
 
 $doctor = [pscustomobject]@{
 	generatedAt = (Get-Date).ToUniversalTime().ToString("o")
@@ -113,6 +181,7 @@ $doctor = [pscustomobject]@{
 	}
 	envDrift = $envDrift
 	adminContinuity = $adminContinuity
+	worktale = $worktale
 	runtime = if ($runtimeStatus -and $runtimeStatus.Payload) { $runtimeStatus.Payload } else { $null }
 	runtimeCore = [pscustomobject]@{
 		composePath = $runtimeCoreComposePath
@@ -146,6 +215,10 @@ Write-Host "Mirror root: $($doctor.dropbox.mirrorRoot)"
 Write-Host "MCP servers: $((@($mcpInventory | ForEach-Object { $_.name }) -join ', '))"
 Write-Host "Skills: $($skillInventory.Count)"
 Write-Host "Admin continuity: $($adminContinuity.overall)"
+Write-Host "Worktale: $(if ($worktale.ready) { 'ready' } else { 'needs bootstrap' })"
+if (-not $worktale.ready -and $worktale.nextStep) {
+	Write-Host "Worktale next step: $($worktale.nextStep)"
+}
 if ($runtimeStatus -and $runtimeStatus.Payload -and $runtimeStatus.Payload.overall) {
 	Write-Host "Runtime: $([string]$runtimeStatus.Payload.overall.text) ($([string]$runtimeStatus.Payload.overall.state))"
 }

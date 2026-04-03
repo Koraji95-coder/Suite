@@ -57,6 +57,18 @@
   - deterministic profile-model routing with no cross-model fallback retries.
   - UI semantics checks for form fields/labels/dialog composition (id/name/htmlFor and Dialog context safety).
 
+## Documentation Navigation
+
+- Start repo documentation at `docs/README.md`.
+- Canonical runtime section indexes live under:
+  - `docs/frontend/README.md`
+  - `docs/backend/README.md`
+  - `docs/runtime-control/README.md`
+  - `docs/cad/README.md`
+- `docs/development` is for operational/support docs, not canonical runtime architecture.
+- Historical-only notes belong under `docs/archive/legacy`.
+- When a slice changes runtime ownership, update or move its docs in the same tranche; do not leave stale pointers behind.
+
 ## Gateway Build/Runtime Guardrail
 
 - The Suite-native gateway is the default gateway path for Suite workflows.
@@ -74,3 +86,11 @@
   - `GET /api/agent/runs/:runId/events`
   - `POST /api/agent/runs/:runId/cancel`
 - Keep orchestration additive; do not change existing single-chat or pairing behavior.
+
+## Performance Workflow
+
+- For browser timing passes, prefer the repo's authenticated Playwright flow over manual login or ad-hoc stopwatch timing.
+- Bootstrap protected-route auth state with `npm run auth:playwright:bootstrap`.
+- Use `npm run test:e2e:dashboard:perf` for dashboard timing snapshots; the run emits `dashboard-performance.json` and reads `window.__suiteDashboardPerf`.
+- Dashboard perf instrumentation lives in `src/components/apps/dashboard/dashboardPerf.ts`; update it additively and keep probes dev-safe.
+- If browser automation or MCP browser tooling is available, use that authenticated flow first before adding new one-off perf scripts.

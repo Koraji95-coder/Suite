@@ -69,6 +69,13 @@ npm run auth:playwright:bootstrap
 npx playwright test tests/e2e/authenticated-shell.spec.ts
 ```
 
+Dashboard timing pass:
+
+```bash
+npm run auth:playwright:bootstrap
+npm run test:e2e:dashboard:perf
+```
+
 ## Notes
 
 - If your frontend origin is `127.0.0.1`, include that exact origin in bootstrap.

@@ -298,10 +298,20 @@ namespace SuiteCadAuthoring
 
         private static JsonObject HandleAction(string action, JsonObject payload)
         {
+            var projectSetupResult = SuiteCadProjectSetupPipeActions.HandleAction(action, payload);
+            if (projectSetupResult is not null)
+            {
+                return projectSetupResult;
+            }
+
+            var projectStandardsResult = SuiteCadProjectStandardsPipeActions.HandleAction(action, payload);
+            if (projectStandardsResult is not null)
+            {
+                return projectStandardsResult;
+            }
+
             return action switch
             {
-                "suite_acade_project_open" => SuiteCadAuthoringCommands.HandlePipeAcadeProjectOpen(payload),
-                "suite_acade_project_create" => SuiteCadAuthoringCommands.HandlePipeAcadeProjectCreate(payload),
                 "suite_pipe_status" => BuildStatusEnvelope(),
                 _ => new JsonObject
                 {

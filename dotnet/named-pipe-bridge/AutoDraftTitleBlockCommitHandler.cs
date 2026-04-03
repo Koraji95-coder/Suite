@@ -157,16 +157,7 @@ static partial class ConduitRouteStubHandlers
                 var score = matchingTagCount * 10;
                 if (!string.IsNullOrWhiteSpace(target.BlockNameHint))
                 {
-                    var normalizedBlockName = NormalizeAutoDraftName(blockName);
-                    var normalizedHint = NormalizeAutoDraftName(target.BlockNameHint);
-                    if (string.Equals(normalizedBlockName, normalizedHint, StringComparison.Ordinal))
-                    {
-                        score += 50;
-                    }
-                    else if (normalizedBlockName.Contains(normalizedHint, StringComparison.Ordinal))
-                    {
-                        score += 20;
-                    }
+                    score += GetAutoDraftTitleBlockHintScore(blockName, target.BlockNameHint);
                 }
 
                 matches.Add(
@@ -603,14 +594,67 @@ static partial class ConduitRouteStubHandlers
         }
 
         var normalizedBlockName = NormalizeAutoDraftName(blockName);
-        var normalizedHint = NormalizeAutoDraftName(blockNameHint);
-        if (normalizedHint.Length <= 0)
+        if (normalizedBlockName.Length <= 0)
         {
             return true;
         }
 
-        return string.Equals(normalizedBlockName, normalizedHint, StringComparison.Ordinal)
-            || normalizedBlockName.Contains(normalizedHint, StringComparison.Ordinal);
+        foreach (var normalizedHint in EnumerateAutoDraftNameHints(blockNameHint))
+        {
+            if (string.Equals(normalizedBlockName, normalizedHint, StringComparison.Ordinal)
+                || normalizedBlockName.Contains(normalizedHint, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int GetAutoDraftTitleBlockHintScore(string blockName, string blockNameHint)
+    {
+        var normalizedBlockName = NormalizeAutoDraftName(blockName);
+        if (normalizedBlockName.Length <= 0)
+        {
+            return 0;
+        }
+
+        var bestScore = 0;
+        foreach (var normalizedHint in EnumerateAutoDraftNameHints(blockNameHint))
+        {
+            if (string.Equals(normalizedBlockName, normalizedHint, StringComparison.Ordinal))
+            {
+                bestScore = Math.Max(bestScore, 50);
+                continue;
+            }
+
+            if (normalizedBlockName.Contains(normalizedHint, StringComparison.Ordinal))
+            {
+                bestScore = Math.Max(bestScore, 20);
+            }
+        }
+
+        return bestScore;
+    }
+
+    private static IEnumerable<string> EnumerateAutoDraftNameHints(string blockNameHint)
+    {
+        if (string.IsNullOrWhiteSpace(blockNameHint))
+        {
+            yield break;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var rawPart in blockNameHint.Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var normalizedHint = NormalizeAutoDraftName(rawPart);
+            if (normalizedHint.Length <= 0 || !seen.Add(normalizedHint))
+            {
+                continue;
+            }
+
+            yield return normalizedHint;
+        }
     }
 
     private static string NormalizeAutoDraftName(string value)

@@ -8,6 +8,11 @@ import {
 	DEFAULT_SHEET_TYPES,
 	parseFileName,
 } from "@/components/apps/drawing-list-manager/drawingListManagerModels";
+import {
+	createProjectScopedFetchCache,
+	getCurrentSupabaseUserId,
+	getLocalStorageApi,
+} from "@/services/projectWorkflowClientSupport";
 
 export type DrawingRevisionRegisterRow =
 	Database["public"]["Tables"]["drawing_revision_register_entries"]["Row"];
@@ -66,6 +71,10 @@ export interface AutoDraftExecutionTraceInput {
 }
 
 const LOCAL_STORAGE_KEY = "suite:project-revision-register:local";
+const revisionEntryFetchCache = createProjectScopedFetchCache<{
+	data: DrawingRevisionRegisterRow[];
+	error: Error | null;
+}>();
 
 const createId = () =>
 	typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -120,10 +129,17 @@ function normalizeText(value: string | null | undefined) {
 	return String(value || "").trim();
 }
 
+function sortEntriesByUpdatedAt(entries: DrawingRevisionRegisterRow[]) {
+	return [...entries].sort((left, right) =>
+		right.updated_at.localeCompare(left.updated_at),
+	);
+}
+
 function readLocalEntries(): DrawingRevisionRegisterRow[] {
-	if (typeof localStorage === "undefined") return [];
+	const storage = getLocalStorageApi();
+	if (!storage) return [];
 	try {
-		const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+		const raw = storage.getItem(LOCAL_STORAGE_KEY);
 		if (!raw) return [];
 		const parsed = JSON.parse(raw) as unknown;
 		return Array.isArray(parsed)
@@ -135,9 +151,10 @@ function readLocalEntries(): DrawingRevisionRegisterRow[] {
 }
 
 function writeLocalEntries(entries: DrawingRevisionRegisterRow[]) {
-	if (typeof localStorage === "undefined") return;
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+		storage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
 	} catch (error) {
 		logger.warn(
 			"ProjectRevisionRegisterService",
@@ -195,14 +212,11 @@ function normalizeRow(
 }
 
 async function getCurrentUserId(): Promise<string | null> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) {
+	try {
+		return await getCurrentSupabaseUserId();
+	} catch {
 		return null;
 	}
-	return user.id;
 }
 
 function buildImportDraft(
@@ -253,6 +267,156 @@ function buildImportDraft(
 }
 
 export const projectRevisionRegisterService = {
+	async fetchEntriesForProjects(projectIds: string[]): Promise<
+		Map<
+			string,
+			{
+				data: DrawingRevisionRegisterRow[];
+				error: Error | null;
+			}
+		>
+	> {
+		const normalizedProjectIds = Array.from(
+			new Set(
+				projectIds
+					.map((projectId) => normalizeText(projectId))
+					.filter(Boolean),
+			),
+		);
+		const results = new Map<
+			string,
+			{
+				data: DrawingRevisionRegisterRow[];
+				error: Error | null;
+			}
+		>();
+		if (normalizedProjectIds.length === 0) {
+			return results;
+		}
+
+		const missingProjectIds: string[] = [];
+		const inFlightPromises: Promise<void>[] = [];
+		for (const projectId of normalizedProjectIds) {
+			const cached = revisionEntryFetchCache.read(projectId);
+			if (cached) {
+				results.set(projectId, cached);
+				continue;
+			}
+
+			const inFlight = revisionEntryFetchCache.readInFlight(projectId);
+			if (inFlight) {
+				inFlightPromises.push(
+					inFlight.then((value) => {
+						results.set(projectId, value);
+					}),
+				);
+				continue;
+			}
+
+			missingProjectIds.push(projectId);
+		}
+
+		if (missingProjectIds.length > 0) {
+			const localRows = readLocalEntries().map(normalizeRow);
+			const localFallbacks = new Map<string, DrawingRevisionRegisterRow[]>();
+			for (const projectId of missingProjectIds) {
+				localFallbacks.set(
+					projectId,
+					sortEntriesByUpdatedAt(
+						localRows.filter((entry) => entry.project_id === projectId),
+					),
+				);
+			}
+
+			const userId = await getCurrentUserId();
+			const remoteProjectIds = missingProjectIds.filter(looksLikeUuid);
+			if (!userId || remoteProjectIds.length === 0) {
+				for (const projectId of missingProjectIds) {
+					const value = revisionEntryFetchCache.write(projectId, {
+						data: localFallbacks.get(projectId) ?? [],
+						error: null,
+					});
+					results.set(projectId, value);
+				}
+			} else {
+				const result = await safeSupabaseQuery(
+					async () =>
+						await supabase
+							.from("drawing_revision_register_entries")
+							.select("*")
+							.eq("user_id", userId)
+							.in("project_id", remoteProjectIds)
+							.order("updated_at", { ascending: false }),
+					"ProjectRevisionRegisterService",
+				);
+
+				if (result.error) {
+					const message = String(result.error.message || "").toLowerCase();
+					const missingTable =
+						message.includes("drawing_revision_register_entries") &&
+						(message.includes("does not exist") ||
+							message.includes("not found") ||
+							message.includes("could not find"));
+					for (const projectId of missingProjectIds) {
+						const value = revisionEntryFetchCache.write(projectId, {
+							data: localFallbacks.get(projectId) ?? [],
+							error: missingTable
+								? null
+								: new Error(
+										String(
+											result.error?.message || "Failed to load revisions.",
+										),
+									),
+						});
+						results.set(projectId, value);
+					}
+					if (missingTable) {
+						logger.warn(
+							"ProjectRevisionRegisterService",
+							"Hosted revision register storage is unavailable; using local fallback.",
+							{
+								projectIds: remoteProjectIds,
+								userId,
+								error: result.error.message,
+							},
+						);
+					}
+				} else {
+					const groupedRows = new Map<string, DrawingRevisionRegisterRow[]>();
+					for (const row of (result.data ?? []) as DrawingRevisionRegisterRow[]) {
+						const projectId = normalizeText(row.project_id);
+						if (!projectId) {
+							continue;
+						}
+						const normalizedRow = normalizeRow(row);
+						const existing = groupedRows.get(projectId);
+						if (existing) {
+							existing.push(normalizedRow);
+						} else {
+							groupedRows.set(projectId, [normalizedRow]);
+						}
+					}
+
+					for (const projectId of missingProjectIds) {
+						const value = revisionEntryFetchCache.write(projectId, {
+							data: sortEntriesByUpdatedAt(
+								groupedRows.get(projectId) ?? localFallbacks.get(projectId) ?? [],
+							),
+							error: null,
+						});
+						results.set(projectId, value);
+					}
+				}
+			}
+		}
+
+		if (inFlightPromises.length > 0) {
+			await Promise.all(inFlightPromises);
+		}
+
+		return results;
+	},
+
 	async fetchEntries(projectId: string): Promise<{
 		data: DrawingRevisionRegisterRow[];
 		error: Error | null;
@@ -265,74 +429,87 @@ export const projectRevisionRegisterService = {
 			};
 		}
 
-		const userId = await getCurrentUserId();
-		if (!looksLikeUuid(normalizedProjectId)) {
-			return {
-				data: readLocalEntries()
-					.filter((entry) => entry.project_id === normalizedProjectId)
-					.map(normalizeRow)
-					.sort((left, right) => right.updated_at.localeCompare(left.updated_at)),
-				error: null,
-			};
+		const cached = revisionEntryFetchCache.read(normalizedProjectId);
+		if (cached) {
+			return cached;
 		}
-		if (!userId) {
-			return {
-				data: readLocalEntries()
-					.filter((entry) => entry.project_id === normalizedProjectId)
-					.map(normalizeRow)
-					.sort((left, right) => right.updated_at.localeCompare(left.updated_at)),
-				error: null,
-			};
+		const inFlight = revisionEntryFetchCache.readInFlight(normalizedProjectId);
+		if (inFlight) {
+			return await inFlight;
 		}
-
-		const result = await safeSupabaseQuery(
-			async () =>
-				await supabase
-					.from("drawing_revision_register_entries")
-					.select("*")
-					.eq("project_id", normalizedProjectId)
-					.eq("user_id", userId)
-					.order("updated_at", { ascending: false }),
-			"ProjectRevisionRegisterService",
-		);
 
 		const localFallback = readLocalEntries()
 			.filter((entry) => entry.project_id === normalizedProjectId)
-			.map(normalizeRow)
-			.sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+			.map(normalizeRow);
 
-		if (result.error) {
-			const message = String(result.error.message || "").toLowerCase();
-			if (
-				message.includes("drawing_revision_register_entries") &&
-				(message.includes("does not exist") ||
-					message.includes("not found") ||
-					message.includes("could not find"))
-			) {
-				logger.warn(
+		const loader = revisionEntryFetchCache.writeInFlight(
+			normalizedProjectId,
+			(async () => {
+				const userId = await getCurrentUserId();
+				if (!looksLikeUuid(normalizedProjectId) || !userId) {
+					return revisionEntryFetchCache.write(normalizedProjectId, {
+						data: sortEntriesByUpdatedAt(localFallback),
+						error: null,
+					});
+				}
+
+				const result = await safeSupabaseQuery(
+					async () =>
+						await supabase
+							.from("drawing_revision_register_entries")
+							.select("*")
+							.eq("project_id", normalizedProjectId)
+							.eq("user_id", userId)
+							.order("updated_at", { ascending: false }),
 					"ProjectRevisionRegisterService",
-					"Hosted revision register storage is unavailable; using local fallback.",
-					{
-						projectId: normalizedProjectId,
-						userId,
-						error: result.error.message,
-					},
 				);
-				return {
-					data: localFallback,
-					error: null,
-				};
-			}
-			return {
-				data: localFallback,
-				error: new Error(String(result.error.message || "Failed to load revisions.")),
-			};
-		}
 
-		return {
-			data: ((result.data ?? []) as DrawingRevisionRegisterRow[]).map(normalizeRow),
-			error: null,
-		};
+				if (result.error) {
+					const message = String(result.error.message || "").toLowerCase();
+					if (
+						message.includes("drawing_revision_register_entries") &&
+						(message.includes("does not exist") ||
+							message.includes("not found") ||
+							message.includes("could not find"))
+					) {
+						logger.warn(
+							"ProjectRevisionRegisterService",
+							"Hosted revision register storage is unavailable; using local fallback.",
+							{
+								projectId: normalizedProjectId,
+								userId,
+								error: result.error.message,
+							},
+						);
+						return revisionEntryFetchCache.write(normalizedProjectId, {
+							data: sortEntriesByUpdatedAt(localFallback),
+							error: null,
+						});
+					}
+					return revisionEntryFetchCache.write(normalizedProjectId, {
+						data: sortEntriesByUpdatedAt(localFallback),
+						error: new Error(
+							String(result.error.message || "Failed to load revisions."),
+						),
+					});
+				}
+
+				return revisionEntryFetchCache.write(normalizedProjectId, {
+					data: sortEntriesByUpdatedAt(
+						((result.data ?? []) as DrawingRevisionRegisterRow[]).map(
+							normalizeRow,
+						),
+					),
+					error: null,
+				});
+			})(),
+		);
+
+		try {
+			return await loader;
+		} finally {
+			revisionEntryFetchCache.clearInFlight(normalizedProjectId);
+		}
 	},
 
 	async createEntry(
@@ -348,6 +525,7 @@ export const projectRevisionRegisterService = {
 			const localEntry = buildLocalEntry(input, null);
 			const current = readLocalEntries();
 			writeLocalEntries([localEntry, ...current]);
+			revisionEntryFetchCache.clear(normalizedProjectId);
 			return normalizeRow(localEntry);
 		}
 
@@ -389,10 +567,12 @@ export const projectRevisionRegisterService = {
 		);
 
 		if (result.data) {
+			revisionEntryFetchCache.clear(normalizedProjectId);
 			return normalizeRow(result.data as DrawingRevisionRegisterRow);
 		}
 
 		const fallback = buildLocalEntry(input, userId);
+		revisionEntryFetchCache.clear(normalizedProjectId);
 		return normalizeRow(fallback);
 	},
 
@@ -492,6 +672,7 @@ export const projectRevisionRegisterService = {
 			);
 			writeLocalEntries(next);
 			const updated = next.find((entry) => entry.id === normalizedId) ?? null;
+			revisionEntryFetchCache.clearAll();
 			return updated ? normalizeRow(updated) : null;
 		}
 
@@ -581,6 +762,7 @@ export const projectRevisionRegisterService = {
 		);
 
 		if (result.data) {
+			revisionEntryFetchCache.clearAll();
 			return normalizeRow(result.data as DrawingRevisionRegisterRow);
 		}
 
@@ -597,6 +779,7 @@ export const projectRevisionRegisterService = {
 			const current = readLocalEntries();
 			const next = current.filter((entry) => entry.id !== normalizedId);
 			writeLocalEntries(next);
+			revisionEntryFetchCache.clearAll();
 			return next.length !== current.length;
 		}
 
@@ -609,6 +792,7 @@ export const projectRevisionRegisterService = {
 					.eq("user_id", userId),
 			"ProjectRevisionRegisterService",
 		);
+		revisionEntryFetchCache.clearAll();
 		return !result.error;
 	},
 

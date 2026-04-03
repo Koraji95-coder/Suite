@@ -1225,7 +1225,7 @@ def _extract_markup_geometry_payload(markup: Dict[str, Any]) -> Optional[Dict[st
 
 
 def _resolve_markup_anchor_point(markup: Dict[str, Any]) -> Optional[Dict[str, float]]:
-    callout_target, _source = _extract_callout_target_point(markup)
+    callout_target = _extract_callout_target_point(markup)
     if callout_target:
         return callout_target
     bounds = _normalize_bounds(markup.get("bounds"))

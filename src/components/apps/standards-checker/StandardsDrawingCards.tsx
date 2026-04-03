@@ -2,7 +2,7 @@ import { CheckCircle, Eye, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsDrawingCards.module.css";
 import { StandardsDrawingStatusIcon } from "./StandardsDrawingStatusIcon";
-import type { DrawingAnnotation } from "./standardsDrawingModels";
+import type { DrawingAnnotation } from "@/features/standards-checker/standardsDrawingModels";
 
 interface StandardsDrawingCardsProps {
 	loading: boolean;

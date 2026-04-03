@@ -85,7 +85,7 @@ internal static class BootstrapProgressReducer
         var completed = NormalizeKnownStepIds(state.CompletedStepIds);
         var failed = NormalizeKnownStepIds(state.FailedStepIds);
         var allStepsComplete = AreAllStepsComplete(completed);
-        var weightedPercent = completed.Sum(static stepId => MilestoneMap[stepId].Weight);
+        var weightedPercent = completed.Sum(static stepId => MilestoneMap.TryGetValue(stepId, out var meta) ? meta.Weight : 0);
         var percent = state.Done && state.Ok && allStepsComplete
             ? 100
             : Math.Min(Math.Max(weightedPercent, Math.Max(state.Percent, 0)), 99);

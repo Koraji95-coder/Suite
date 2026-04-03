@@ -68,6 +68,7 @@ internal sealed class RuntimeShellForm : Form
     private readonly List<string> _queuedMessages = new();
     private readonly object _queueLock = new();
     private readonly OfficeBrokerClient _officeBrokerClient = new();
+    private WorkstationFolderPickerBridge? _workstationFolderPickerBridge;
 
     private bool _isClosing;
     private bool _uiReady;
@@ -83,7 +84,9 @@ internal sealed class RuntimeShellForm : Form
     private string _selectedLogSourceId = "transcript";
     private string _selectedLogSourcePath = string.Empty;
     private string _selectedUtilityTab = "context";
-    private int _utilityPaneWidth = 400;
+    private int _utilityPaneWidth = RuntimeShellDisplaySettings.DefaultUtilityPaneWidth;
+    private bool _utilityPaneCollapsed = true;
+    private int _contentScalePercent = RuntimeShellDisplaySettings.DefaultContentScalePercent;
     private string? _lastOfficeSnapshotJson;
     private DateTimeOffset _lastOfficeSnapshotPublishedAt = DateTimeOffset.MinValue;
     private DateTimeOffset _lastOfficeBrokerLaunchAttemptAt = DateTimeOffset.MinValue;
@@ -218,6 +221,7 @@ internal sealed class RuntimeShellForm : Form
         try
         {
             await InitializeWebViewAsync();
+            StartWorkstationFolderPickerBridge();
             _pollTimer.Start();
         }
         catch (Exception exception)
@@ -262,6 +266,131 @@ internal sealed class RuntimeShellForm : Form
         ApplyWebViewDpiZoom();
 
         _webView.Source = new Uri("https://suite-runtime.local/index.html");
+    }
+
+    private void StartWorkstationFolderPickerBridge()
+    {
+        if (_workstationFolderPickerBridge is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            var projectSetupActionHandler = new ProjectSetupActionHandler(
+                _repoRoot,
+                ShowFolderPickerOnUiAsync,
+                message => RuntimeShellLogger.Log(message),
+                (scope, exception) => RuntimeShellLogger.LogException(scope, exception));
+            var projectStandardsActionHandler = new ProjectStandardsActionHandler(
+                _repoRoot,
+                message => RuntimeShellLogger.Log(message),
+                (scope, exception) => RuntimeShellLogger.LogException(scope, exception));
+            _workstationFolderPickerBridge = new WorkstationFolderPickerBridge(
+                ShowFolderPickerOnUiAsync,
+                message => RuntimeShellLogger.Log(message),
+                (scope, exception) => RuntimeShellLogger.LogException(scope, exception),
+                projectSetupActionHandler,
+                projectStandardsActionHandler);
+            _workstationFolderPickerBridge.Start();
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-workstation-folder-picker-start", exception);
+        }
+    }
+
+    private Task<string?> ShowFolderPickerOnUiAsync(
+        string? initialPath,
+        string? title,
+        CancellationToken cancellationToken)
+    {
+        if (_isClosing || IsDisposed)
+        {
+            return Task.FromException<string?>(
+                new InvalidOperationException("Runtime Control is closing."));
+        }
+
+        var taskCompletionSource = new TaskCompletionSource<string?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationTokenRegistration cancellationRegistration = default;
+
+        if (cancellationToken.CanBeCanceled)
+        {
+            cancellationRegistration = cancellationToken.Register(
+                static state =>
+                {
+                    var source = (TaskCompletionSource<string?>)state!;
+                    source.TrySetCanceled();
+                },
+                taskCompletionSource);
+        }
+
+        void ShowDialogOnUiThread()
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                cancellationRegistration.Dispose();
+                return;
+            }
+
+            try
+            {
+                using var dialog = new FolderBrowserDialog
+                {
+                    AutoUpgradeEnabled = true,
+                    Description = string.IsNullOrWhiteSpace(title)
+                        ? "Select Watchdog Root Folder"
+                        : title.Trim(),
+                    ShowNewFolderButton = false,
+                    UseDescriptionForTitle = true,
+                };
+
+                var candidateInitialPath = string.IsNullOrWhiteSpace(initialPath)
+                    ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                    : initialPath.Trim();
+                if (!string.IsNullOrWhiteSpace(candidateInitialPath) &&
+                    Directory.Exists(candidateInitialPath))
+                {
+                    dialog.SelectedPath = candidateInitialPath;
+                }
+
+                var dialogResult = IsHandleCreated
+                    ? dialog.ShowDialog(this)
+                    : dialog.ShowDialog();
+                var selectedPath = dialogResult == DialogResult.OK &&
+                    !string.IsNullOrWhiteSpace(dialog.SelectedPath)
+                    ? Path.GetFullPath(dialog.SelectedPath.Trim())
+                    : null;
+
+                cancellationRegistration.Dispose();
+                taskCompletionSource.TrySetResult(selectedPath);
+            }
+            catch (Exception exception)
+            {
+                cancellationRegistration.Dispose();
+                taskCompletionSource.TrySetException(exception);
+            }
+        }
+
+        try
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke((MethodInvoker)ShowDialogOnUiThread);
+            }
+            else
+            {
+                ShowDialogOnUiThread();
+            }
+        }
+        catch (Exception exception)
+        {
+            cancellationRegistration.Dispose();
+            taskCompletionSource.TrySetException(exception);
+        }
+
+        return taskCompletionSource.Task;
     }
 
     private async Task OnNavigationCompletedAsync(CoreWebView2NavigationCompletedEventArgs eventArgs)
@@ -394,6 +523,9 @@ internal sealed class RuntimeShellForm : Form
                     break;
                 case "runtime.stop_all":
                     await RunStopAllAsync();
+                    break;
+                case "runtime.reset_all":
+                    await RunResetAllAsync();
                     break;
                 case "runtime.refresh":
                     await PublishSnapshotAsync(force: true);
@@ -1564,13 +1696,94 @@ internal sealed class RuntimeShellForm : Form
         }
     }
 
+    private async Task RunResetAllAsync()
+    {
+        if (!TryBeginAction("reset_all", null))
+        {
+            return;
+        }
+
+        try
+        {
+            _runtimeLogOffset = GetCurrentLogLength();
+            SendLog("START", "Resetting local runtime services without clearing local data.", "hi");
+            SendProgress(visible: true, percent: 8, step: "Stopping local services before reset.");
+
+            var stopResult = await ProcessRunner.RunPowerShellFileAsync(
+                _stopScriptPath,
+                _repoRoot,
+                new[] { "-RepoRoot", _repoRoot, "-IncludeFrontend", "-Json" });
+
+            PumpRuntimeLog();
+            await PublishSnapshotAsync(force: true);
+            PublishProgressFromSnapshot();
+
+            var stopSummary = TryGetSummaryFromJson(stopResult.CombinedOutput) ??
+                (stopResult.Succeeded ? "Runtime services stopped." : "Runtime stop needs attention.");
+            if (stopResult.Succeeded)
+            {
+                SendLog("OK", stopSummary, "ok");
+            }
+            else
+            {
+                SendLog("ERR", stopSummary, "err");
+            }
+
+            foreach (var warning in TryGetStringArrayFromJson(stopResult.CombinedOutput, "warnings"))
+            {
+                if (!string.IsNullOrWhiteSpace(warning))
+                {
+                    SendLog("WARN", warning, "warn");
+                }
+            }
+
+            if (!stopResult.Succeeded)
+            {
+                return;
+            }
+
+            SendProgress(visible: true, percent: 48, step: "Bootstrapping runtime services after reset.");
+
+            var bootstrapResult = await ProcessRunner.RunPowerShellFileAsync(
+                _bootstrapScriptPath,
+                _repoRoot,
+                new[] { "-RepoRoot", _repoRoot, "-Json" });
+
+            PumpRuntimeLog();
+            await PublishSnapshotAsync(force: true);
+            PublishProgressFromSnapshot();
+
+            var bootstrapSummary = TryGetSummaryFromJson(bootstrapResult.CombinedOutput) ??
+                (bootstrapResult.Succeeded ? "Runtime reset completed." : "Runtime reset needs attention.");
+            if (bootstrapResult.Succeeded)
+            {
+                SendLog("OK", bootstrapSummary, "ok hi");
+            }
+            else
+            {
+                SendLog("ERR", bootstrapSummary, "err");
+            }
+        }
+        catch (Exception exception)
+        {
+            RuntimeShellLogger.LogException("runtime-shell-reset-all", exception);
+            SendError("Reset all failed.", exception.Message);
+        }
+        finally
+        {
+            EndAction();
+        }
+    }
+
     private void ApplyInitialShellWindowState()
     {
         var shellState = LoadShellWindowState();
 
-        _utilityPaneWidth = Math.Clamp(shellState?.UtilityPaneWidth ?? 400, 320, 640);
+        _utilityPaneWidth = RuntimeShellDisplaySettings.NormalizeUtilityPaneWidth(shellState?.UtilityPaneWidth);
+        _utilityPaneCollapsed = shellState?.UtilityPaneCollapsed ?? true;
         _selectedUtilityTab = NormalizeUtilityTab(shellState?.UtilityPaneTab);
         _selectedLogSourceId = ResolveValidLogSourceId(shellState?.ActiveLogSourceId);
+        _contentScalePercent = RuntimeShellDisplaySettings.NormalizeContentScalePercent(shellState?.ContentScalePercent);
 
         var workingArea = GetPreferredWorkingArea(shellState);
         var initialBounds = ResolveInitialShellBounds(shellState, workingArea, MinimumSize);
@@ -1601,7 +1814,9 @@ internal sealed class RuntimeShellForm : Form
         System.Drawing.Rectangle workingArea,
         System.Drawing.Size minimumSize)
     {
-        var defaultSize = new System.Drawing.Size(1560, 980);
+        var defaultSize = new System.Drawing.Size(
+            Math.Max(1600, (int)Math.Round(workingArea.Width * 0.9d)),
+            Math.Max(980, (int)Math.Round(workingArea.Height * 0.9d)));
         var desiredBounds = shellState is not null && shellState.Width > 0 && shellState.Height > 0
             ? new System.Drawing.Rectangle(shellState.Left, shellState.Top, shellState.Width, shellState.Height)
             : CenterShellBoundsInWorkingArea(workingArea, defaultSize, minimumSize);
@@ -1692,9 +1907,11 @@ internal sealed class RuntimeShellForm : Form
                 Width = bounds.Width,
                 Height = bounds.Height,
                 WindowState = WindowState == FormWindowState.Maximized ? "Maximized" : "Normal",
-                UtilityPaneWidth = Math.Clamp(_utilityPaneWidth, 320, 640),
+                UtilityPaneWidth = RuntimeShellDisplaySettings.NormalizeUtilityPaneWidth(_utilityPaneWidth),
+                UtilityPaneCollapsed = _utilityPaneCollapsed,
                 UtilityPaneTab = NormalizeUtilityTab(_selectedUtilityTab),
                 ActiveLogSourceId = ResolveValidLogSourceId(_selectedLogSourceId),
+                ContentScalePercent = RuntimeShellDisplaySettings.NormalizeContentScalePercent(_contentScalePercent),
             };
 
             File.WriteAllText(
@@ -1711,8 +1928,9 @@ internal sealed class RuntimeShellForm : Form
     {
         try
         {
-            var dpi = DeviceDpi > 0 ? DeviceDpi : 96;
-            var zoomFactor = Math.Clamp(96d / dpi, 0.4d, 1d);
+            var zoomFactor = RuntimeShellDisplaySettings.ComputeWebViewZoomFactor(
+                DeviceDpi,
+                _contentScalePercent);
             if (Math.Abs(_webView.ZoomFactor - zoomFactor) > 0.001d)
             {
                 _webView.ZoomFactor = zoomFactor;
@@ -2812,6 +3030,7 @@ internal sealed class RuntimeShellForm : Form
     {
         _selectedLogSourceId = ResolveValidLogSourceId(sourceId);
         _selectedUtilityTab = "logs";
+        _utilityPaneCollapsed = false;
         PersistShellWindowState();
         PublishShellWindowState();
         await PublishSelectedLogSourceAsync(force: true);
@@ -2930,10 +3149,12 @@ internal sealed class RuntimeShellForm : Form
     {
         var payload = new
         {
-            utilityPaneWidth = Math.Clamp(_utilityPaneWidth, 320, 640),
+            utilityPaneWidth = RuntimeShellDisplaySettings.NormalizeUtilityPaneWidth(_utilityPaneWidth),
+            utilityPaneCollapsed = _utilityPaneCollapsed,
             activeUtilityTab = NormalizeUtilityTab(_selectedUtilityTab),
             utilityPaneTab = NormalizeUtilityTab(_selectedUtilityTab),
             activeLogSourceId = ResolveValidLogSourceId(_selectedLogSourceId),
+            contentScalePercent = RuntimeShellDisplaySettings.NormalizeContentScalePercent(_contentScalePercent),
         };
         PostEvent("shell.window_state", payload);
         PostEvent("shell.preferences", payload);
@@ -2950,7 +3171,13 @@ internal sealed class RuntimeShellForm : Form
             && widthElement.ValueKind == JsonValueKind.Number
             && widthElement.TryGetInt32(out var utilityPaneWidth))
         {
-            _utilityPaneWidth = Math.Clamp(utilityPaneWidth, 320, 640);
+            _utilityPaneWidth = RuntimeShellDisplaySettings.NormalizeUtilityPaneWidth(utilityPaneWidth);
+        }
+
+        if (payload.Value.TryGetProperty("utilityPaneCollapsed", out var collapsedElement)
+            && (collapsedElement.ValueKind == JsonValueKind.True || collapsedElement.ValueKind == JsonValueKind.False))
+        {
+            _utilityPaneCollapsed = collapsedElement.GetBoolean();
         }
 
         if (payload.Value.TryGetProperty("utilityPaneTab", out var tabElement)
@@ -2968,6 +3195,14 @@ internal sealed class RuntimeShellForm : Form
             && activeLogSourceElement.ValueKind == JsonValueKind.String)
         {
             _selectedLogSourceId = ResolveValidLogSourceId(activeLogSourceElement.GetString());
+        }
+
+        if (payload.Value.TryGetProperty("contentScalePercent", out var contentScaleElement)
+            && contentScaleElement.ValueKind == JsonValueKind.Number
+            && contentScaleElement.TryGetInt32(out var contentScalePercent))
+        {
+            _contentScalePercent = RuntimeShellDisplaySettings.NormalizeContentScalePercent(contentScalePercent);
+            ApplyWebViewDpiZoom();
         }
 
         PersistShellWindowState();
@@ -3828,6 +4063,8 @@ internal sealed class RuntimeShellForm : Form
     {
         _isClosing = true;
         _pollTimer.Stop();
+        _workstationFolderPickerBridge?.Dispose();
+        _workstationFolderPickerBridge = null;
         _instanceCoordinator.ReportPhase(
             RuntimeShellPhases.Closing,
             activatable: false,
@@ -3838,6 +4075,8 @@ internal sealed class RuntimeShellForm : Form
     private void OnFormClosed(object? sender, FormClosedEventArgs eventArgs)
     {
         _pollTimer.Dispose();
+        _workstationFolderPickerBridge?.Dispose();
+        _workstationFolderPickerBridge = null;
         _lastSnapshotDocument?.Dispose();
         RuntimeShellLogger.Log("runtime-shell-closed");
     }

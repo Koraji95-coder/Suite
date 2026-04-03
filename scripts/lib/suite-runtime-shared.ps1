@@ -588,6 +588,41 @@ function Get-TomlSectionIntegerValue {
 	return $null
 }
 
+function Get-TomlSectionBooleanValue {
+	param(
+		[string]$Path,
+		[string]$SectionName,
+		[string]$Key
+	)
+
+	if (
+		[string]::IsNullOrWhiteSpace($Path) -or
+		[string]::IsNullOrWhiteSpace($SectionName) -or
+		[string]::IsNullOrWhiteSpace($Key) -or
+		-not (Test-Path -LiteralPath $Path)
+	) {
+		return $null
+	}
+
+	$currentSection = $null
+	foreach ($line in Get-Content -LiteralPath $Path) {
+		$trimmedLine = $line.Trim()
+		if ($trimmedLine -match '^\[(.+)\]$') {
+			$currentSection = $Matches[1].Trim()
+			continue
+		}
+
+		if (
+			$currentSection -eq $SectionName -and
+			$trimmedLine -match ('^{0}\s*=\s*(true|false)\b' -f [Regex]::Escape($Key))
+		) {
+			return [System.Convert]::ToBoolean($Matches[1])
+		}
+	}
+
+	return $null
+}
+
 function Get-DotEnvStringValue {
 	param(
 		[string]$Path,
@@ -617,6 +652,127 @@ function Get-DotEnvStringValue {
 	}
 
 	return $null
+}
+
+function Get-SuiteSupabaseConfigPath {
+	param([string]$RepoRoot)
+
+	if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+		return $null
+	}
+
+	$configPath = Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) "supabase\config.toml"
+	if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+		return $null
+	}
+
+	return $configPath
+}
+
+function Test-SuiteSupabaseFunctionsDirectoryPresent {
+	param([string]$RepoRoot)
+
+	if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+		return $false
+	}
+
+	$functionsPath = Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) "supabase\functions"
+	return (Test-Path -LiteralPath $functionsPath -PathType Container)
+}
+
+function Test-SuiteSupabaseEdgeRuntimeExpected {
+	param([string]$RepoRoot)
+
+	$configPath = Get-SuiteSupabaseConfigPath -RepoRoot $RepoRoot
+	if ([string]::IsNullOrWhiteSpace($configPath)) {
+		return $false
+	}
+
+	$edgeRuntimeEnabled = Get-TomlSectionBooleanValue -Path $configPath -SectionName "edge_runtime" -Key "enabled"
+	if ($null -eq $edgeRuntimeEnabled -or -not $edgeRuntimeEnabled) {
+		return $false
+	}
+
+	return (Test-SuiteSupabaseFunctionsDirectoryPresent -RepoRoot $RepoRoot)
+}
+
+function Get-SuiteSupabaseStoppedServices {
+	param([string]$Text)
+
+	if ([string]::IsNullOrWhiteSpace($Text)) {
+		return @()
+	}
+
+	$match = [Regex]::Match($Text, '(?im)^Stopped services:\s*\[(.*?)\]\s*$')
+	if (-not $match.Success) {
+		return @()
+	}
+
+	$rawServices = $match.Groups[1].Value.Trim()
+	if ([string]::IsNullOrWhiteSpace($rawServices)) {
+		return @()
+	}
+
+	return @(
+		$rawServices -split '[,\s]+' |
+			ForEach-Object { [string]$_ } |
+			Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+	)
+}
+
+function Get-SuiteSupabaseMissingExpectedServices {
+	param(
+		[string]$RepoRoot,
+		[string]$StatusText
+	)
+
+	$missingServices = New-Object System.Collections.Generic.List[string]
+	$stoppedServices = @(Get-SuiteSupabaseStoppedServices -Text $StatusText)
+	if ($stoppedServices.Count -eq 0) {
+		return @()
+	}
+
+	if (Test-SuiteSupabaseEdgeRuntimeExpected -RepoRoot $RepoRoot) {
+		$edgeRuntimeStopped = @(
+			$stoppedServices |
+				Where-Object { $_ -match '^(?i)supabase_edge_runtime_' }
+		).Count -gt 0
+		if ($edgeRuntimeStopped) {
+			$missingServices.Add("edge_runtime") | Out-Null
+		}
+	}
+
+	return @($missingServices.ToArray())
+}
+
+function Test-SuiteSupabaseStatusReady {
+	param(
+		[string]$Text,
+		[string]$RepoRoot
+	)
+
+	if ([string]::IsNullOrWhiteSpace($Text)) {
+		return $false
+	}
+
+	if (
+		$Text -match "(?im)\bcontainer is not ready\b" -or
+		$Text -match "(?im)\bfailed to inspect\b" -or
+		$Text -match "(?im)\btry rerunning the command with --debug\b" -or
+		$Text -match "(?im)\bno active local containers\b"
+	) {
+		return $false
+	}
+
+	$hasReadyMarker = (
+		$Text -match "(?im)\bsupabase local development setup is running\b" -or
+		$Text -match "(?im)\bProject URL\b"
+	)
+	if (-not $hasReadyMarker) {
+		return $false
+	}
+
+	return (@(Get-SuiteSupabaseMissingExpectedServices -RepoRoot $RepoRoot -StatusText $Text).Count -eq 0)
 }
 
 function Get-SuiteSupabaseLocalPorts {

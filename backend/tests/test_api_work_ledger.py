@@ -177,11 +177,11 @@ class _SubprocessStub:
     def _install_post_commit_hook(self) -> None:
         hooks_dir = self._ensure_hooks_dir()
         (hooks_dir / "post-commit").write_text(
-            "#!/bin/sh\n# Worktale post-commit hook\nworktale capture --silent 2>/dev/null || true\n",
+            "#!/bin/sh\n# Worktale post-commit hook\nnode \"$REPO_ROOT/scripts/run-worktale-cli.mjs\" capture --silent 2>/dev/null || true\n",
             encoding="utf-8",
         )
         (hooks_dir / "post-commit.ps1").write_text(
-            "# Worktale post-commit hook (Windows)\n& worktale capture --silent\n",
+            "# Worktale post-commit hook (Windows)\n& node scripts\\run-worktale-cli.mjs capture --silent\n",
             encoding="utf-8",
         )
         self.post_commit_installed = True
@@ -189,7 +189,7 @@ class _SubprocessStub:
     def _install_post_push_hook(self) -> None:
         hooks_dir = self._ensure_hooks_dir()
         (hooks_dir / "post-push").write_text(
-            "#!/bin/sh\n# Worktale post-push reminder\necho \"  Tip: run 'worktale digest' to review today's work\" 2>/dev/null || true\n",
+            "#!/bin/sh\n# Worktale post-push reminder\necho \"  Tip: run 'npm run worktale:digest' to review today's work\" 2>/dev/null || true\n",
             encoding="utf-8",
         )
         self.post_push_installed = True
@@ -209,6 +209,36 @@ class _SubprocessStub:
                 hook_path.unlink()
         self.post_commit_installed = False
         self.post_push_installed = False
+
+    def _readiness_payload(self) -> dict[str, Any]:
+        bootstrapped = (self.repo_root / ".worktale").exists()
+        ready = bootstrapped and self.post_commit_installed and self.post_push_installed
+        issues: list[str] = []
+        if not bootstrapped:
+            issues.append("Initialize Worktale metadata with `npm run worktale:bootstrap`.")
+        if not self.post_commit_installed:
+            issues.append("Install or repair the Worktale post-commit hook.")
+        if not self.post_push_installed:
+            issues.append("Install or repair the Worktale post-push hook.")
+        return {
+            "ready": ready,
+            "repoRoot": str(self.repo_root),
+            "checks": {
+                "cliInstalled": True,
+                "cliPath": "C:\\tools\\worktale\\dist\\cli.js",
+                "runnerStrategy": "node22-npx",
+                "repoExists": True,
+                "gitRepository": True,
+                "gitEmailConfigured": True,
+                "gitEmail": "user@example.com",
+                "bootstrapped": bootstrapped,
+                "postCommitHookInstalled": self.post_commit_installed,
+                "postPushHookInstalled": self.post_push_installed,
+            },
+            "issues": issues,
+            "recommendedActions": [] if ready else ["Run `npm run worktale:bootstrap` to initialize the repository and repair hooks."],
+            "nextStep": None if ready else "npm run worktale:bootstrap",
+        }
 
     def run(
         self,
@@ -233,6 +263,23 @@ class _SubprocessStub:
                 0,
                 stdout="src/services/agentService.ts\nsrc/components/apps/projects/ProjectDetailHeader.tsx\n",
             )
+        if len(command) >= 2 and command[0].endswith("node.exe"):
+            script_name = Path(command[1]).name
+            if script_name == "check-worktale-readiness.mjs":
+                return _CompletedProcessStub(
+                    0,
+                    stdout=f"{__import__('json').dumps(self._readiness_payload())}\n",
+                )
+            if script_name == "bootstrap-worktale.mjs":
+                if not (self.repo_root / ".worktale").exists():
+                    self.mark_bootstrapped()
+                self.install_hooks()
+                return _CompletedProcessStub(0, stdout="worktale: repository is bootstrapped\n")
+            if script_name == "run-worktale-cli.mjs" and len(command) >= 3:
+                if command[2] == "note":
+                    if self.fail_publish_note:
+                        return _CompletedProcessStub(1, stderr="Worktale note failed")
+                    return _CompletedProcessStub(0, stdout="Note added")
         if command[:2] == ["worktale", "init"]:
             self.mark_bootstrapped()
             self._install_post_commit_hook()
@@ -306,6 +353,14 @@ class TestApiWorkLedger(unittest.TestCase):
         self.repo_root = Path(self.temp_dir.name) / "repo"
         self.repo_root.mkdir(parents=True, exist_ok=True)
         (self.repo_root / ".git").mkdir(parents=True, exist_ok=True)
+        scripts_root = self.repo_root / "scripts"
+        scripts_root.mkdir(parents=True, exist_ok=True)
+        for script_name in (
+            "bootstrap-worktale.mjs",
+            "check-worktale-readiness.mjs",
+            "run-worktale-cli.mjs",
+        ):
+            (scripts_root / script_name).write_text("// test fixture\n", encoding="utf-8")
         self.artifact_root = Path(self.temp_dir.name) / "artifacts"
 
         self.requests_stub = _RequestsStub()
@@ -315,7 +370,7 @@ class TestApiWorkLedger(unittest.TestCase):
 
         self.which_patcher = patch(
             "backend.work_ledger.worktale_runtime.shutil.which",
-            return_value="C:\\tools\\worktale.exe",
+            side_effect=lambda name: "C:\\tools\\node.exe" if name == "node" else None,
         )
         self.which_patcher.start()
 

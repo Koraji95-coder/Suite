@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { deleteSetting, loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -90,17 +91,11 @@ function composeProjectRule(
 }
 
 async function requireCurrentUserId(): Promise<string> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error) {
-		throw error;
-	}
-	if (!user) {
+	const userId = await getCurrentSupabaseUserId();
+	if (!userId) {
 		throw new Error("Not authenticated");
 	}
-	return user.id;
+	return userId;
 }
 
 async function loadStoredProjectRule(

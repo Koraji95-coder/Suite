@@ -3,9 +3,9 @@ import { Section } from "@/components/apps/ui/PageFrame";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
 import { Panel } from "@/components/primitives/Panel";
+import type { Contact, DraftState } from "@/features/transmittal-builder";
 import { cn } from "@/lib/utils";
 import styles from "./TransmittalBuilderContactsSection.module.css";
-import type { Contact, DraftState } from "./transmittalBuilderModels";
 
 const TransmittalSection = Section;
 

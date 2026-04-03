@@ -69,7 +69,7 @@ tracks implementation priorities with explicit acceptance criteria.
   - Fix:
     - removed legacy duplicate prototype artifacts under `src/components/apps/autowire/*`.
     - documented archival/removal mapping in
-      `docs/development/autowire-legacy-artifacts-archive.md`.
+      `docs/archive/legacy/autowire-legacy-artifacts-archive.md`.
   - Acceptance:
     - no runtime imports reference `src/components/apps/autowire/*`.
     - canonical AutoWire implementation remains under
@@ -111,8 +111,7 @@ tracks implementation priorities with explicit acceptance criteria.
 - [x] Docs root index corruption / drift
   - Fix:
     - replaced `docs/README.md` with a clean repository docs index.
-    - moved exploratory prose to
-      `docs/development/autodraft-integration-notes-legacy.md`.
+    - deleted the obsolete exploratory note that had drifted out of the active docs map.
   - Acceptance:
     - docs root now points to stable category entry points and high-signal docs.
-    - exploratory notes are preserved outside the root index.
+    - obsolete exploratory noise is no longer part of the repository docs surface.

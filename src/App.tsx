@@ -12,27 +12,44 @@ import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
 import { logger } from "./lib/logger";
 import AgentPairingRedirectGate from "./routes/AgentPairingRedirectGate";
-import AppDashboardPage from "./routes/AppDashboardPage";
-import Shell from "./routes/AppShell";
 import AudienceRoute from "./routes/AudienceRoute";
-import AppsRoutePage from "./routes/apps/AppsRoutePage";
-import DrawingListManagerRoutePage from "./routes/apps/drawing-list-manager/DrawingListManagerRoutePage";
-import StandardsCheckerRoutePage from "./routes/apps/standards-checker/StandardsCheckerRoutePage";
-import TransmittalBuilderRoutePage from "./routes/apps/transmittal-builder/TransmittalBuilderRoutePage";
-import CalendarRoutePage from "./routes/CalendarRoutePage";
-import DeveloperDocsRoutePage from "./routes/knowledge/DeveloperDocsRoutePage";
-import KnowledgeRoutePage from "./routes/knowledge/KnowledgeRoutePage";
-import MathToolsLibraryPage from "./routes/knowledge/math-tools/MathToolsLibraryPage";
 import LandingPage from "./routes/LandingPage";
-import LoginPage from "./routes/LoginPage";
-import PrivacyPage from "./routes/PrivacyPage";
-import ProjectsRoutePage from "./routes/ProjectsRoutePage";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
-import SignupPage from "./routes/SignupPage";
-import SettingsPage from "./routes/settings/SettingsPage";
-import WatchdogRoutePage from "./routes/watchdog/WatchdogRoutePage";
 
+const AppDashboardPage = lazy(() => import("./routes/AppDashboardPage"));
+const Shell = lazy(() => import("./routes/AppShell"));
+const AppsRoutePage = lazy(() => import("./routes/apps/AppsRoutePage"));
+const DrawingListManagerRoutePage = lazy(
+	() =>
+		import(
+			"./routes/apps/drawing-list-manager/DrawingListManagerRoutePage"
+		),
+);
+const StandardsCheckerRoutePage = lazy(
+	() => import("./routes/apps/standards-checker/StandardsCheckerRoutePage"),
+);
+const TransmittalBuilderRoutePage = lazy(
+	() => import("./routes/apps/transmittal-builder/TransmittalBuilderRoutePage"),
+);
+const CalendarRoutePage = lazy(() => import("./routes/CalendarRoutePage"));
+const DeveloperDocsRoutePage = lazy(
+	() => import("./routes/knowledge/DeveloperDocsRoutePage"),
+);
+const KnowledgeRoutePage = lazy(
+	() => import("./routes/knowledge/KnowledgeRoutePage"),
+);
+const LoginPage = lazy(() => import("./routes/LoginPage"));
+const MathToolsLibraryPage = lazy(
+	() => import("./routes/knowledge/math-tools/MathToolsLibraryPage"),
+);
+const PrivacyPage = lazy(() => import("./routes/PrivacyPage"));
+const ProjectsRoutePage = lazy(() => import("./routes/ProjectsRoutePage"));
+const SettingsPage = lazy(() => import("./routes/settings/SettingsPage"));
+const SignupPage = lazy(() => import("./routes/SignupPage"));
+const WatchdogRoutePage = lazy(
+	() => import("./routes/watchdog/WatchdogRoutePage"),
+);
 const AgentRoutePage = lazy(() => import("./routes/agent/AgentRoutePage"));
 const DeveloperPortalRoutePage = lazy(
 	() => import("./routes/DeveloperPortalRoutePage"),
@@ -111,9 +128,18 @@ export default function App() {
 
 						<Routes>
 							<Route path="/" element={<LandingPage />} />
-							<Route path="/login" element={<LoginPage />} />
-							<Route path="/signup" element={<SignupPage />} />
-							<Route path="/privacy" element={<PrivacyPage />} />
+							<Route
+								path="/login"
+								element={withRouteSuspense(<LoginPage />)}
+							/>
+							<Route
+								path="/signup"
+								element={withRouteSuspense(<SignupPage />)}
+							/>
+							<Route
+								path="/privacy"
+								element={withRouteSuspense(<PrivacyPage />)}
+							/>
 							<Route
 								path="/roadmap"
 								element={<Navigate to="/" replace />}
@@ -124,7 +150,10 @@ export default function App() {
 							/>
 
 							<Route element={<ProtectedRoute />}>
-								<Route path="/app" element={<Shell />}>
+								<Route
+									path="/app"
+									element={withRouteSuspense(<Shell />)}
+								>
 									<Route
 										index
 										element={<Navigate to="/app/dashboard" replace />}

@@ -5,7 +5,7 @@
     <AssemblyName>SuiteCadAuthoring</AssemblyName>
     <LangVersion>latest</LangVersion>
     <OutputType>Library</OutputType>
-    <Nullable>disable</Nullable>
+    <Nullable>annotations</Nullable>
     <ImplicitUsings>false</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <EnableDynamicLoading>true</EnableDynamicLoading>
@@ -16,6 +16,8 @@
     <AutoCadTargetFramework Condition="'$(AutoCadTargetFramework)' == ''">net48</AutoCadTargetFramework>
     <TargetFramework>$(AutoCadTargetFramework)</TargetFramework>
     <AutoCadInstallDir Condition="'$(AutoCadInstallDir)' == ''">$([System.Environment]::GetEnvironmentVariable('AUTOCAD_INSTALL_DIR'))</AutoCadInstallDir>
+    <!-- AutoCAD 2026 managed DLLs mix legacy BCL versions under net8. Keep MSB3277 as a message here so real plugin regressions stay visible. -->
+    <MSBuildWarningsAsMessages Condition="'$(TargetFramework)' == 'net8.0-windows'">$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(ResolvedAutoCadInstallDir)' == '' and '$(AutoCadInstallDir)' != '' and Exists('$(AutoCadInstallDir)\accoremgd.dll')">

@@ -3,6 +3,7 @@ import { loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import { safeSupabaseQuery } from "@/supabase/utils";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 
 export type ProjectCadWritePassRow =
 	Database["public"]["Tables"]["project_cad_write_passes"]["Row"];
@@ -234,14 +235,11 @@ function writeLocalPasses(
 }
 
 async function getCurrentUserId() {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) {
+	try {
+		return await getCurrentSupabaseUserId();
+	} catch {
 		return null;
 	}
-	return user.id;
 }
 
 function isMissingPassTable(error: unknown) {

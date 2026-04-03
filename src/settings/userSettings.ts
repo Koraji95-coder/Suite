@@ -7,6 +7,7 @@
  */
 
 import type { Database, Json } from "@/supabase/database";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { logger } from "../lib/logger";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
@@ -15,15 +16,20 @@ export type UserSetting = Database["public"]["Tables"]["user_settings"]["Row"];
 export type UserPreferences =
 	Database["public"]["Tables"]["user_preferences"]["Row"];
 
-async function requireUserId(): Promise<string> {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
+function isExpectedUnauthenticatedState(error: unknown): boolean {
+	const message =
+		error instanceof Error ? error.message : String(error ?? "");
+	const normalized = message.trim().toLowerCase();
+	return (
+		normalized.includes("not authenticated") ||
+		normalized.includes("auth session missing")
+	);
+}
 
-	if (error) throw error;
-	if (!user) throw new Error("Not authenticated");
-	return user.id;
+async function requireUserId(): Promise<string> {
+	const userId = await getCurrentSupabaseUserId();
+	if (!userId) throw new Error("Not authenticated");
+	return userId;
 }
 
 export async function saveSetting(
@@ -88,11 +94,19 @@ export async function loadSetting<T = unknown>(
 		return defaultValue ?? null;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unknown error";
-		logger.warn(
-			`Failed to load setting: ${key}, using default`,
-			"userSettings",
-			{ error: message },
-		);
+		if (isExpectedUnauthenticatedState(error)) {
+			logger.debug(
+				`Setting unavailable before auth: ${key}, using default`,
+				"userSettings",
+				{ error: message },
+			);
+		} else {
+			logger.warn(
+				`Failed to load setting: ${key}, using default`,
+				"userSettings",
+				{ error: message },
+			);
+		}
 		return defaultValue ?? null;
 	}
 }
@@ -157,6 +171,50 @@ export async function loadProjectSettings(
 		logger.error("Failed to load project settings", "userSettings", { error });
 		return {};
 	}
+}
+
+export async function loadSettingsForProjects<T = unknown>(
+	key: string,
+	projectIds: string[],
+): Promise<Map<string, T>> {
+	const normalizedProjectIds = Array.from(
+		new Set(
+			projectIds
+				.map((projectId) => String(projectId ?? "").trim())
+				.filter(Boolean),
+		),
+	);
+
+	if (normalizedProjectIds.length === 0) {
+		return new Map();
+	}
+
+	if (!isSupabaseConfigured()) {
+		return new Map();
+	}
+
+	const userId = await requireUserId();
+	const { data, error } = await supabase
+		.from("user_settings")
+		.select("project_id, setting_value")
+		.eq("user_id", userId)
+		.eq("setting_key", key)
+		.in("project_id", normalizedProjectIds);
+
+	if (error) {
+		throw error;
+	}
+
+	const settings = new Map<string, T>();
+	for (const row of data ?? []) {
+		const projectId = String(row.project_id ?? "").trim();
+		if (!projectId) {
+			continue;
+		}
+		settings.set(projectId, row.setting_value as T);
+	}
+
+	return settings;
 }
 
 export async function savePreferences(

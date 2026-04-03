@@ -5,9 +5,14 @@ import { TransmittalBuilderApp } from "./TransmittalBuilderApp";
 
 const mockUseTransmittalBuilderState = vi.hoisted(() => vi.fn());
 
-vi.mock("./useTransmittalBuilderState", () => ({
-	useTransmittalBuilderState: mockUseTransmittalBuilderState,
-}));
+vi.mock("@/features/transmittal-builder", async (importOriginal) => {
+	const actual =
+		await importOriginal<typeof import("@/features/transmittal-builder")>();
+	return {
+		...actual,
+		useTransmittalBuilderState: mockUseTransmittalBuilderState,
+	};
+});
 
 vi.mock("./TransmittalBuilderMainForm", () => ({
 	TransmittalBuilderMainForm: () => <div>main form</div>,
@@ -59,6 +64,9 @@ function createState(overrides: Record<string, unknown> = {}) {
 		projectMetadataError: null,
 		projectMetadataWarnings: [],
 		projectMetadataLoadedAt: null,
+		nativeStandardsReview: null,
+		nativeStandardsReviewLoading: false,
+		nativeStandardsReviewError: null,
 		outputFormat: "both",
 		generationState: { state: "idle" },
 		outputs: [],
@@ -214,9 +222,94 @@ describe("TransmittalBuilderApp", () => {
 		).toBeTruthy();
 		expect(screen.getByText("Nanulak")).toBeTruthy();
 		expect(screen.getByText("Project metadata ready")).toBeTruthy();
-		expect(screen.getByText(/IFC-01 • 1 row/i)).toBeTruthy();
+		expect(screen.getByText(/IFC-01 (?:\||•) 1 row/i)).toBeTruthy();
 		expect(
 			screen.getByRole("link", { name: /review/i }).getAttribute("href"),
 		).toBe("/app/projects/project-1?view=review&issueSet=issue-set-1");
+	});
+
+	it("asks for native standards review before issue when no review is recorded", () => {
+		mockUseTransmittalBuilderState.mockReturnValue(
+			createState({
+				projectOptions: [
+					{
+						id: "project-1",
+						name: "Nanulak",
+						description: "Substation package",
+						projectPeName: "Jamie River, PE",
+						firmNumber: "AB - Firm #99887",
+						watchdogRootPath: "C:/Projects/Nanulak",
+					},
+				],
+				draft: {
+					...createState().draft,
+					selectedProjectId: "project-1",
+					projectName: "Nanulak",
+					transmittalNumber: "XMTL-009",
+					standardDocuments: [
+						{
+							id: "doc-1",
+							fileName: "One.pdf",
+							attachmentFileName: "One.pdf",
+							drawingNumber: "R3P-1",
+							title: "One",
+							revision: "A",
+							confidence: 1,
+							source: "project_metadata",
+							needsReview: false,
+							accepted: true,
+							overrideReason: "",
+							metadataWarnings: [],
+						},
+					],
+				},
+				files: {
+					template: new File(["template"], "template.docx"),
+					index: null,
+					acadeReport: null,
+					pdfs: [new File(["pdf"], "One.pdf")],
+					cid: [],
+				},
+				projectMetadataLoadedAt: "2026-03-23T10:00:00.000Z",
+				completeContacts: [
+					{
+						id: "contact-1",
+						name: "Alex",
+						company: "Root3",
+						email: "alex@example.com",
+						phone: "555-1234",
+					},
+				],
+				nativeStandardsReview: {
+					hasRecordedReview: false,
+					isBlocking: false,
+					overallStatus: null,
+					recordedAt: null,
+					requestId: null,
+					standardsCategory: null,
+					selectedStandardCount: 0,
+					inspectedDrawingCount: 0,
+					warningCount: 0,
+					providerPath: null,
+					summaryMessage:
+						"No native project standards review has been recorded yet.",
+				},
+			}),
+		);
+
+		render(
+			<MemoryRouter>
+				<TransmittalBuilderApp />
+			</MemoryRouter>,
+		);
+
+		expect(
+			screen.getByText("Run the native standards review before issuing Nanulak."),
+		).toBeTruthy();
+		expect(
+			screen.getByText(
+				"The package is staged, but no project-level native standards review has been recorded yet.",
+			),
+		).toBeTruthy();
 	});
 });

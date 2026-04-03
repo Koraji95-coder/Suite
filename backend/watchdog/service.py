@@ -1372,3 +1372,53 @@ class WatchdogMonitorService:
             },
             "trendBuckets": trend_buckets,
         }
+
+    def dashboard_snapshot(
+        self,
+        user_key: str,
+        *,
+        project_id: str | None = None,
+        collector_id: str | None = None,
+        time_window_ms: int = 24 * 60 * 60 * 1000,
+        events_limit: int = 8,
+        sessions_limit: int = 8,
+    ) -> Dict[str, Any]:
+        now_ms = int(self.time.time() * 1000)
+        safe_window = max(60_000, int(time_window_ms))
+        normalized_project_id = self._optional_text(project_id)
+        normalized_collector_id = self._optional_text(collector_id)
+        safe_events_limit = max(1, min(100, int(events_limit)))
+        safe_sessions_limit = max(1, min(100, int(sessions_limit)))
+        start_ms = now_ms - safe_window
+
+        collectors_payload = self.list_collectors(user_key)
+        overview_payload = self.overview(
+            user_key,
+            project_id=normalized_project_id,
+            time_window_ms=safe_window,
+        )
+        events_payload = self.list_events(
+            user_key,
+            limit=safe_events_limit,
+            collector_id=normalized_collector_id,
+            project_id=normalized_project_id,
+            since_ms=start_ms,
+        )
+        sessions_payload = self.list_sessions(
+            user_key,
+            limit=safe_sessions_limit,
+            collector_id=normalized_collector_id,
+            project_id=normalized_project_id,
+            time_window_ms=safe_window,
+        )
+
+        return {
+            "generatedAt": now_ms,
+            "timeWindowMs": safe_window,
+            "projectId": normalized_project_id,
+            "collectorId": normalized_collector_id,
+            "collectors": {"ok": True, **collectors_payload},
+            "overview": {"ok": True, **overview_payload},
+            "events": {"ok": True, **events_payload},
+            "sessions": {"ok": True, **sessions_payload},
+        }

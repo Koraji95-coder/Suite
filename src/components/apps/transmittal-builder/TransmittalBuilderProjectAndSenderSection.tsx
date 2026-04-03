@@ -7,12 +7,12 @@ import {
 	SelectValue,
 } from "@/components/apps/ui/select";
 import { Input, TextArea } from "@/components/primitives/Input";
-import styles from "./TransmittalBuilderProjectAndSenderSection.module.css";
 import {
 	isProjectSenderId,
 	type DraftState,
-} from "./transmittalBuilderModels";
-import type { PeProfile } from "./transmittalConfig";
+	type PeProfile,
+} from "@/features/transmittal-builder";
+import styles from "./TransmittalBuilderProjectAndSenderSection.module.css";
 
 const TransmittalSection = Section;
 

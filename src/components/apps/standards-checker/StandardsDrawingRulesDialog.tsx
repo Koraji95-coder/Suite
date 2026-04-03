@@ -9,7 +9,7 @@ import {
 } from "@/components/apps/ui/dialog";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsDrawingDialogs.module.css";
-import type { QARule } from "./standardsDrawingModels";
+import type { QARule } from "@/features/standards-checker/standardsDrawingModels";
 
 interface StandardsDrawingRulesDialogProps {
 	open: boolean;

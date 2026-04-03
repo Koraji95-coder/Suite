@@ -28,6 +28,7 @@ import {
 	useDashboardDeliverySummary,
 } from "./useDashboardDeliverySummary";
 import { useDashboardOverviewData } from "./useDashboardOverviewData";
+import { startDashboardPerfSpan } from "./dashboardPerf";
 
 interface DashboardOverviewPanelProps {
 	onNavigateToProject?: (projectId: string) => void;
@@ -264,6 +265,11 @@ export function DashboardOverviewPanel({
 
 	useEffect(() => {
 		let cancelled = false;
+		const watchdogLoadPerf = startDashboardPerfSpan("dashboard.watchdog.load", {
+			selectedCollectorId,
+			selectedProjectId,
+			selectedWindowMs,
+		});
 
 		const run = async () => {
 			setTelemetryLoading(true);
@@ -274,62 +280,121 @@ export function DashboardOverviewPanel({
 			const collectorId =
 				selectedCollectorId !== "all" ? selectedCollectorId : undefined;
 
-			const [overviewResult, eventsResult, sessionsResult, collectorsResult] =
-				await Promise.allSettled([
-					watchdogService.getOverview({
-						projectId,
-						timeWindowMs: selectedWindowMs,
-					}),
-					watchdogService.listEvents({
-						projectId,
-						collectorId,
-						limit: 8,
-						sinceMs: Date.now() - selectedWindowMs,
-					}),
-					watchdogService.listSessions({
-						projectId,
-						collectorId,
-						limit: 8,
-						timeWindowMs: selectedWindowMs,
-					}),
-					watchdogService.listCollectors(),
-				]);
+			const applyLegacyWatchdogTelemetry = async (
+				fallbackReason?: string,
+			): Promise<void> => {
+				const [overviewResult, eventsResult, sessionsResult, collectorsResult] =
+					await Promise.allSettled([
+						watchdogService.getOverview({
+							projectId,
+							timeWindowMs: selectedWindowMs,
+						}),
+						watchdogService.listEvents({
+							projectId,
+							collectorId,
+							limit: 8,
+							sinceMs: Date.now() - selectedWindowMs,
+						}),
+						watchdogService.listSessions({
+							projectId,
+							collectorId,
+							limit: 8,
+							timeWindowMs: selectedWindowMs,
+						}),
+						watchdogService.listCollectors(),
+					]);
 
-			if (cancelled) return;
+				if (cancelled) return;
 
-			if (overviewResult.status === "fulfilled") {
-				setWatchdogOverview(overviewResult.value);
-			} else {
-				setWatchdogOverview(null);
-				setWatchdogError(
-					overviewResult.reason instanceof Error
-						? overviewResult.reason.message
-						: "Watchdog overview is unavailable.",
+				if (overviewResult.status === "fulfilled") {
+					setWatchdogOverview(overviewResult.value);
+				} else {
+					setWatchdogOverview(null);
+					setWatchdogError(
+						overviewResult.reason instanceof Error
+							? overviewResult.reason.message
+							: "Watchdog overview is unavailable.",
+					);
+				}
+
+				setWatchdogEvents(
+					eventsResult.status === "fulfilled"
+						? (eventsResult.value.events ?? [])
+						: [],
 				);
+				setWatchdogSessions(
+					sessionsResult.status === "fulfilled"
+						? (sessionsResult.value.sessions ?? [])
+						: [],
+				);
+				setCollectors(
+					collectorsResult.status === "fulfilled"
+						? (collectorsResult.value.collectors ?? [])
+						: [],
+				);
+
+				watchdogLoadPerf.finish({
+					collectorCount:
+						collectorsResult.status === "fulfilled"
+							? (collectorsResult.value.collectors ?? []).length
+							: 0,
+					eventsCount:
+						eventsResult.status === "fulfilled"
+							? (eventsResult.value.events ?? []).length
+							: 0,
+					fallbackReason,
+					overviewStatus: overviewResult.status,
+					overviewTotalEvents:
+						overviewResult.status === "fulfilled"
+							? overviewResult.value.events.inWindow
+							: 0,
+					requestMode: "legacy-fallback",
+					sessionsCount:
+						sessionsResult.status === "fulfilled"
+							? (sessionsResult.value.sessions ?? []).length
+							: 0,
+				});
+			};
+
+			try {
+				const snapshot = await watchdogService.getDashboardSnapshot({
+					projectId,
+					collectorId,
+					timeWindowMs: selectedWindowMs,
+					eventsLimit: 8,
+					sessionsLimit: 8,
+				});
+				if (cancelled) return;
+
+				setWatchdogOverview(snapshot.overview);
+				setWatchdogEvents(snapshot.events.events ?? []);
+				setWatchdogSessions(snapshot.sessions.sessions ?? []);
+				setCollectors(snapshot.collectors.collectors ?? []);
+				setWatchdogError(null);
+
+				watchdogLoadPerf.finish({
+					collectorCount: snapshot.collectors.count,
+					eventsCount: snapshot.events.count,
+					overviewStatus: "fulfilled",
+					overviewTotalEvents: snapshot.overview.events.inWindow,
+					requestMode: "snapshot",
+					sessionsCount: snapshot.sessions.count,
+				});
+			} catch (error) {
+				await applyLegacyWatchdogTelemetry(
+					error instanceof Error ? error.message : String(error),
+				);
+			} finally {
+				if (!cancelled) {
+					setTelemetryLoading(false);
+				}
 			}
-
-			setWatchdogEvents(
-				eventsResult.status === "fulfilled"
-					? (eventsResult.value.events ?? [])
-					: [],
-			);
-			setWatchdogSessions(
-				sessionsResult.status === "fulfilled"
-					? (sessionsResult.value.sessions ?? [])
-					: [],
-			);
-			setCollectors(
-				collectorsResult.status === "fulfilled"
-					? (collectorsResult.value.collectors ?? [])
-					: [],
-			);
-
-			setTelemetryLoading(false);
 		};
 
 		void run();
 		return () => {
 			cancelled = true;
+			watchdogLoadPerf.cancel({ reason: "effect-cleanup" });
 		};
 	}, [selectedCollectorId, selectedProjectId, selectedWindowMs]);
 

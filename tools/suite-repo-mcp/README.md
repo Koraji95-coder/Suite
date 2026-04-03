@@ -41,6 +41,13 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 
 ### Resources
 - `repo://docs/development/autocad-electrical-2026-project-flow`
+- `repo://docs/development/autocad-electrical-2026-autolisp-api-reference` (generated from `ACE_API.chm` plus local ACADE asset inventory)
+- `repo://docs/development/autocad-electrical-2026-installation-context`
+- `repo://docs/development/autocad-electrical-2026-installation-context-yaml`
+- `repo://docs/development/autocad-electrical-2026-lookup-index`
+- `repo://docs/development/autocad-electrical-2026-regression-fixtures`
+- `repo://docs/development/autocad-electrical-2026-suite-integration-playbook`
+- `repo://docs/development/autocad-electrical-2026-reference-pack`
 
 ## Location
 
@@ -56,7 +63,7 @@ PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-works
 ```
 
 The canonical workstation profile source lives in `tools/suite-repo-mcp/workstation-profiles.json`.
-Human-facing matrix notes live in `docs/development/mcp-workstation-matrix.md`.
+Human-facing matrix notes live in `docs/runtime-control/mcp-workstation-matrix.md`.
 This sync script is the only supported path for stamping `mcp_servers.suite_repo_mcp.env`.
 
 To preview the generated MCP block without writing `~/.codex/config.toml`:

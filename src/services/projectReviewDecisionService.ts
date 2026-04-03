@@ -1,5 +1,9 @@
 import { logger } from "@/lib/logger";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
+import {
+	createProjectScopedFetchCache,
+	getLocalStorageApi,
+} from "@/services/projectWorkflowClientSupport";
 
 export type ProjectReviewDecisionItemType = "title-block" | "standards";
 export type ProjectReviewDecisionStatus = "accepted" | "waived";
@@ -30,6 +34,10 @@ export interface ProjectReviewDecisionInput {
 const REVIEW_DECISION_SETTING_KEY = "project_review_decisions_v1";
 const LOCAL_STORAGE_PREFIX = "suite:project-review-decisions";
 const hasOwn = Object.prototype.hasOwnProperty;
+const reviewDecisionFetchCache = createProjectScopedFetchCache<{
+	data: ProjectReviewDecisionRecord[];
+	error: Error | null;
+}>();
 
 function createId() {
 	return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -94,12 +102,13 @@ function buildLocalStorageKey(projectId: string) {
 }
 
 function readLocalDecisions(projectId: string): ProjectReviewDecisionRecord[] {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return [];
 	}
 
 	try {
-		const raw = localStorage.getItem(buildLocalStorageKey(projectId));
+		const raw = storage.getItem(buildLocalStorageKey(projectId));
 		if (!raw) {
 			return [];
 		}
@@ -128,12 +137,13 @@ function writeLocalDecisions(
 	projectId: string,
 	entries: ProjectReviewDecisionRecord[],
 ) {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return;
 	}
 
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(projectId),
 			JSON.stringify(sortDecisions(entries)),
 		);
@@ -178,39 +188,66 @@ export const projectReviewDecisionService = {
 			};
 		}
 
+		const cached = reviewDecisionFetchCache.read(normalizedProjectId);
+		if (cached) {
+			return cached;
+		}
+		const inFlight =
+			reviewDecisionFetchCache.readInFlight(normalizedProjectId);
+		if (inFlight) {
+			return await inFlight;
+		}
+
 		const localFallback = readLocalDecisions(normalizedProjectId);
+		const loader = reviewDecisionFetchCache.writeInFlight(
+			normalizedProjectId,
+			(async () => {
+				try {
+					const stored = await loadSetting<unknown>(
+						REVIEW_DECISION_SETTING_KEY,
+						normalizedProjectId,
+						null,
+					);
+					if (stored === null) {
+						return reviewDecisionFetchCache.write(normalizedProjectId, {
+							data: localFallback,
+							error: null,
+						});
+					}
+					if (!Array.isArray(stored)) {
+						return reviewDecisionFetchCache.write(normalizedProjectId, {
+							data: localFallback,
+							error: new Error("Stored review decision data is invalid."),
+						});
+					}
+					const normalized = sortDecisions(
+						stored
+							.map((entry) => normalizeRecord(entry))
+							.filter(
+								(entry): entry is ProjectReviewDecisionRecord => entry !== null,
+							),
+					);
+					writeLocalDecisions(normalizedProjectId, normalized);
+					return reviewDecisionFetchCache.write(normalizedProjectId, {
+						data: normalized,
+						error: null,
+					});
+				} catch (error) {
+					return reviewDecisionFetchCache.write(normalizedProjectId, {
+						data: localFallback,
+						error:
+							error instanceof Error
+								? error
+								: new Error("Unable to load review decisions."),
+					});
+				}
+			})(),
+		);
+
 		try {
-			const stored = await loadSetting<unknown>(
-				REVIEW_DECISION_SETTING_KEY,
-				normalizedProjectId,
-				null,
-			);
-			if (stored === null) {
-				return { data: localFallback, error: null };
-			}
-			if (!Array.isArray(stored)) {
-				return {
-					data: localFallback,
-					error: new Error("Stored review decision data is invalid."),
-				};
-			}
-			const normalized = sortDecisions(
-				stored
-					.map((entry) => normalizeRecord(entry))
-					.filter(
-						(entry): entry is ProjectReviewDecisionRecord => entry !== null,
-					),
-			);
-			writeLocalDecisions(normalizedProjectId, normalized);
-			return { data: normalized, error: null };
-		} catch (error) {
-			return {
-				data: localFallback,
-				error:
-					error instanceof Error
-						? error
-						: new Error("Unable to load review decisions."),
-			};
+			return await loader;
+		} finally {
+			reviewDecisionFetchCache.clearInFlight(normalizedProjectId);
 		}
 	},
 
@@ -255,6 +292,10 @@ export const projectReviewDecisionService = {
 			...existingResult.data.filter((entry) => entry.id !== record.id),
 		]);
 		const persistError = await persistDecisions(projectId, nextEntries);
+		reviewDecisionFetchCache.write(projectId, {
+			data: nextEntries,
+			error: persistError,
+		});
 		return {
 			data: record,
 			error: persistError,
@@ -286,6 +327,10 @@ export const projectReviewDecisionService = {
 			normalizedProjectId,
 			nextEntries,
 		);
+		reviewDecisionFetchCache.write(normalizedProjectId, {
+			data: nextEntries,
+			error: persistError,
+		});
 		return {
 			success: persistError === null,
 			error: persistError,

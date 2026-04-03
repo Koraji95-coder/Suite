@@ -3,6 +3,10 @@ import { loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import { safeSupabaseQuery } from "@/supabase/utils";
+import {
+	getCurrentSupabaseUserId,
+	getLocalStorageApi,
+} from "@/services/projectWorkflowClientSupport";
 
 export type ProjectMarkupSnapshotRow =
 	Database["public"]["Tables"]["project_markup_snapshots"]["Row"];
@@ -199,11 +203,12 @@ function sortSnapshots(entries: ProjectMarkupSnapshotRecord[]) {
 }
 
 function readLocalSnapshots(projectId: string) {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return [] as ProjectMarkupSnapshotRecord[];
 	}
 	try {
-		const raw = localStorage.getItem(buildLocalStorageKey(projectId));
+		const raw = storage.getItem(buildLocalStorageKey(projectId));
 		if (!raw) {
 			return [] as ProjectMarkupSnapshotRecord[];
 		}
@@ -232,11 +237,12 @@ function writeLocalSnapshots(
 	projectId: string,
 	entries: ProjectMarkupSnapshotRecord[],
 ) {
-	if (typeof localStorage === "undefined") {
+	const storage = getLocalStorageApi();
+	if (!storage) {
 		return;
 	}
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(projectId),
 			JSON.stringify(sortSnapshots(entries)),
 		);
@@ -250,14 +256,11 @@ function writeLocalSnapshots(
 }
 
 async function getCurrentUserId() {
-	const {
-		data: { user },
-		error,
-	} = await supabase.auth.getUser();
-	if (error || !user) {
+	try {
+		return await getCurrentSupabaseUserId();
+	} catch {
 		return null;
 	}
-	return user.id;
 }
 
 function isMissingMarkupSnapshotTable(error: unknown) {

@@ -1,7 +1,10 @@
+import type {
+	CheckResult,
+	Standard,
+} from "@/features/standards-checker/standardsCheckerModels";
 import { cn } from "@/lib/utils";
 import styles from "./StandardsChecker.module.css";
 import { StandardsCheckerStatusIcon } from "./StandardsCheckerStatusIcon";
-import type { CheckResult, Standard } from "./standardsCheckerModels";
 
 interface StandardsCheckerStandardsListProps {
 	activeCategory: string;

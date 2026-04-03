@@ -8,9 +8,9 @@ import {
 	type DraftState,
 	type FileState,
 	type OptionKey,
-} from "./transmittalBuilderModels";
-import type { PeProfile } from "./transmittalConfig";
-import type { ProjectDocumentMetadataProjectOption } from "@/services/projectDocumentMetadataService";
+	type PeProfile,
+} from "@/features/transmittal-builder";
+import type { ProjectDocumentMetadataProjectOption } from "@/features/project-documents";
 
 interface TransmittalBuilderMainFormProps {
 	draft: DraftState;

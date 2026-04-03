@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import styles from "./StandardsChecker.module.css";
-import type { StandardsCheckerMode } from "./standardsCheckerModels";
+import type { StandardsCheckerMode } from "@/features/standards-checker/standardsCheckerModels";
 
 interface StandardsCheckerModeTabsProps {
 	mode: StandardsCheckerMode;

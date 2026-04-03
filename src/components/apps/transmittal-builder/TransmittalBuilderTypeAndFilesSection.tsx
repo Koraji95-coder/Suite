@@ -10,16 +10,16 @@ import {
 } from "@/components/apps/ui/select";
 import { Button } from "@/components/primitives/Button";
 import { Input } from "@/components/primitives/Input";
-import { cn } from "@/lib/utils";
-import { TransmittalBuilderFileRow as FileRow } from "./TransmittalBuilderFileRow";
-import styles from "./TransmittalBuilderTypeAndFilesSection.module.css";
 import {
 	type DraftState,
 	type FileState,
 	REVISION_OPTIONS,
 	type TransmittalType,
-} from "./transmittalBuilderModels";
-import type { ProjectDocumentMetadataProjectOption } from "@/services/projectDocumentMetadataService";
+} from "@/features/transmittal-builder";
+import { cn } from "@/lib/utils";
+import { TransmittalBuilderFileRow as FileRow } from "./TransmittalBuilderFileRow";
+import styles from "./TransmittalBuilderTypeAndFilesSection.module.css";
+import type { ProjectDocumentMetadataProjectOption } from "@/features/project-documents";
 
 const TransmittalSection = Section;
 

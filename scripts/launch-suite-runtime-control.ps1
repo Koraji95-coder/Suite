@@ -275,6 +275,19 @@ function Get-HostSourceTimestampUtc {
     return ($sourceFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
 }
 
+function Get-HostBuildTimestampUtc {
+    if (-not (Test-Path -LiteralPath $hostBuildOutputDirectory -PathType Container)) {
+        return [datetime]::MinValue
+    }
+
+    $outputFiles = Get-ChildItem -Path $hostBuildOutputDirectory -Recurse -File -ErrorAction SilentlyContinue
+    if (-not $outputFiles) {
+        return [datetime]::MinValue
+    }
+
+    return ($outputFiles | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1).LastWriteTimeUtc
+}
+
 function Get-DotNetExecutable {
     $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
     if ($dotnet) {
@@ -333,7 +346,7 @@ function Resolve-HostLaunchTarget {
     $needsBuild = -not $hostOutputExists
 
     if ($hostOutputExists) {
-        $hostTimestamp = (Get-Item -LiteralPath $hostOutputPath).LastWriteTimeUtc
+        $hostTimestamp = Get-HostBuildTimestampUtc
         $sourceTimestamp = Get-HostSourceTimestampUtc
         $needsBuild = $sourceTimestamp -gt $hostTimestamp
     }
@@ -344,7 +357,7 @@ function Resolve-HostLaunchTarget {
         }
 
         Write-LauncherLog -Message "Building desktop shell host."
-        & $dotNetExecutable build $hostProjectPath -c Debug -v quiet /nologo
+        $null = & $dotNetExecutable build $hostProjectPath -c Debug -v quiet /nologo
         $exitCode = if (Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue) { [int]$LASTEXITCODE } else { 0 }
         if ($exitCode -ne 0) {
             throw "dotnet build failed for the runtime shell."
@@ -363,7 +376,12 @@ function Resolve-HostLaunchTarget {
         throw "The desktop shell executable was not produced."
     }
 
-    $buildStamp = (Get-Item -LiteralPath $hostOutputPath).LastWriteTimeUtc.ToString(
+    $hostBuildTimestamp = Get-HostBuildTimestampUtc
+    if ($hostBuildTimestamp -eq [datetime]::MinValue) {
+        $hostBuildTimestamp = (Get-Item -LiteralPath $hostOutputPath).LastWriteTimeUtc
+    }
+
+    $buildStamp = $hostBuildTimestamp.ToString(
         "yyyyMMddHHmmssfff",
         [System.Globalization.CultureInfo]::InvariantCulture)
     $stageDirectory = Join-Path $hostStageRoot $buildStamp
@@ -395,6 +413,35 @@ function Resolve-HostLaunchTarget {
         Directory = $stageDirectory
         ExecutablePath = $stageExecutablePath
     }
+}
+
+function Resolve-ValidatedHostLaunchTarget {
+    $rawLaunchTarget = @(Resolve-HostLaunchTarget)
+    $launchTarget = $rawLaunchTarget |
+        Where-Object {
+            $_ -and
+            $_.PSObject.Properties.Name -contains "Directory" -and
+            $_.PSObject.Properties.Name -contains "ExecutablePath"
+        } |
+        Select-Object -Last 1
+
+    if (-not $launchTarget) {
+        throw "The desktop shell launch target could not be resolved."
+    }
+
+    if ($rawLaunchTarget.Count -gt 1) {
+        $types = $rawLaunchTarget | ForEach-Object {
+            if ($_ -eq $null) {
+                "<null>"
+            }
+            else {
+                $_.GetType().FullName
+            }
+        } | Sort-Object -Unique
+        Write-LauncherLog -Message ("Launch target resolver returned extra values. Using the last valid launch target. Types={0}" -f ($types -join ", ")) -Tag "WARN"
+    }
+
+    return $launchTarget
 }
 
 function Invoke-ExistingDesktopShellActivation {
@@ -689,7 +736,7 @@ function Ensure-DesktopShell {
         [switch]$ForwardAutoBootstrapToExistingShell
     )
 
-    $launchTarget = Resolve-HostLaunchTarget
+    $launchTarget = Resolve-ValidatedHostLaunchTarget
     $existingSummary = Get-DesktopShellSummary
     if ($existingSummary.status -eq "healthy") {
         $activation = Invoke-ExistingDesktopShellActivation `

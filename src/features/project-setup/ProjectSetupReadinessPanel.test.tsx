@@ -83,7 +83,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 	return {
 		id: "project-1",
 		user_id: "user-1",
-		name: "Nanulak",
+		name: "MyProject",
 		description: "Issue package setup",
 		status: "active",
 		priority: "high",
@@ -127,10 +127,10 @@ describe("ProjectSetupReadinessPanel", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				acadeProjectFilePath: null,
 				acadeLine1: "",
 				acadeLine2: "",
@@ -148,9 +148,9 @@ describe("ProjectSetupReadinessPanel", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-				wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-				wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+				wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+				wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+				wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -208,11 +208,11 @@ describe("ProjectSetupReadinessPanel", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				project_root_path: "C:/Projects/Nanulak",
+				project_root_path: "C:/Projects/MyProject",
 				acade_project_file_path: null,
-				acade_line1: "Nanulak 180MW Substation",
+				acade_line1: "MyProject Substation",
 				acade_line2: "Issue for review",
-				acade_line4: "R3P-25074",
+				acade_line4: "PROJ-00001",
 				signer_drawn_by: "KD",
 				signer_checked_by: "QA",
 				signer_engineer: "",
@@ -227,14 +227,14 @@ describe("ProjectSetupReadinessPanel", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				acadeProjectFilePath: null,
-				acadeLine1: "Nanulak 180MW Substation",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
-				acadeLine4: "R3P-25074",
+				acadeLine4: "PROJ-00001",
 				signerDrawnBy: "KD",
 				signerCheckedBy: "QA",
 				signerEngineer: "",
@@ -248,9 +248,9 @@ describe("ProjectSetupReadinessPanel", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-				wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-				wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+				wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+				wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+				wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -265,13 +265,13 @@ describe("ProjectSetupReadinessPanel", () => {
 			<MemoryRouter>
 				<ProjectSetupReadinessPanel
 					project={createProject({
-						watchdog_root_path: "C:/Projects/Nanulak",
+						watchdog_root_path: "C:/Projects/MyProject",
 					})}
 					telemetry={createTelemetry({
 						ruleConfigured: true,
 						rule: {
 							projectId: "project-1",
-							roots: ["C:/Projects/Nanulak"],
+							roots: ["C:/Projects/MyProject"],
 							includeGlobs: ["**/*.dwg"],
 							excludeGlobs: [],
 							drawingPatterns: ["R3P-*.dwg"],
@@ -300,11 +300,11 @@ describe("ProjectSetupReadinessPanel", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				project_root_path: "C:/Projects/Nanulak",
-				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
-				acade_line1: "Nanulak 180MW Substation",
+				project_root_path: "C:/Projects/MyProject",
+				acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
+				acade_line1: "MyProject Substation",
 				acade_line2: "Issue for review",
-				acade_line4: "R3P-25074",
+				acade_line4: "PROJ-00001",
 				signer_drawn_by: "KD",
 				signer_checked_by: "QA",
 				signer_engineer: "",
@@ -319,7 +319,7 @@ describe("ProjectSetupReadinessPanel", () => {
 					id: "rev-1",
 					project_id: "project-1",
 					file_id: null,
-					drawing_number: "R3P-25074-E0-0001",
+					drawing_number: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "A",
 					previous_revision: null,
@@ -346,14 +346,14 @@ describe("ProjectSetupReadinessPanel", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
-				acadeLine4: "R3P-25074",
+				acadeLine4: "PROJ-00001",
 				signerDrawnBy: "KD",
 				signerCheckedBy: "QA",
 				signerEngineer: "",
@@ -367,9 +367,9 @@ describe("ProjectSetupReadinessPanel", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-				wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-				wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+				wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+				wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+				wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -384,13 +384,13 @@ describe("ProjectSetupReadinessPanel", () => {
 			<MemoryRouter>
 				<ProjectSetupReadinessPanel
 					project={createProject({
-						watchdog_root_path: "C:/Projects/Nanulak",
+						watchdog_root_path: "C:/Projects/MyProject",
 					})}
 					telemetry={createTelemetry({
 						ruleConfigured: true,
 						rule: {
 							projectId: "project-1",
-							roots: ["C:/Projects/Nanulak"],
+							roots: ["C:/Projects/MyProject"],
 							includeGlobs: ["**/*.dwg"],
 							excludeGlobs: [],
 							drawingPatterns: ["R3P-*.dwg"],
@@ -411,8 +411,8 @@ describe("ProjectSetupReadinessPanel", () => {
 		expect(
 			screen.getByText(/Revision history is in place for issue-set review/i),
 		).toBeTruthy();
-		expect(screen.getByText("R3P-25074")).toBeTruthy();
-		expect(screen.getByText("C:/Projects/Nanulak/Nanulak.wdp")).toBeTruthy();
+		expect(screen.getByText("PROJ-00001")).toBeTruthy();
+		expect(screen.getByText("C:/Projects/MyProject/MyProject.wdp")).toBeTruthy();
 		expect(
 			screen.getAllByText(/Existing ACADE project definition/i).length,
 		).toBeGreaterThan(0);
@@ -438,14 +438,14 @@ describe("ProjectSetupReadinessPanel", () => {
 			success: true,
 			message: "ACADE opened and project activated.",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-					projectRootPath: "C:/Projects/Nanulak",
-					acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-					acadeLine1: "Nanulak 180MW Substation",
+					projectRootPath: "C:/Projects/MyProject",
+					acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+					acadeLine1: "MyProject Substation",
 					acadeLine2: "Issue for review",
-					acadeLine4: "R3P-25074",
+					acadeLine4: "PROJ-00001",
 					signerDrawnBy: "KD",
 					signerCheckedBy: "QA",
 					signerEngineer: "",
@@ -460,9 +460,9 @@ describe("ProjectSetupReadinessPanel", () => {
 					wdTbConflictCount: 0,
 				},
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-					wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-					wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+					wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+					wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+					wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -476,11 +476,11 @@ describe("ProjectSetupReadinessPanel", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				project_root_path: "C:/Projects/Nanulak",
-				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
-				acade_line1: "Nanulak 180MW Substation",
+				project_root_path: "C:/Projects/MyProject",
+				acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
+				acade_line1: "MyProject Substation",
 				acade_line2: "Issue for review",
-				acade_line4: "R3P-25074",
+				acade_line4: "PROJ-00001",
 				signer_drawn_by: "KD",
 				signer_checked_by: "QA",
 				signer_engineer: "",
@@ -495,14 +495,14 @@ describe("ProjectSetupReadinessPanel", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
-				acadeLine4: "R3P-25074",
+				acadeLine4: "PROJ-00001",
 				signerDrawnBy: "KD",
 				signerCheckedBy: "QA",
 				signerEngineer: "",
@@ -516,9 +516,9 @@ describe("ProjectSetupReadinessPanel", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-				wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-				wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+				wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+				wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+				wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -533,7 +533,7 @@ describe("ProjectSetupReadinessPanel", () => {
 			<MemoryRouter>
 				<ProjectSetupReadinessPanel
 					project={createProject({
-						watchdog_root_path: "C:/Projects/Nanulak",
+						watchdog_root_path: "C:/Projects/MyProject",
 					})}
 					telemetry={createTelemetry()}
 				/>
@@ -548,18 +548,18 @@ describe("ProjectSetupReadinessPanel", () => {
 		await waitFor(() =>
 			expect(projectSetupReadinessMocks.openProjectMock).toHaveBeenCalledWith({
 				projectId: "project-1",
-				projectName: "Nanulak",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectName: "MyProject",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					id: "profile-1",
 					project_id: "project-1",
 					user_id: "user-1",
 					block_name: DEFAULT_PROJECT_TITLE_BLOCK_NAME,
-					project_root_path: "C:/Projects/Nanulak",
-					acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
-					acade_line1: "Nanulak 180MW Substation",
+					project_root_path: "C:/Projects/MyProject",
+					acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
+					acade_line1: "MyProject Substation",
 					acade_line2: "Issue for review",
-					acade_line4: "R3P-25074",
+					acade_line4: "PROJ-00001",
 					signer_drawn_by: "KD",
 					signer_checked_by: "QA",
 					signer_engineer: "",

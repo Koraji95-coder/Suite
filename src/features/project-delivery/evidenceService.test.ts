@@ -23,7 +23,7 @@ function createProject(): Project {
 	return {
 		id: "project-1",
 		user_id: "user-1",
-		name: "Nanulak",
+		name: "MyProject",
 		description: "Issue package setup",
 		status: "active",
 		priority: "high",
@@ -31,7 +31,7 @@ function createProject(): Project {
 		category: "Substation",
 		created_at: "2026-03-20T00:00:00.000Z",
 		updated_at: "2026-03-20T00:00:00.000Z",
-		watchdog_root_path: "C:/Projects/Nanulak",
+		watchdog_root_path: "C:/Projects/MyProject",
 	} as Project;
 }
 
@@ -39,7 +39,7 @@ function createIssueSet(): ProjectIssueSetRecord {
 	return {
 		id: "issue-set-1",
 		projectId: "project-1",
-		name: "Nanulak IFC package",
+		name: "MyProject IFC package",
 		issueTag: "IFC-01",
 		status: "review",
 		targetDate: "2026-03-31",
@@ -49,9 +49,9 @@ function createIssueSet(): ProjectIssueSetRecord {
 		terminalScheduleSnapshotId: null,
 		summary: "Ready for final review.",
 		notes: null,
-		selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+		selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 		selectedRegisterRowIds: ["register-row-1"],
-		selectedDrawingNumbers: ["R3P-25074-E0-0001"],
+		selectedDrawingNumbers: ["PROJ-00001-E0-0001"],
 		selectedPdfFileIds: ["file-1"],
 		snapshot: {
 			drawingCount: 2,
@@ -77,7 +77,7 @@ function createRegisterSnapshot(): ProjectDeliverableRegisterSnapshot {
 		projectId: "project-1",
 		workbookFileName: "Master Deliverable List.xlsx",
 		importedAt: "2026-03-20T00:00:00.000Z",
-		dwgRootPath: "C:/Projects/Nanulak",
+		dwgRootPath: "C:/Projects/MyProject",
 		pdfSourceSummary: "Issued package",
 		sheetNames: ["Overall"],
 		rowCount: 1,
@@ -87,7 +87,7 @@ function createRegisterSnapshot(): ProjectDeliverableRegisterSnapshot {
 				snapshotId: "register-1",
 				sheetName: "Overall",
 				setName: "BESS",
-				drawingNumber: "R3P-25074-E0-0001",
+				drawingNumber: "PROJ-00001-E0-0001",
 				drawingKey: "R3P25074E00001",
 				drawingDescription: "Drawing Index",
 				currentRevision: "A",
@@ -116,12 +116,12 @@ function createScanRows(): ProjectDocumentMetadataRow[] {
 		{
 			id: "row-1",
 			projectId: "project-1",
-			fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-			relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+			fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+			relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			absolutePath:
-				"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			fileType: "dwg",
-			drawingNumber: "R3P-25074-E0-0001",
+			drawingNumber: "PROJ-00001-E0-0001",
 			title: "Drawing Index",
 			revision: "A",
 			source: "title_block_sync",
@@ -140,12 +140,12 @@ function createScanRows(): ProjectDocumentMetadataRow[] {
 		{
 			id: "row-2",
 			projectId: "project-1",
-			fileName: "R3P-25074-E0-0002 - ONE LINE.dwg",
-			relativePath: "Issued/R3P-25074-E0-0002 - ONE LINE.dwg",
+			fileName: "PROJ-00001-E0-0002 - ONE LINE.dwg",
+			relativePath: "Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
 			absolutePath:
-				"C:/Projects/Nanulak/Issued/R3P-25074-E0-0002 - ONE LINE.dwg",
+				"C:/Projects/MyProject/Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
 			fileType: "dwg",
-			drawingNumber: "R3P-25074-E0-0002",
+			drawingNumber: "PROJ-00001-E0-0002",
 			title: "One Line",
 			revision: "A",
 			source: "filename_fallback",
@@ -170,7 +170,7 @@ function createRevisions(): DrawingRevisionRegisterRow[] {
 			id: "rev-1",
 			project_id: "project-1",
 			title: "Drawing Index revision",
-			drawing_number: "R3P-25074-E0-0001",
+			drawing_number: "PROJ-00001-E0-0001",
 			revision: "A",
 			issue_status: "open",
 			issue_severity: "warning",
@@ -187,7 +187,7 @@ function createRevisions(): DrawingRevisionRegisterRow[] {
 			id: "rev-2",
 			project_id: "project-1",
 			title: "Other drawing revision",
-			drawing_number: "R3P-25074-E0-0002",
+			drawing_number: "PROJ-00001-E0-0002",
 			revision: "A",
 			issue_status: "open",
 			issue_severity: "error",
@@ -207,8 +207,8 @@ function createStandardsChecks(): DrawingAnnotation[] {
 	return [
 		{
 			id: "ann-1",
-			drawing_name: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-			file_path: "/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+			drawing_name: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+			file_path: "/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			annotations: [
 				{
 					type: "layer",
@@ -226,8 +226,8 @@ function createStandardsChecks(): DrawingAnnotation[] {
 		},
 		{
 			id: "ann-2",
-			drawing_name: "R3P-25074-E0-0002 - ONE LINE.dwg",
-			file_path: "/Issued/R3P-25074-E0-0002 - ONE LINE.dwg",
+			drawing_name: "PROJ-00001-E0-0002 - ONE LINE.dwg",
+			file_path: "/Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
 			annotations: [],
 			qa_status: "pass",
 			checked_at: "2026-03-21T00:00:00.000Z",
@@ -273,7 +273,7 @@ function createReceipts(): ProjectTransmittalReceiptRecord[] {
 		{
 			id: "receipt-1",
 			projectId: "project-1",
-			projectName: "Nanulak",
+			projectName: "MyProject",
 			projectNumber: "25074",
 			transmittalType: "standard",
 			transmittalNumber: "XMTL-001",
@@ -338,7 +338,7 @@ function createAutomationReceipts(): ProjectAutomationReceiptRecord[] {
 			cadUtilityChangedDrawingCount: 0,
 			cadUtilityChangedItemCount: 0,
 			requestId: "req-123",
-			drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+			drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			createdAt: "2026-03-21T00:10:00.000Z",
 		},
 	];
@@ -367,8 +367,8 @@ function createTelemetry(): ProjectWatchdogTelemetry {
 		trackedDrawings: [
 			{
 				drawingPath:
-					"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				lifetimeTrackedMs: 180_000,
 				todayTrackedMs: 180_000,
 				lastWorkedAt: "2026-03-21T00:00:00.000Z",
@@ -379,8 +379,8 @@ function createTelemetry(): ProjectWatchdogTelemetry {
 			},
 			{
 				drawingPath:
-					"C:/Projects/Nanulak/Issued/R3P-25074-E0-0002 - ONE LINE.dwg",
-				drawingName: "R3P-25074-E0-0002 - ONE LINE.dwg",
+					"C:/Projects/MyProject/Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
+				drawingName: "PROJ-00001-E0-0002 - ONE LINE.dwg",
 				lifetimeTrackedMs: 60_000,
 				todayTrackedMs: 60_000,
 				lastWorkedAt: "2026-03-21T00:00:00.000Z",
@@ -396,11 +396,11 @@ function createTelemetry(): ProjectWatchdogTelemetry {
 function createScanProfile(): TitleBlockSyncProfile {
 	return {
 		blockName: "R3P-24x36BORDER&TITLE",
-		projectRootPath: "C:/Projects/Nanulak",
-		acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-		acadeLine1: "Nanulak 180MW Substation",
+		projectRootPath: "C:/Projects/MyProject",
+		acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+		acadeLine1: "MyProject Substation",
 		acadeLine2: "Issued for design review",
-		acadeLine4: "R3P-25074",
+		acadeLine4: "PROJ-00001",
 		signerDrawnBy: "KD",
 		signerCheckedBy: "QA",
 		signerEngineer: "APS",
@@ -409,9 +409,9 @@ function createScanProfile(): TitleBlockSyncProfile {
 
 function createArtifacts(): TitleBlockSyncArtifacts {
 	return {
-		wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-		wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-		wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+		wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+		wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+		wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 		wdpText: "",
 		wdtText: "",
 		wdlText: "",
@@ -467,10 +467,10 @@ describe("projectDeliveryEvidenceService", () => {
 		});
 
 		expect(packet.selectedDrawings).toHaveLength(1);
-		expect(packet.selectedDrawings[0]?.drawingNumber).toBe("R3P-25074-E0-0001");
+		expect(packet.selectedDrawings[0]?.drawingNumber).toBe("PROJ-00001-E0-0001");
 		expect(packet.revisions.openCount).toBe(1);
 		expect(packet.revisions.entries[0]?.drawingNumber).toBe(
-			"R3P-25074-E0-0001",
+			"PROJ-00001-E0-0001",
 		);
 		expect(packet.standards.matchedDrawingCount).toBe(1);
 		expect(packet.standards.warningCount).toBe(1);
@@ -489,16 +489,16 @@ describe("projectDeliveryEvidenceService", () => {
 			{
 				itemType: "title-block",
 				status: "accepted",
-				label: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				label: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			},
 			{
 				itemType: "standards",
 				status: "waived",
-				label: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				label: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 			},
 		]);
-		expect(packet.acadeSetup.projectNumber).toBe("R3P-25074");
-		expect(packet.acadeSetup.wdpPath).toBe("C:/Projects/Nanulak/Nanulak.wdp");
+		expect(packet.acadeSetup.projectNumber).toBe("PROJ-00001");
+		expect(packet.acadeSetup.wdpPath).toBe("C:/Projects/MyProject/MyProject.wdp");
 		expect(packet.acadeSetup.wdpState).toBe("existing");
 		expect(packet.automation.linkedReceiptCount).toBe(1);
 		expect(packet.automation.latestReceipt?.mode).toBe("combined");
@@ -524,13 +524,13 @@ describe("projectDeliveryEvidenceService", () => {
 
 		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
 
-		expect(markdown).toContain("# Nanulak IFC package");
+		expect(markdown).toContain("# MyProject IFC package");
 		expect(markdown).toContain("accepted for package");
 		expect(markdown).toContain("## ACADE Setup");
-		expect(markdown).toContain("Project number: R3P-25074");
-		expect(markdown).toContain("ACADE project file: C:/Projects/Nanulak/Nanulak.wdp");
+		expect(markdown).toContain("Project number: PROJ-00001");
+		expect(markdown).toContain("ACADE project file: C:/Projects/MyProject/MyProject.wdp");
 		expect(markdown).toContain("## Deliverable Register");
-		expect(markdown).toContain("Overall / BESS | R3P-25074-E0-0001");
+		expect(markdown).toContain("Overall / BESS | PROJ-00001-E0-0001");
 		expect(markdown).toContain("## Review Decisions");
 		expect(markdown).toContain("Title block review | accepted");
 		expect(markdown).toContain("## Standards Evidence");
@@ -539,7 +539,7 @@ describe("projectDeliveryEvidenceService", () => {
 		expect(markdown).toContain("## Transmittal Evidence");
 		expect(markdown).toContain("## Automation Evidence");
 		expect(markdown).toContain("Applied markup cleanup and terminal plan preview.");
-		expect(markdown).toContain("R3P-25074-E0-0001 - DRAWING INDEX.dwg");
+		expect(markdown).toContain("PROJ-00001-E0-0001 - DRAWING INDEX.dwg");
 		expect(markdown).not.toContain("Other drawing revision");
 	});
 });

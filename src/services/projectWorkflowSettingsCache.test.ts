@@ -107,7 +107,7 @@ function createTransmittalReceiptRecord() {
 	return {
 		id: "receipt-1",
 		projectId: "project-1",
-		projectName: "Nanulak",
+		projectName: "MyProject",
 		projectNumber: "25074",
 		transmittalType: "standard",
 		transmittalNumber: "XMTL-001",
@@ -181,7 +181,7 @@ function createDeliverableRegisterSnapshot() {
 		projectId: "project-1",
 		workbookFileName: "deliverables.xlsx",
 		importedAt: "2026-04-02T00:00:00.000Z",
-		dwgRootPath: "C:/Projects/Nanulak",
+		dwgRootPath: "C:/Projects/MyProject",
 		pdfSourceSummary: "Issued PDFs",
 		sheetNames: ["Overall"],
 		rowCount: 1,
@@ -354,7 +354,7 @@ describe("project workflow settings caches", () => {
 
 		const saved = await projectTransmittalReceiptService.saveReceipt({
 			projectId,
-			projectName: "Nanulak",
+			projectName: "MyProject",
 			projectNumber: "25074",
 			transmittalType: "standard",
 			transmittalNumber: "XMTL-002",

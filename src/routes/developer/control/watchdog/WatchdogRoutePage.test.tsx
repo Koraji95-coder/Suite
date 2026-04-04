@@ -77,13 +77,13 @@ function createCollector(
 		collectorId: "collector-cad",
 		name: "AutoCAD Collector",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		capabilities: ["autocad", "drawing_sessions", "commands"],
 		metadata: {
 			sourceAvailable: true,
 			activeDrawingPath:
-				"C:/Projects/Nanulak/R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
-			activeDrawingName: "R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
+				"C:/Projects/MyProject/PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
+			activeDrawingName: "PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
 			currentSessionId: "session-1",
 			trackerUpdatedAt: Date.now(),
 			pendingCount: 0,
@@ -106,14 +106,14 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		eventType: "drawing_opened",
 		sourceType: "autocad",
 		timestamp: Date.now(),
 		projectId: "project-1",
 		sessionId: "session-1",
 		drawingPath:
-			"C:/Projects/Nanulak/R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
+			"C:/Projects/MyProject/PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
 		path: null,
 		metadata: {},
 		...overrides,
@@ -127,10 +127,10 @@ function createSession(
 		sessionId: "session-1",
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		projectId: "project-1",
 		drawingPath:
-			"C:/Projects/Nanulak/R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
+			"C:/Projects/MyProject/PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
 		status: "live",
 		active: true,
 		startedAt: Date.now() - 15 * 60 * 1000,
@@ -182,7 +182,7 @@ describe("WatchdogRoutePage", () => {
 			error: null,
 		});
 		mockProjectOrder.mockResolvedValue({
-			data: [{ id: "project-1", name: "Nanulak" }],
+			data: [{ id: "project-1", name: "MyProject" }],
 			error: null,
 		});
 		mockGetOverview.mockResolvedValue({
@@ -229,14 +229,14 @@ describe("WatchdogRoutePage", () => {
 				}),
 				createEvent({
 					eventId: 4,
-					drawingPath: "C:/Projects/Nanulak/Drawing-02.dwg",
+					drawingPath: "C:/Projects/MyProject/Drawing-02.dwg",
 					eventType: "drawing_opened",
 					sessionId: "session-2",
 					metadata: {},
 				}),
 				createEvent({
 					eventId: 5,
-					drawingPath: "C:/Projects/Nanulak/Drawing-02.dwg",
+					drawingPath: "C:/Projects/MyProject/Drawing-02.dwg",
 					eventType: "command_executed",
 					sessionId: "session-2",
 					metadata: { commandName: "QSAVE" },
@@ -270,7 +270,7 @@ describe("WatchdogRoutePage", () => {
 				createSession(),
 				createSession({
 					sessionId: "session-2",
-					drawingPath: "C:/Projects/Nanulak/Drawing-02.dwg",
+					drawingPath: "C:/Projects/MyProject/Drawing-02.dwg",
 					status: "completed",
 					active: false,
 				}),
@@ -285,7 +285,7 @@ describe("WatchdogRoutePage", () => {
 			data: {
 				id: "issue-set-1",
 				projectId: "project-1",
-				name: "Nanulak IFC package",
+				name: "MyProject IFC package",
 				issueTag: "IFC-01",
 				status: "review",
 				targetDate: "2026-03-31",
@@ -294,7 +294,7 @@ describe("WatchdogRoutePage", () => {
 				summary: "Ready for package review.",
 				notes: null,
 				selectedDrawingPaths: [
-					"C:/Projects/Nanulak/R3P-25074-E0-0006 - BESS DRAWING INDEX.dwg",
+					"C:/Projects/MyProject/PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
 				],
 				snapshot: {
 					drawingCount: 2,
@@ -330,7 +330,7 @@ describe("WatchdogRoutePage", () => {
 			expect(screen.getAllByText(/Package IFC-01/i).length).toBeGreaterThan(0),
 		);
 		expect(
-			screen.getAllByText(/R3P-25074-E0-0006 - BESS DRAWING INDEX/i).length,
+			screen.getAllByText(/PROJ-00001-E0-0006 - BESS DRAWING INDEX/i).length,
 		).toBeGreaterThan(0);
 		expect(screen.queryByText("Drawing-02.dwg")).toBeNull();
 	});
@@ -386,7 +386,7 @@ describe("WatchdogRoutePage", () => {
 		expect(
 			screen.getAllByRole("button", { name: /open project/i }).length,
 		).toBeGreaterThanOrEqual(1);
-		expect(screen.getByDisplayValue("Nanulak")).toBeTruthy();
+		expect(screen.getByDisplayValue("MyProject")).toBeTruthy();
 	});
 
 	it("uses the same cleaned activity stream for dev users", async () => {

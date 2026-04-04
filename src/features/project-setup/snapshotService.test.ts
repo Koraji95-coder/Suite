@@ -59,11 +59,11 @@ describe("projectSetup snapshotService", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: "TB,TITLE-D",
-				project_root_path: "C:/Projects/Nanulak",
-				acade_project_file_path: "C:/Projects/Nanulak/wddemo.wdp",
-				acade_line1: "Nanulak 180MW Substation",
+				project_root_path: "C:/Projects/MyProject",
+				acade_project_file_path: "C:/Projects/MyProject/wddemo.wdp",
+				acade_line1: "MyProject Substation",
 				acade_line2: "Issue for review",
-				acade_line4: "R3P-25074",
+				acade_line4: "PROJ-00001",
 				signer_drawn_by: "KD",
 				signer_checked_by: "QA",
 				signer_engineer: "APS",
@@ -79,7 +79,7 @@ describe("projectSetup snapshotService", () => {
 					id: "rev-1",
 					project_id: "project-1",
 					file_id: null,
-					drawing_number: "R3P-25074-E6-0001",
+					drawing_number: "PROJ-00001-E6-0001",
 					title: "Single Line Diagram",
 					revision: "A",
 					previous_revision: null,
@@ -121,13 +121,13 @@ describe("projectSetup snapshotService", () => {
 			message: "Scan complete",
 			requestId: "scan-1",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				files: [],
 				bridgeDrawings: [],
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-					wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-					wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+					wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+					wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+					wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -142,14 +142,14 @@ describe("projectSetup snapshotService", () => {
 			message: "Preview complete",
 			requestId: "preview-1",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "TB,TITLE-D",
-					projectRootPath: "C:/Projects/Nanulak",
-					acadeProjectFilePath: "C:/Projects/Nanulak/wddemo.wdp",
-					acadeLine1: "Nanulak 180MW Substation",
+					projectRootPath: "C:/Projects/MyProject",
+					acadeProjectFilePath: "C:/Projects/MyProject/wddemo.wdp",
+					acadeLine1: "MyProject Substation",
 					acadeLine2: "Issue for review",
-					acadeLine4: "R3P-25074",
+					acadeLine4: "PROJ-00001",
 					signerDrawnBy: "KD",
 					signerCheckedBy: "QA",
 					signerEngineer: "APS",
@@ -164,9 +164,9 @@ describe("projectSetup snapshotService", () => {
 					wdTbConflictCount: 0,
 				},
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-					wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-					wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+					wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+					wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+					wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -180,7 +180,7 @@ describe("projectSetup snapshotService", () => {
 	it("loads snapshots through the ticketed scan and hosted preview flow", async () => {
 		const result = await loadProjectSetupDocumentSnapshot({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 		});
 
 		expect(snapshotServiceMocks.issueTicketMock).toHaveBeenCalledWith(
@@ -195,19 +195,19 @@ describe("projectSetup snapshotService", () => {
 				ticket: "ticket-1",
 			}),
 			expect.objectContaining({
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: expect.objectContaining({
 					blockName: "TB,TITLE-D",
-					projectRootPath: "C:/Projects/Nanulak",
+					projectRootPath: "C:/Projects/MyProject",
 				}),
 			}),
 		);
 		expect(snapshotServiceMocks.buildPreviewMock).toHaveBeenCalledWith(
 			expect.objectContaining({
 				projectId: "project-1",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				scanSnapshot: expect.objectContaining({
-					projectRootPath: "C:/Projects/Nanulak",
+					projectRootPath: "C:/Projects/MyProject",
 				}),
 				revisionEntries: expect.arrayContaining([
 					expect.objectContaining({
@@ -217,7 +217,7 @@ describe("projectSetup snapshotService", () => {
 			}),
 		);
 		expect(result.summary.drawingFiles).toBe(2);
-		expect(result.artifacts.wdpPath).toBe("C:/Projects/Nanulak/wddemo.wdp");
+		expect(result.artifacts.wdpPath).toBe("C:/Projects/MyProject/wddemo.wdp");
 		expect(result.warnings).toEqual([
 			"Local scan warning",
 			"Preview warning",
@@ -235,7 +235,7 @@ describe("projectSetup snapshotService", () => {
 		await expect(
 			loadProjectSetupDocumentSnapshot({
 				projectId: "project-1",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 			}),
 		).rejects.toThrow("Preview failed Scan artifacts are incomplete.");
 	});

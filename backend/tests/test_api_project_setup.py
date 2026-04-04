@@ -52,7 +52,7 @@ class TestApiProjectSetup(unittest.TestCase):
     def setUp(self) -> None:
         self.temp_dir = tempfile.TemporaryDirectory()
         self.project_root = Path(self.temp_dir.name)
-        (self.project_root / "R3P-25074-E6-0001 MAIN.dwg").write_text(
+        (self.project_root / "PROJ-00001-E6-0001 MAIN.dwg").write_text(
             "",
             encoding="utf-8",
         )
@@ -178,7 +178,7 @@ class TestApiProjectSetup(unittest.TestCase):
         )
 
     def test_preview_builds_rows_from_scan_snapshot(self) -> None:
-        drawing_path = str((self.project_root / "R3P-25074-E6-0001 MAIN.dwg").resolve())
+        drawing_path = str((self.project_root / "PROJ-00001-E6-0001 MAIN.dwg").resolve())
 
         response = self.client.post(
             "/api/project-setup/preview",
@@ -201,7 +201,7 @@ class TestApiProjectSetup(unittest.TestCase):
                     "files": [
                         {
                             "absolutePath": drawing_path,
-                            "relativePath": "R3P-25074-E6-0001 MAIN.dwg",
+                            "relativePath": "PROJ-00001-E6-0001 MAIN.dwg",
                             "fileType": "dwg",
                         }
                     ],
@@ -214,7 +214,7 @@ class TestApiProjectSetup(unittest.TestCase):
                             "handle": "ABCD",
                             "hasWdTb": False,
                             "attributes": {
-                                "DWGNO": "R3P-25074-E6-0001",
+                                "DWGNO": "PROJ-00001-E6-0001",
                                 "TITLE3": "MAIN",
                                 "REV": "A",
                             },
@@ -233,7 +233,7 @@ class TestApiProjectSetup(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload["success"])
         self.assertEqual(payload["data"]["summary"]["drawingFiles"], 1)
-        self.assertEqual(payload["data"]["drawings"][0]["drawingNumber"], "R3P-25074-E6-0001")
+        self.assertEqual(payload["data"]["drawings"][0]["drawingNumber"], "PROJ-00001-E6-0001")
         self.assertEqual(payload["data"]["artifacts"]["wdpPath"], str((self.project_root / "demo.wdp").resolve()))
 
     def test_results_endpoint_accepts_local_action_receipts(self) -> None:

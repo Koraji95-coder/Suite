@@ -83,7 +83,7 @@ function TestHarness({
 	);
 }
 
-function fillRequiredBasics(projectName = "Nanulak 180MW Substation") {
+function fillRequiredBasics(projectName = "MyProject Substation") {
 	fireEvent.change(screen.getByLabelText("Project name"), {
 		target: { value: projectName },
 	});
@@ -104,10 +104,10 @@ function fillRequiredDefaults() {
 		target: { value: "Hunt Energy Network" },
 	});
 	fireEvent.change(screen.getByLabelText("Facility / site"), {
-		target: { value: "Nanulak 180MW BESS Substation" },
+		target: { value: "MyProject 180MW BESS Substation" },
 	});
 	fireEvent.change(screen.getByLabelText("Project number"), {
-		target: { value: "R3P-25074" },
+		target: { value: "PROJ-00001" },
 	});
 	fireEvent.change(screen.getByLabelText("Drawn by"), {
 		target: { value: "Drafting lead" },
@@ -172,12 +172,12 @@ describe("ProjectFormModal", () => {
 		const submitSpy = vi.fn();
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-setup-test",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
 				signerDrawnBy: "KD",
@@ -193,9 +193,9 @@ describe("ProjectFormModal", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -205,12 +205,12 @@ describe("ProjectFormModal", () => {
 				{
 					id: "row-1",
 					projectId: "project-setup-test",
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					absolutePath:
-						"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					fileType: "dwg",
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "A",
 					source: "title_block_sync",
@@ -226,12 +226,12 @@ describe("ProjectFormModal", () => {
 					warnings: [],
 					rawRow: {
 						id: "raw-1",
-						fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-						relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+						relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 						absolutePath:
-							"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+							"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 						fileType: "dwg",
-						filenameDrawingNumber: "R3P-25074-E0-0001",
+						filenameDrawingNumber: "PROJ-00001-E0-0001",
 						filenameTitle: "Drawing Index",
 						filenameRevision: "A",
 						titleBlockFound: true,
@@ -252,7 +252,7 @@ describe("ProjectFormModal", () => {
 						issues: [],
 						warnings: [],
 						revisionEntryCount: 0,
-						drawingNumber: "R3P-25074-E0-0001",
+						drawingNumber: "PROJ-00001-E0-0001",
 						drawingTitle: "Drawing Index",
 						acadeValues: {},
 						suiteUpdates: {},
@@ -272,10 +272,10 @@ describe("ProjectFormModal", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
 		fireEvent.change(screen.getByLabelText("Project root folder"), {
-			target: { value: "C:/Projects/Nanulak" },
+			target: { value: "C:/Projects/MyProject" },
 		});
 		fireEvent.change(screen.getByLabelText("PDF package root"), {
-			target: { value: "C:/Projects/Nanulak/Issued PDF" },
+			target: { value: "C:/Projects/MyProject/Issued PDF" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
 
@@ -289,11 +289,11 @@ describe("ProjectFormModal", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
 		await waitFor(() =>
-			expect(screen.getByDisplayValue("Nanulak 180MW Substation")).toBeTruthy(),
+			expect(screen.getByDisplayValue("MyProject Substation")).toBeTruthy(),
 		);
 		expect(screen.getByDisplayValue("Issue for review")).toBeTruthy();
 		fireEvent.change(screen.getByLabelText("Project number"), {
-			target: { value: "R3P-25074" },
+			target: { value: "PROJ-00001" },
 		});
 		fireEvent.change(screen.getByLabelText("Engineer"), {
 			target: { value: "Engineer of record" },
@@ -310,7 +310,7 @@ describe("ProjectFormModal", () => {
 				/After you save, open the project workflow to run drawing scan, clear review items, and build the package/i,
 			),
 		).toBeTruthy();
-		expect(screen.getByText("C:/Projects/Nanulak/Issued PDF")).toBeTruthy();
+		expect(screen.getByText("C:/Projects/MyProject/Issued PDF")).toBeTruthy();
 
 		fireEvent.click(screen.getByRole("button", { name: "Save Setup Only" }));
 		await waitFor(() => expect(submitSpy).toHaveBeenCalledTimes(1));
@@ -416,10 +416,10 @@ describe("ProjectFormModal", () => {
 		async () => {
 			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 				projectId: "project-setup-test",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "R3P-24x36BORDER&TITLE",
-					projectRootPath: "C:/Projects/Nanulak",
+					projectRootPath: "C:/Projects/MyProject",
 					acadeProjectFilePath: "",
 					acadeLine1: "",
 					acadeLine2: "",
@@ -456,10 +456,10 @@ describe("ProjectFormModal", () => {
 			fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
 			fireEvent.change(screen.getByLabelText("Project root folder"), {
-				target: { value: "C:/Projects/Nanulak" },
+				target: { value: "C:/Projects/MyProject" },
 			});
 			fireEvent.change(screen.getByLabelText("PDF package root"), {
-				target: { value: "C:/Projects/Nanulak/Issued PDF" },
+				target: { value: "C:/Projects/MyProject/Issued PDF" },
 			});
 			fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
 
@@ -479,7 +479,7 @@ describe("ProjectFormModal", () => {
 							"ACADE project target (.wdp)",
 						) as HTMLInputElement
 					).value,
-				).toBe("C:/Projects/Nanulak/Nanulak 180MW Substation.wdp"),
+				).toBe("C:/Projects/MyProject/MyProject Substation.wdp"),
 			);
 		},
 		15_000,
@@ -622,10 +622,10 @@ describe("ProjectFormModal", () => {
 		async () => {
 			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 				projectId: "project-setup-test",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "R3P-24x36BORDER&TITLE",
-					projectRootPath: "C:/Projects/Nanulak",
+					projectRootPath: "C:/Projects/MyProject",
 					acadeProjectFilePath: "",
 					acadeLine1: "",
 					acadeLine2: "",
@@ -662,10 +662,10 @@ describe("ProjectFormModal", () => {
 			fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
 			fireEvent.change(screen.getByLabelText("Project root folder"), {
-				target: { value: "C:/Projects/Nanulak" },
+				target: { value: "C:/Projects/MyProject" },
 			});
 			fireEvent.change(screen.getByLabelText("PDF package root"), {
-				target: { value: "C:/Projects/Nanulak/Issued PDF" },
+				target: { value: "C:/Projects/MyProject/Issued PDF" },
 			});
 			fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
 
@@ -698,10 +698,10 @@ describe("ProjectFormModal", () => {
 		async () => {
 			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 				projectId: "project-setup-test",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "R3P-24x36BORDER&TITLE",
-					projectRootPath: "C:/Projects/Nanulak",
+					projectRootPath: "C:/Projects/MyProject",
 					acadeProjectFilePath: "",
 					acadeLine1: "",
 					acadeLine2: "",
@@ -759,10 +759,10 @@ describe("ProjectFormModal", () => {
 			expect(screen.getByText("Tracking root")).toBeTruthy();
 
 			fireEvent.change(screen.getByLabelText("Project root folder"), {
-				target: { value: "C:/Projects/Nanulak" },
+				target: { value: "C:/Projects/MyProject" },
 			});
 			fireEvent.change(screen.getByLabelText("PDF package root"), {
-				target: { value: "C:/Projects/Nanulak/Issued PDF" },
+				target: { value: "C:/Projects/MyProject/Issued PDF" },
 			});
 
 			expect(defaultsStepButton.disabled).toBe(true);
@@ -805,12 +805,12 @@ describe("ProjectFormModal", () => {
 			const submitAndOpenSpy = vi.fn();
 			vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 				projectId: "project-setup-test",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "R3P-24x36BORDER&TITLE",
-					projectRootPath: "C:/Projects/Nanulak",
-					acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-					acadeLine1: "Nanulak 180MW Substation",
+					projectRootPath: "C:/Projects/MyProject",
+					acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+					acadeLine1: "MyProject Substation",
 					acadeLine2: "Issue for review",
 					acadeLine4: "",
 					signerDrawnBy: "KD",
@@ -826,9 +826,9 @@ describe("ProjectFormModal", () => {
 					wdTbConflictCount: 0,
 				},
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-					wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-					wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+					wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+					wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+					wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -850,10 +850,10 @@ describe("ProjectFormModal", () => {
 			fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
 			fireEvent.change(screen.getByLabelText("Project root folder"), {
-				target: { value: "C:/Projects/Nanulak" },
+				target: { value: "C:/Projects/MyProject" },
 			});
 			fireEvent.change(screen.getByLabelText("PDF package root"), {
-				target: { value: "C:/Projects/Nanulak/Issued PDF" },
+				target: { value: "C:/Projects/MyProject/Issued PDF" },
 			});
 			fireEvent.click(screen.getByRole("button", { name: /validate root/i }));
 
@@ -866,10 +866,10 @@ describe("ProjectFormModal", () => {
 			);
 			fireEvent.click(screen.getByRole("button", { name: "Next" }));
 			await waitFor(() =>
-				expect(screen.getByDisplayValue("Nanulak 180MW Substation")).toBeTruthy(),
+				expect(screen.getByDisplayValue("MyProject Substation")).toBeTruthy(),
 			);
 			fireEvent.change(screen.getByLabelText("Project number"), {
-				target: { value: "R3P-25074" },
+				target: { value: "PROJ-00001" },
 			});
 			fireEvent.change(screen.getByLabelText("Engineer"), {
 				target: { value: "Engineer of record" },

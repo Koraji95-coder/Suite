@@ -22,9 +22,9 @@ describe("projectDocumentMetadataService snapshot caching", () => {
 					blockName: "TB,TITLE-D",
 					projectRootPath: args.projectRootPath,
 					acadeProjectFilePath: `${args.projectRootPath}/wddemo.wdp`,
-					acadeLine1: "Nanulak 180MW Substation",
+					acadeLine1: "MyProject Substation",
 					acadeLine2: "Issue for review",
-					acadeLine4: "R3P-25074",
+					acadeLine4: "PROJ-00001",
 					signerDrawnBy: "KD",
 					signerCheckedBy: "QA",
 					signerEngineer: "",
@@ -56,11 +56,11 @@ describe("projectDocumentMetadataService snapshot caching", () => {
 		const [left, right] = await Promise.all([
 			projectDocumentMetadataService.loadSnapshot({
 				projectId: "project-1",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 			}),
 			projectDocumentMetadataService.loadSnapshot({
 				projectId: "project-1",
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 			}),
 		]);
 
@@ -73,16 +73,16 @@ describe("projectDocumentMetadataService snapshot caching", () => {
 	it("bypasses the short-lived cache when report rows are supplied", async () => {
 		await projectDocumentMetadataService.loadSnapshot({
 			projectId: "project-2",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 		});
 
 		await projectDocumentMetadataService.loadSnapshot({
 			projectId: "project-2",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			reportRows: [
 				{
 					fileName: "DEMO01.DWG",
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "A",
 				},

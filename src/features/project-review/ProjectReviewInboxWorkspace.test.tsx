@@ -67,7 +67,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 	return {
 		id: "project-1",
 		user_id: "user-1",
-		name: "Nanulak",
+		name: "MyProject",
 		description: "Issue package setup",
 		status: "active",
 		priority: "high",
@@ -75,7 +75,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 		category: "Substation",
 		created_at: "2026-03-20T00:00:00.000Z",
 		updated_at: "2026-03-20T00:00:00.000Z",
-		watchdog_root_path: "C:/Projects/Nanulak",
+		watchdog_root_path: "C:/Projects/MyProject",
 		...overrides,
 	} as Project;
 }
@@ -105,8 +105,8 @@ function createTelemetry(
 		trackedDrawings: [
 			{
 				drawingPath:
-					"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				lifetimeTrackedMs: 120_000,
 				todayTrackedMs: 120_000,
 				lastWorkedAt: "2026-03-21T00:00:00.000Z",
@@ -146,7 +146,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "issue-set-1",
 					projectId: "project-1",
-					name: "Nanulak IFC package",
+					name: "MyProject IFC package",
 					issueTag: "IFC-01",
 					status: "review",
 					targetDate: "2026-03-31",
@@ -157,7 +157,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: [
-						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					],
 					selectedRegisterRowIds: [],
 					selectedDrawingNumbers: [],
@@ -210,8 +210,8 @@ describe("ProjectReviewInboxWorkspace", () => {
 			data: [
 				{
 					id: "ann-1",
-					drawing_name: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					file_path: "/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					drawing_name: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					file_path: "/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					annotations: [
 						{
 							type: "layer",
@@ -232,11 +232,11 @@ describe("ProjectReviewInboxWorkspace", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
 				signerDrawnBy: "KD",
@@ -252,8 +252,8 @@ describe("ProjectReviewInboxWorkspace", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 				wdtText: "",
 				wdlText: "",
 			},
@@ -261,12 +261,12 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "row-1",
 					projectId: "project-1",
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					absolutePath:
-						"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					fileType: "dwg",
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "A",
 					source: "title_block_sync",
@@ -338,7 +338,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "issue-set-1",
 					projectId: "project-1",
-					name: "Nanulak IFC package",
+					name: "MyProject IFC package",
 					issueTag: "IFC-01",
 					status: "review",
 					targetDate: "2026-03-31",
@@ -349,7 +349,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 					summary: "Ready for final review.",
 					notes: null,
 					selectedDrawingPaths: [
-						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					],
 					selectedRegisterRowIds: [],
 					selectedDrawingNumbers: [],
@@ -373,7 +373,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "issue-set-2",
 					projectId: "project-1",
-					name: "Nanulak final issue",
+					name: "MyProject final issue",
 					issueTag: "IFC-02",
 					status: "ready",
 					targetDate: "2026-04-07",
@@ -384,7 +384,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 					summary: "Ready for issue.",
 					notes: null,
 					selectedDrawingPaths: [
-						"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					],
 					selectedRegisterRowIds: [],
 					selectedDrawingNumbers: [],
@@ -441,11 +441,11 @@ describe("ProjectReviewInboxWorkspace", () => {
 		});
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
 				signerDrawnBy: "KD",
@@ -461,8 +461,8 @@ describe("ProjectReviewInboxWorkspace", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 				wdtText: "",
 				wdlText: "",
 			},
@@ -470,12 +470,12 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "row-1",
 					projectId: "project-1",
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					absolutePath:
-						"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					fileType: "dwg",
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "A",
 					source: "title_block_sync",
@@ -534,7 +534,7 @@ describe("ProjectReviewInboxWorkspace", () => {
 				{
 					id: "issue-set-1",
 					projectId: "project-1",
-					name: "Nanulak IFC package",
+					name: "MyProject IFC package",
 					issueTag: "IFC-01",
 					status: "review",
 					targetDate: "2026-03-31",
@@ -591,11 +591,11 @@ describe("ProjectReviewInboxWorkspace", () => {
 		);
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
 				signerDrawnBy: "KD",
@@ -611,8 +611,8 @@ describe("ProjectReviewInboxWorkspace", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 				wdtText: "",
 				wdlText: "",
 			},
@@ -698,11 +698,11 @@ describe("ProjectReviewInboxWorkspace", () => {
 		);
 		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 			projectId: "project-1",
-			projectRootPath: "C:/Projects/Nanulak",
+			projectRootPath: "C:/Projects/MyProject",
 			profile: {
 				blockName: "R3P-24x36BORDER&TITLE",
-				projectRootPath: "C:/Projects/Nanulak",
-				acadeLine1: "Nanulak 180MW Substation",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
 				acadeLine2: "Issue for review",
 				acadeLine4: "",
 				signerDrawnBy: "KD",
@@ -718,8 +718,8 @@ describe("ProjectReviewInboxWorkspace", () => {
 				wdTbConflictCount: 0,
 			},
 			artifacts: {
-				wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-				wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 				wdtText: "",
 				wdlText: "",
 			},

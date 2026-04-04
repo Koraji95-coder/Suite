@@ -132,9 +132,9 @@ describe("projectDrawingProgramService", () => {
 		});
 		expect(plan.updatedProgram.rows).toHaveLength(3);
 		expect(plan.updatedProgram.rows.map((row) => row.drawingNumber)).toEqual([
-			"R3P-25074-E0-0000",
-			"R3P-25074-E0-0001",
-			"R3P-25074-E6-0001",
+			"PROJ-00001-E0-0000",
+			"PROJ-00001-E0-0001",
+			"PROJ-00001-E6-0001",
 		]);
 	});
 
@@ -154,7 +154,7 @@ describe("projectDrawingProgramService", () => {
 					projectId: "project-1",
 					standardRowId: "single-line",
 					sortOrder: 10,
-					drawingNumber: "R3P-25074-E6-0001",
+					drawingNumber: "PROJ-00001-E6-0001",
 					title: "Single Line Diagram",
 					discipline: "E",
 					sheetFamily: "Single Line Diagram",
@@ -167,12 +167,12 @@ describe("projectDrawingProgramService", () => {
 					templatePath: "Templates/single-line.dwg",
 					status: "planned",
 					provisionState: "provisioned",
-					dwgRelativePath: "R3P-25074-E6-0001 - Single Line Diagram.dwg",
+					dwgRelativePath: "PROJ-00001-E6-0001 - Single Line Diagram.dwg",
 					acadeSection: "SCHEMATIC",
 					acadeGroup: "DIAGRAMS",
 					workbookSyncedAt: null,
 					workbookDriftDetectedAt: null,
-					numberPrefix: "R3P-25074-E6-",
+					numberPrefix: "PROJ-00001-E6-",
 					sequenceDigits: 4,
 					sequenceNumber: 1,
 					createdAt: "2026-03-30T00:00:00.000Z",
@@ -183,7 +183,7 @@ describe("projectDrawingProgramService", () => {
 					projectId: "project-1",
 					standardRowId: threeLine?.id ?? null,
 					sortOrder: 20,
-					drawingNumber: "R3P-25074-E6-0101",
+					drawingNumber: "PROJ-00001-E6-0101",
 					title: "Three Line Diagram",
 					discipline: "E",
 					sheetFamily: "Three Line Diagram",
@@ -196,12 +196,12 @@ describe("projectDrawingProgramService", () => {
 					templatePath: "Templates/three-line.dwg",
 					status: "planned",
 					provisionState: "provisioned",
-					dwgRelativePath: "R3P-25074-E6-0101 - Three Line Diagram.dwg",
+					dwgRelativePath: "PROJ-00001-E6-0101 - Three Line Diagram.dwg",
 					acadeSection: "SCHEMATIC",
 					acadeGroup: "DIAGRAMS",
 					workbookSyncedAt: null,
 					workbookDriftDetectedAt: null,
-					numberPrefix: "R3P-25074-E6-",
+					numberPrefix: "PROJ-00001-E6-",
 					sequenceDigits: 4,
 					sequenceNumber: 101,
 					createdAt: "2026-03-30T00:00:00.000Z",
@@ -219,13 +219,13 @@ describe("projectDrawingProgramService", () => {
 			count: 1,
 		});
 		expect(plan.updatedProgram.rows.map((row) => row.drawingNumber)).toEqual([
-			"R3P-25074-E6-0001",
-			"R3P-25074-E6-0101",
-			"R3P-25074-E6-0102",
+			"PROJ-00001-E6-0001",
+			"PROJ-00001-E6-0101",
+			"PROJ-00001-E6-0102",
 		]);
 		expect(
 			plan.renumberPlan?.changes.some(
-				(change) => change.oldDrawingNumber === "R3P-25074-E6-0001",
+				(change) => change.oldDrawingNumber === "PROJ-00001-E6-0001",
 			),
 		).toBe(false);
 	});
@@ -243,7 +243,7 @@ describe("projectDrawingProgramService", () => {
 			projectId: "project-1",
 			standardRowId: threeLine!.id,
 			sortOrder: (index + 1) * 10,
-			drawingNumber: `R3P-25074-E6-${String(101 + index).padStart(4, "0")}`,
+			drawingNumber: `PROJ-00001-E6-${String(101 + index).padStart(4, "0")}`,
 			title: `Three Line Diagram ${index + 1}`,
 			discipline: "E",
 			sheetFamily: "Three Line Diagram",
@@ -256,12 +256,12 @@ describe("projectDrawingProgramService", () => {
 			templatePath: "Templates/three-line.dwg",
 			status: "planned" as const,
 			provisionState: "provisioned" as const,
-			dwgRelativePath: `R3P-25074-E6-${String(101 + index).padStart(4, "0")} - Three Line Diagram ${index + 1}.dwg`,
+			dwgRelativePath: `PROJ-00001-E6-${String(101 + index).padStart(4, "0")} - Three Line Diagram ${index + 1}.dwg`,
 			acadeSection: "SCHEMATIC",
 			acadeGroup: "DIAGRAMS",
 			workbookSyncedAt: null,
 			workbookDriftDetectedAt: null,
-			numberPrefix: "R3P-25074-E6-",
+			numberPrefix: "PROJ-00001-E6-",
 			sequenceDigits: 4,
 			sequenceNumber: 101 + index,
 			createdAt: "2026-03-30T00:00:00.000Z",

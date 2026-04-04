@@ -9,7 +9,7 @@ import {
 } from "./projectPersistence";
 
 const BASE_FORM: ProjectFormData = {
-	name: "Nanulak 180MW Substation",
+	name: "MyProject Substation",
 	description: "Fixture-backed ACADE smoke test project.",
 	deadline: "2026-04-15",
 	priority: "high",
@@ -17,13 +17,13 @@ const BASE_FORM: ProjectFormData = {
 	category: "Substation",
 	projectPeName: "Engineer Name ",
 	projectFirmNumber: " TX-Firm #000000 ",
-	watchdogRootPath: " C:/Projects/Nanulak ",
-	pdfPackageRootPath: " C:/Projects/Nanulak/Issued PDF ",
+	watchdogRootPath: " C:/Projects/MyProject ",
+	pdfPackageRootPath: " C:/Projects/MyProject/Issued PDF ",
 	titleBlockBlockName: "R3P-24x36BORDER&TITLE",
 	titleBlockAcadeProjectFilePath: "",
 	titleBlockAcadeLine1: "Hunt Energy Network",
-	titleBlockAcadeLine2: "Nanulak 180MW BESS Substation",
-	titleBlockAcadeLine4: "R3P-25074",
+	titleBlockAcadeLine2: "MyProject 180MW BESS Substation",
+	titleBlockAcadeLine4: "PROJ-00001",
 	titleBlockDrawnBy: "Drafting lead",
 	titleBlockCheckedBy: "QA / reviewer",
 	titleBlockEngineer: "Engineer of record",
@@ -31,17 +31,17 @@ const BASE_FORM: ProjectFormData = {
 
 describe("projectPersistence", () => {
 	it("normalizes project roots into nullable trimmed strings", () => {
-		expect(normalizeProjectRootPath("  C:/Projects/Nanulak  ")).toBe(
-			"C:/Projects/Nanulak",
+		expect(normalizeProjectRootPath("  C:/Projects/MyProject  ")).toBe(
+			"C:/Projects/MyProject",
 		);
 		expect(normalizeProjectRootPath("   ")).toBeNull();
 	});
 
 	it("derives the ACADE project file path only when the form leaves it blank", () => {
 		expect(
-			withDerivedAcadeProjectFilePath(BASE_FORM, "C:/Projects/Nanulak")
+			withDerivedAcadeProjectFilePath(BASE_FORM, "C:/Projects/MyProject")
 				.titleBlockAcadeProjectFilePath,
-		).toBe("C:/Projects/Nanulak/Nanulak 180MW Substation.wdp");
+		).toBe("C:/Projects/MyProject/MyProject Substation.wdp");
 
 		expect(
 			withDerivedAcadeProjectFilePath(
@@ -49,7 +49,7 @@ describe("projectPersistence", () => {
 					...BASE_FORM,
 					titleBlockAcadeProjectFilePath: "C:/Custom/ManualProject.wdp",
 				},
-				"C:/Projects/Nanulak",
+				"C:/Projects/MyProject",
 			).titleBlockAcadeProjectFilePath,
 		).toBe("C:/Custom/ManualProject.wdp");
 	});
@@ -58,29 +58,29 @@ describe("projectPersistence", () => {
 		expect(
 			buildProjectInsertPayload({
 				form: BASE_FORM,
-				watchdogRootPath: "C:/Projects/Nanulak",
+				watchdogRootPath: "C:/Projects/MyProject",
 				userId: "user-1",
 			}),
 		).toMatchObject({
-			name: "Nanulak 180MW Substation",
+			name: "MyProject Substation",
 			pe_name: "Engineer Name",
 			firm_number: "TX-Firm #000000",
-			watchdog_root_path: "C:/Projects/Nanulak",
-			pdf_package_root_path: "C:/Projects/Nanulak/Issued PDF",
+			watchdog_root_path: "C:/Projects/MyProject",
+			pdf_package_root_path: "C:/Projects/MyProject/Issued PDF",
 			user_id: "user-1",
 		});
 
 		expect(
 			buildProjectUpdatePayload({
 				form: BASE_FORM,
-				watchdogRootPath: "C:/Projects/Nanulak",
+				watchdogRootPath: "C:/Projects/MyProject",
 			}),
 		).toMatchObject({
-			name: "Nanulak 180MW Substation",
+			name: "MyProject Substation",
 			pe_name: "Engineer Name",
 			firm_number: "TX-Firm #000000",
-			watchdog_root_path: "C:/Projects/Nanulak",
-			pdf_package_root_path: "C:/Projects/Nanulak/Issued PDF",
+			watchdog_root_path: "C:/Projects/MyProject",
+			pdf_package_root_path: "C:/Projects/MyProject/Issued PDF",
 		});
 	});
 

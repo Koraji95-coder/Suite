@@ -92,8 +92,8 @@ describe("DrawingListManager", () => {
 			data: [
 				{
 					id: "project-1",
-					name: "Nanulak",
-					watchdog_root_path: "C:/Projects/Nanulak",
+					name: "MyProject",
+					watchdog_root_path: "C:/Projects/MyProject",
 				},
 			],
 			error: null,
@@ -108,7 +108,7 @@ describe("DrawingListManager", () => {
 				user_id: "user-1",
 				block_name: "R3P-24x36BORDER&TITLE",
 				project_root_path: "",
-				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+				acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
 				acade_line1: "",
 				acade_line2: "",
 				acade_line4: "",
@@ -125,8 +125,8 @@ describe("DrawingListManager", () => {
 			project_id: "project-1",
 			user_id: "user-1",
 			block_name: "R3P-24x36BORDER&TITLE",
-			project_root_path: "C:/Projects/Nanulak",
-			acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+			project_root_path: "C:/Projects/MyProject",
+			acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
 			acade_line1: "",
 			acade_line2: "",
 			acade_line4: "",
@@ -151,7 +151,7 @@ describe("DrawingListManager", () => {
 			data: {
 				id: "issue-set-1",
 				projectId: "project-1",
-				name: "Nanulak IFC package",
+				name: "MyProject IFC package",
 				issueTag: "IFC-01",
 				status: "review",
 				targetDate: "2026-03-31",
@@ -159,7 +159,7 @@ describe("DrawingListManager", () => {
 				transmittalDocumentName: "IFC package",
 				summary: "Ready for review.",
 				notes: null,
-				selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+				selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 				snapshot: {
 					drawingCount: 1,
 					selectedDrawingCount: 1,
@@ -182,11 +182,11 @@ describe("DrawingListManager", () => {
 			success: true,
 			message: "Scan complete.",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "R3P-24x36BORDER&TITLE",
-					projectRootPath: "C:/Projects/Nanulak",
-					acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
+					projectRootPath: "C:/Projects/MyProject",
+					acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
 					acadeLine1: "",
 					acadeLine2: "",
 					acadeLine4: "",
@@ -256,8 +256,8 @@ describe("DrawingListManager", () => {
 			data: [
 				{
 					id: "project-1",
-					name: "Nanulak",
-					watchdog_root_path: "C:/Projects/Nanulak",
+					name: "MyProject",
+					watchdog_root_path: "C:/Projects/MyProject",
 				},
 			],
 			error: null,
@@ -271,8 +271,8 @@ describe("DrawingListManager", () => {
 				project_id: "project-1",
 				user_id: "user-1",
 				block_name: "R3P-24x36BORDER&TITLE",
-				project_root_path: "C:/Projects/Nanulak",
-				acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+				project_root_path: "C:/Projects/MyProject",
+				acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
 				acade_line1: "",
 				acade_line2: "",
 				acade_line4: "",
@@ -289,8 +289,8 @@ describe("DrawingListManager", () => {
 			project_id: "project-1",
 			user_id: "user-1",
 			block_name: "R3P-24x36BORDER&TITLE",
-			project_root_path: "C:/Projects/Nanulak",
-			acade_project_file_path: "C:/Projects/Nanulak/Nanulak.wdp",
+			project_root_path: "C:/Projects/MyProject",
+			acade_project_file_path: "C:/Projects/MyProject/MyProject.wdp",
 			acade_line1: "",
 			acade_line2: "",
 			acade_line4: "",
@@ -324,7 +324,7 @@ describe("DrawingListManager", () => {
 
 		await act(async () => {
 			latestProps?.onPendingTitleBlockSyncChange?.({
-				paths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+				paths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 				at: "2026-03-30T04:00:00.000Z",
 			});
 		});

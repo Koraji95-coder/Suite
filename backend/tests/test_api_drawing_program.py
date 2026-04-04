@@ -19,7 +19,7 @@ class TestApiDrawingProgram(unittest.TestCase):
         (self.project_root / "Templates" / "sheet-template.dwg").write_text(
             "template", encoding="utf-8"
         )
-        (self.project_root / "R3P-25074-E3-0001 - Existing.dwg").write_text(
+        (self.project_root / "PROJ-00001-E3-0001 - Existing.dwg").write_text(
             "existing", encoding="utf-8"
         )
 
@@ -62,7 +62,7 @@ class TestApiDrawingProgram(unittest.TestCase):
                 "profile": {
                     "acadeLine1": "Client",
                     "acadeLine2": "Site",
-                    "acadeLine4": "R3P-25074",
+                    "acadeLine4": "PROJ-00001",
                     "acadeProjectFilePath": str(self.project_root / "Test.wdp"),
                 },
                 "program": {"rows": []},
@@ -76,11 +76,11 @@ class TestApiDrawingProgram(unittest.TestCase):
                         "rows": [
                             {
                                 "id": "row-new",
-                                "drawingNumber": "R3P-25074-E3-0002",
+                                "drawingNumber": "PROJ-00001-E3-0002",
                                 "title": "New Three Line",
                                 "status": "planned",
                                 "provisionState": "provisioned",
-                                "dwgRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                                "dwgRelativePath": "PROJ-00001-E3-0002 - New Three Line.dwg",
                                 "templateKey": "3LINE",
                                 "sheetFamily": "Three-Line Diagram",
                                 "discipline": "E",
@@ -89,11 +89,11 @@ class TestApiDrawingProgram(unittest.TestCase):
                             },
                             {
                                 "id": "row-existing",
-                                "drawingNumber": "R3P-25074-E3-0003",
+                                "drawingNumber": "PROJ-00001-E3-0003",
                                 "title": "Existing",
                                 "status": "planned",
                                 "provisionState": "provisioned",
-                                "dwgRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                                "dwgRelativePath": "PROJ-00001-E3-0003 - Existing.dwg",
                                 "templateKey": "3LINE",
                                 "sheetFamily": "Three-Line Diagram",
                                 "discipline": "E",
@@ -106,15 +106,15 @@ class TestApiDrawingProgram(unittest.TestCase):
                         {
                             "kind": "copy-template",
                             "rowId": "row-new",
-                            "toRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                            "toRelativePath": "PROJ-00001-E3-0002 - New Three Line.dwg",
                             "templatePath": "Templates/sheet-template.dwg",
                             "blocked": False,
                         },
                         {
                             "kind": "rename-dwg",
                             "rowId": "row-existing",
-                            "fromRelativePath": "R3P-25074-E3-0001 - Existing.dwg",
-                            "toRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                            "fromRelativePath": "PROJ-00001-E3-0001 - Existing.dwg",
+                            "toRelativePath": "PROJ-00001-E3-0003 - Existing.dwg",
                             "blocked": False,
                         },
                     ],
@@ -122,28 +122,28 @@ class TestApiDrawingProgram(unittest.TestCase):
                         {
                             "suiteRowId": "row-new",
                             "sortOrder": 10,
-                            "drawingNumber": "R3P-25074-E3-0002",
+                            "drawingNumber": "PROJ-00001-E3-0002",
                             "title": "New Three Line",
                             "status": "planned",
                             "discipline": "E",
                             "sheetFamily": "Three-Line Diagram",
                             "templateKey": "3LINE",
                             "provisionState": "provisioned",
-                            "dwgRelativePath": "R3P-25074-E3-0002 - New Three Line.dwg",
+                            "dwgRelativePath": "PROJ-00001-E3-0002 - New Three Line.dwg",
                             "acadeSection": "SCHEMATIC",
                             "acadeGroup": "",
                         },
                         {
                             "suiteRowId": "row-existing",
                             "sortOrder": 20,
-                            "drawingNumber": "R3P-25074-E3-0003",
+                            "drawingNumber": "PROJ-00001-E3-0003",
                             "title": "Existing",
                             "status": "planned",
                             "discipline": "E",
                             "sheetFamily": "Three-Line Diagram",
                             "templateKey": "3LINE",
                             "provisionState": "provisioned",
-                            "dwgRelativePath": "R3P-25074-E3-0003 - Existing.dwg",
+                            "dwgRelativePath": "PROJ-00001-E3-0003 - Existing.dwg",
                             "acadeSection": "SCHEMATIC",
                             "acadeGroup": "",
                         },
@@ -157,21 +157,21 @@ class TestApiDrawingProgram(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertTrue(payload.get("success"))
         self.assertTrue(
-            (self.project_root / "R3P-25074-E3-0002 - New Three Line.dwg").exists()
+            (self.project_root / "PROJ-00001-E3-0002 - New Three Line.dwg").exists()
         )
         self.assertTrue(
-            (self.project_root / "R3P-25074-E3-0003 - Existing.dwg").exists()
+            (self.project_root / "PROJ-00001-E3-0003 - Existing.dwg").exists()
         )
         self.assertFalse(
-            (self.project_root / "R3P-25074-E3-0001 - Existing.dwg").exists()
+            (self.project_root / "PROJ-00001-E3-0001 - Existing.dwg").exists()
         )
         workbook = load_workbook(self.project_root / "Drawing Index.xlsx")
         self.assertEqual(workbook.sheetnames, ["Drawing Index"])
         sheet = workbook["Drawing Index"]
         self.assertEqual(sheet["A2"].value, "row-new")
         wdp_text = (self.project_root / "Test.wdp").read_text(encoding="utf-8")
-        self.assertIn("R3P-25074-E3-0002 - New Three Line.dwg", wdp_text)
-        self.assertIn("R3P-25074-E3-0003 - Existing.dwg", wdp_text)
+        self.assertIn("PROJ-00001-E3-0002 - New Three Line.dwg", wdp_text)
+        self.assertIn("PROJ-00001-E3-0003 - Existing.dwg", wdp_text)
 
     def test_sync_acade_writes_current_program_stack(self) -> None:
         response = self.client.post(
@@ -182,7 +182,7 @@ class TestApiDrawingProgram(unittest.TestCase):
                 "profile": {
                     "acadeLine1": "Client",
                     "acadeLine2": "Site",
-                    "acadeLine4": "R3P-25074",
+                    "acadeLine4": "PROJ-00001",
                     "acadeProjectFilePath": str(self.project_root / "SyncOnly.wdp"),
                 },
                 "program": {
@@ -194,11 +194,11 @@ class TestApiDrawingProgram(unittest.TestCase):
                     "rows": [
                         {
                             "id": "row-existing",
-                            "drawingNumber": "R3P-25074-E3-0001",
+                            "drawingNumber": "PROJ-00001-E3-0001",
                             "title": "Existing",
                             "status": "planned",
                             "provisionState": "provisioned",
-                            "dwgRelativePath": "R3P-25074-E3-0001 - Existing.dwg",
+                            "dwgRelativePath": "PROJ-00001-E3-0001 - Existing.dwg",
                             "templateKey": "3LINE",
                             "sheetFamily": "Three-Line Diagram",
                             "discipline": "E",
@@ -213,5 +213,5 @@ class TestApiDrawingProgram(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertTrue(payload.get("success"))
         wdp_text = (self.project_root / "SyncOnly.wdp").read_text(encoding="utf-8")
-        self.assertIn("R3P-25074-E3-0001 - Existing.dwg", wdp_text)
+        self.assertIn("PROJ-00001-E3-0001 - Existing.dwg", wdp_text)
 

@@ -1,10 +1,10 @@
 {
   "profiles": [
     {
-      "id": "DUSTIN-HOME",
+      "id": "DEV-WORKSTATION",
       "label": "Dustin Home station",
       "role": "home",
-      "computerNames": ["DUSTIN-HOME"],
+      "computerNames": ["DEV-WORKSTATION"],
       "gitUserName": "koraji95-coder",
       "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
     },

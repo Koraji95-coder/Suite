@@ -35,11 +35,11 @@ import type { TitleBlockSyncPayload } from "./types";
 function buildDrawingRow(overrides: Record<string, unknown> = {}) {
 	return {
 		id: "row-1",
-		fileName: "R3P-25074-E6-0001.dwg",
-		relativePath: "Issued/R3P-25074-E6-0001.dwg",
-		absolutePath: "C:/Projects/Nanulak/Issued/R3P-25074-E6-0001.dwg",
+		fileName: "PROJ-00001-E6-0001.dwg",
+		relativePath: "Issued/PROJ-00001-E6-0001.dwg",
+		absolutePath: "C:/Projects/MyProject/Issued/PROJ-00001-E6-0001.dwg",
 		fileType: "dwg",
-		filenameDrawingNumber: "R3P-25074-E6-0001",
+		filenameDrawingNumber: "PROJ-00001-E6-0001",
 		filenameTitle: "Single Line",
 		filenameRevision: "A",
 		titleBlockFound: true,
@@ -60,7 +60,7 @@ function buildDrawingRow(overrides: Record<string, unknown> = {}) {
 		issues: [],
 		warnings: [],
 		revisionEntryCount: 0,
-		drawingNumber: "R3P-25074-E6-0001",
+		drawingNumber: "PROJ-00001-E6-0001",
 		drawingTitle: "Single Line",
 		acadeValues: {},
 		acadeExpectedTags: {},
@@ -77,14 +77,14 @@ function buildDrawingRow(overrides: Record<string, unknown> = {}) {
 function buildPayload(overrides: Partial<TitleBlockSyncPayload> = {}): TitleBlockSyncPayload {
 	return {
 		projectId: "project-1",
-		projectRootPath: "C:/Projects/Nanulak",
+		projectRootPath: "C:/Projects/MyProject",
 		profile: {
 			blockName: "TB,TITLE-D",
-			projectRootPath: "C:/Projects/Nanulak",
-			acadeProjectFilePath: "C:/Projects/Nanulak/wddemo.wdp",
-			acadeLine1: "Nanulak 180MW Substation",
+			projectRootPath: "C:/Projects/MyProject",
+			acadeProjectFilePath: "C:/Projects/MyProject/wddemo.wdp",
+			acadeLine1: "MyProject Substation",
 			acadeLine2: "Issue for review",
-			acadeLine4: "R3P-25074",
+			acadeLine4: "PROJ-00001",
 			signerDrawnBy: "KD",
 			signerCheckedBy: "QA",
 			signerEngineer: "APS",
@@ -128,13 +128,13 @@ describe("projectSetupActionService", () => {
 			message: "Scan complete",
 			requestId: "scan-request",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				files: [],
 				bridgeDrawings: [],
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-					wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-					wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+					wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+					wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+					wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -149,14 +149,14 @@ describe("projectSetupActionService", () => {
 			message: "Preview complete",
 			requestId: "preview-request",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: {
 					blockName: "TB,TITLE-D",
-					projectRootPath: "C:/Projects/Nanulak",
-					acadeProjectFilePath: "C:/Projects/Nanulak/wddemo.wdp",
-					acadeLine1: "Nanulak 180MW Substation",
+					projectRootPath: "C:/Projects/MyProject",
+					acadeProjectFilePath: "C:/Projects/MyProject/wddemo.wdp",
+					acadeLine1: "MyProject Substation",
 					acadeLine2: "Issue for review",
-					acadeLine4: "R3P-25074",
+					acadeLine4: "PROJ-00001",
 					signerDrawnBy: "KD",
 					signerCheckedBy: "QA",
 					signerEngineer: "APS",
@@ -173,9 +173,9 @@ describe("projectSetupActionService", () => {
 					wdTbConflictCount: 0,
 				},
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-					wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-					wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+					wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+					wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+					wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",
@@ -190,9 +190,9 @@ describe("projectSetupActionService", () => {
 			message: "Artifacts ready",
 			requestId: "ensure-request",
 			data: {
-				wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-				wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-				wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+				wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+				wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+				wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 				wdpText: "",
 				wdtText: "",
 				wdlText: "",
@@ -216,7 +216,7 @@ describe("projectSetupActionService", () => {
 			}),
 		);
 		expect(response.success).toBe(true);
-		expect(response.data?.artifacts.wdpPath).toBe("C:/Projects/Nanulak/wddemo.wdp");
+		expect(response.data?.artifacts.wdpPath).toBe("C:/Projects/MyProject/wddemo.wdp");
 	});
 
 	it("keeps the apply conflict envelope backward compatible", async () => {
@@ -225,7 +225,7 @@ describe("projectSetupActionService", () => {
 			message: "Preview complete",
 			requestId: "preview-request",
 			data: {
-				projectRootPath: "C:/Projects/Nanulak",
+				projectRootPath: "C:/Projects/MyProject",
 				profile: buildPayload().profile,
 				drawings: [buildDrawingRow({ hasWdTbConflict: true })],
 				summary: {
@@ -237,9 +237,9 @@ describe("projectSetupActionService", () => {
 					wdTbConflictCount: 1,
 				},
 				artifacts: {
-					wdpPath: "C:/Projects/Nanulak/wddemo.wdp",
-					wdtPath: "C:/Projects/Nanulak/wddemo.wdt",
-					wdlPath: "C:/Projects/Nanulak/wddemo_wdtitle.wdl",
+					wdpPath: "C:/Projects/MyProject/wddemo.wdp",
+					wdtPath: "C:/Projects/MyProject/wddemo.wdt",
+					wdlPath: "C:/Projects/MyProject/wddemo_wdtitle.wdl",
 					wdpText: "",
 					wdtText: "",
 					wdlText: "",

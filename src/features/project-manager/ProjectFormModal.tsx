@@ -174,7 +174,7 @@ export function ProjectFormModal({
 										updateProjectForm(setFormData, { name: event.target.value })
 									}
 									className={styles.input}
-									placeholder="Nanulak 180MW Substation"
+									placeholder="MyProject Substation"
 								/>
 							</div>
 							<div>
@@ -644,7 +644,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="Nanulak 180MW BESS Substation"
+										placeholder="MyProject 180MW BESS Substation"
 									/>
 								</div>
 							</div>
@@ -667,7 +667,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="R3P-25074"
+										placeholder="PROJ-00001"
 									/>
 								</div>
 								<div />

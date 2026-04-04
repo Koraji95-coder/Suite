@@ -51,7 +51,7 @@ function createMetadataRow(args: {
 		projectId: "project-1",
 		fileName: args.fileName,
 		relativePath: `Issued/${args.fileName}`,
-		absolutePath: `C:/Projects/Nanulak/Issued/${args.fileName}`,
+		absolutePath: `C:/Projects/MyProject/Issued/${args.fileName}`,
 		fileType: "dwg",
 		drawingNumber: args.drawingNumber,
 		title: args.title,
@@ -91,7 +91,7 @@ async function createWorkbookBuffer() {
 	]);
 	overall.addRow([
 		"BESS",
-		"R3P-25074-E0-0001",
+		"PROJ-00001-E0-0001",
 		"Drawing Index",
 		"A",
 		"2026-03-01",
@@ -113,7 +113,7 @@ async function createWorkbookBuffer() {
 	]);
 	pc.addRow([
 		"P&C",
-		"R3P-25074-E6-0001",
+		"PROJ-00001-E6-0001",
 		"Relay One Line",
 		"0",
 		"2026-03-11",
@@ -122,7 +122,7 @@ async function createWorkbookBuffer() {
 	]);
 	pc.addRow([
 		"P&C",
-		"R3P-25074-E6-0999",
+		"PROJ-00001-E6-0999",
 		"Future Control Detail",
 		"",
 		"",
@@ -159,39 +159,39 @@ describe("projectDeliverableRegisterService", () => {
 			projectFiles: [
 				createProjectFile({
 					id: "file-1",
-					name: "R3P-25074-E0-0001 - DRAWING INDEX.pdf",
+					name: "PROJ-00001-E0-0001 - DRAWING INDEX.pdf",
 				}),
 				createProjectFile({
 					id: "file-2",
-					name: "R3P-25074-E6-0001 - RELAY ONE LINE.pdf",
+					name: "PROJ-00001-E6-0001 - RELAY ONE LINE.pdf",
 				}),
 				createProjectFile({
 					id: "file-3",
-					name: "R3P-25074-E6-0001 - RELAY ONE LINE (SIGNED).pdf",
+					name: "PROJ-00001-E6-0001 - RELAY ONE LINE (SIGNED).pdf",
 				}),
 				createProjectFile({
 					id: "file-4",
-					name: "R3P-25074-E6-0999 - FUTURE DETAIL.pdf",
+					name: "PROJ-00001-E6-0999 - FUTURE DETAIL.pdf",
 				}),
 			],
 			metadataRows: [
 				createMetadataRow({
 					id: "meta-1",
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					drawingNumber: "R3P-25074-E0-0001",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					drawingNumber: "PROJ-00001-E0-0001",
 					title: "Drawing Index",
 					revision: "B",
 				}),
 				createMetadataRow({
 					id: "meta-2",
-					fileName: "R3P-25074-E6-0001 - RELAY ONE LINE.dwg",
-					drawingNumber: "R3P-25074-E6-0001",
+					fileName: "PROJ-00001-E6-0001 - RELAY ONE LINE.dwg",
+					drawingNumber: "PROJ-00001-E6-0001",
 					title: "Relay Diagram",
 					revision: "0",
 					acadeTitle: "Relay Diagram",
 				}),
 			],
-			dwgRootPath: "C:/Projects/Nanulak",
+			dwgRootPath: "C:/Projects/MyProject",
 		});
 
 		expect(result.error).toBeNull();
@@ -199,7 +199,7 @@ describe("projectDeliverableRegisterService", () => {
 		expect(result.data?.rowCount).toBe(3);
 
 		const drawingIndexRow = result.data?.rows.find(
-			(row) => row.drawingNumber === "R3P-25074-E0-0001",
+			(row) => row.drawingNumber === "PROJ-00001-E0-0001",
 		);
 		expect(drawingIndexRow?.currentRevision).toBe("B");
 		expect(drawingIndexRow?.revisionHistory).toHaveLength(2);
@@ -209,7 +209,7 @@ describe("projectDeliverableRegisterService", () => {
 		expect(drawingIndexRow?.issueSetEligible).toBe(true);
 
 		const relayRow = result.data?.rows.find(
-			(row) => row.drawingNumber === "R3P-25074-E6-0001",
+			(row) => row.drawingNumber === "PROJ-00001-E6-0001",
 		);
 		expect(relayRow?.pdfPairingStatus).toBe("multiple");
 		expect(relayRow?.titleBlockVerificationState).toBe("mismatch");
@@ -219,7 +219,7 @@ describe("projectDeliverableRegisterService", () => {
 		expect(relayRow?.issueSetEligible).toBe(false);
 
 		const futureRow = result.data?.rows.find(
-			(row) => row.drawingNumber === "R3P-25074-E6-0999",
+			(row) => row.drawingNumber === "PROJ-00001-E6-0999",
 		);
 		expect(futureRow?.readinessState).toBe("blocked");
 		expect(futureRow?.titleBlockVerificationState).toBe("mismatch");

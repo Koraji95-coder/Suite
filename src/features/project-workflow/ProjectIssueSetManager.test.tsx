@@ -94,7 +94,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 	return {
 		id: "project-1",
 		user_id: "user-1",
-		name: "Nanulak",
+		name: "MyProject",
 		description: "Issue package setup",
 		status: "active",
 		priority: "high",
@@ -102,7 +102,7 @@ function createProject(overrides: Partial<Project> = {}): Project {
 		category: "Substation",
 		created_at: "2026-03-20T00:00:00.000Z",
 		updated_at: "2026-03-20T00:00:00.000Z",
-		watchdog_root_path: "C:/Projects/Nanulak",
+		watchdog_root_path: "C:/Projects/MyProject",
 		...overrides,
 	} as Project;
 }
@@ -132,8 +132,8 @@ function createTelemetry(
 		trackedDrawings: [
 			{
 				drawingPath:
-					"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				lifetimeTrackedMs: 120_000,
 				todayTrackedMs: 120_000,
 				lastWorkedAt: "2026-03-21T00:00:00.000Z",
@@ -153,7 +153,7 @@ function createSavedIssueSet(
 	const base: ProjectIssueSetRecord = {
 		id: "issue-set-1",
 		projectId: "project-1",
-		name: "Nanulak IFC package",
+		name: "MyProject IFC package",
 		issueTag: "IFC-01",
 		status: "review",
 		targetDate: "2026-03-31",
@@ -163,7 +163,7 @@ function createSavedIssueSet(
 		terminalScheduleSnapshotId: null,
 		summary: "Ready for final review.",
 		notes: "Keep substation index and SLD together.",
-		selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+		selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 		selectedRegisterRowIds: [],
 		selectedDrawingNumbers: [],
 		selectedPdfFileIds: [],
@@ -204,7 +204,7 @@ function createReceipt(
 	return {
 		id: "receipt-1",
 		projectId: "project-1",
-		projectName: "Nanulak",
+		projectName: "MyProject",
 		projectNumber: "25074",
 		transmittalType: "standard",
 		transmittalNumber: "XMTL-001",
@@ -245,7 +245,7 @@ function createEvidencePacket(
 ): ProjectIssueSetEvidencePacket {
 	return {
 		projectId: issueSet.projectId,
-		projectName: "Nanulak",
+		projectName: "MyProject",
 		issueSetId: issueSet.id,
 		issueSetName: issueSet.name,
 		issueTag: issueSet.issueTag,
@@ -255,9 +255,9 @@ function createEvidencePacket(
 		summary: issueSet.summary,
 		selectedDrawings: [
 			{
-				fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				drawingNumber: "R3P-25074-E0-0001",
+				fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				drawingNumber: "PROJ-00001-E0-0001",
 				title: "Drawing Index",
 				revision: "A",
 				reviewState: "ready",
@@ -271,8 +271,8 @@ function createEvidencePacket(
 			fallbackCount: 0,
 			drawings: [
 				{
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					drawingNumber: "R3P-25074-E0-0001",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					drawingNumber: "PROJ-00001-E0-0001",
 					reviewState: "ready",
 					acceptedForPackage: false,
 					issues: [],
@@ -288,7 +288,7 @@ function createEvidencePacket(
 				{
 					sheetName: "Overall",
 					setName: "BESS",
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					drawingDescription: "Drawing Index",
 					currentRevision: "A",
 					readinessState: "package-ready",
@@ -300,13 +300,13 @@ function createEvidencePacket(
 		},
 		acadeSetup: {
 			blockName: "R3P-24x36BORDER&TITLE",
-			clientOrUtility: "Nanulak 180MW Substation",
+			clientOrUtility: "MyProject Substation",
 			facilityOrSite: "Issue for review",
-			projectNumber: "R3P-25074",
-			acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-			wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-			wdtPath: "C:/Projects/Nanulak/Nanulak.wdt",
-			wdlPath: "C:/Projects/Nanulak/Nanulak.wdl",
+			projectNumber: "PROJ-00001",
+			acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+			wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+			wdtPath: "C:/Projects/MyProject/MyProject.wdt",
+			wdlPath: "C:/Projects/MyProject/MyProject.wdl",
 			wdpState: "existing",
 		},
 		reviewDecisions: {
@@ -338,7 +338,7 @@ function createEvidencePacket(
 			},
 			checks: [
 				{
-					drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					qaStatus: "pass",
 					reviewedAt: "2026-03-21T00:00:00.000Z",
 					issuesFound: 0,
@@ -370,7 +370,7 @@ function createEvidencePacket(
 				terminalScheduleSnapshotId: null,
 				reportId: null,
 				requestId: "req-123",
-				drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				createdAt: "2026-03-21T02:00:00.000Z",
 			},
 			receipts: [
@@ -389,7 +389,7 @@ function createEvidencePacket(
 					terminalScheduleSnapshotId: null,
 					reportId: null,
 					requestId: "req-123",
-					drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					createdAt: "2026-03-21T02:00:00.000Z",
 				},
 			],
@@ -398,7 +398,7 @@ function createEvidencePacket(
 			matchedTrackedCount: 1,
 			drawings: [
 				{
-					drawingName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					drawingName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					lifetimeTrackedMs: 120_000,
 					lastWorkedAt: "2026-03-21T00:00:00.000Z",
 				},
@@ -449,12 +449,12 @@ function mockProjectData(
 	);
 	vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
 		projectId: "project-1",
-		projectRootPath: "C:/Projects/Nanulak",
+		projectRootPath: "C:/Projects/MyProject",
 		profile: {
 			blockName: "R3P-24x36BORDER&TITLE",
-			projectRootPath: "C:/Projects/Nanulak",
-			acadeProjectFilePath: "C:/Projects/Nanulak/Nanulak.wdp",
-			acadeLine1: "Nanulak 180MW Substation",
+			projectRootPath: "C:/Projects/MyProject",
+			acadeProjectFilePath: "C:/Projects/MyProject/MyProject.wdp",
+			acadeLine1: "MyProject Substation",
 			acadeLine2: "Issue for review",
 			acadeLine4: "",
 			signerDrawnBy: "KD",
@@ -470,9 +470,9 @@ function mockProjectData(
 			wdTbConflictCount: 0,
 		},
 		artifacts: {
-			wdpPath: "C:/Projects/Nanulak/Nanulak.wdp",
-			wdtPath: "C:/Projects/Nanulak/_suite/scan.wdt",
-			wdlPath: "C:/Projects/Nanulak/_suite/scan.wdl",
+			wdpPath: "C:/Projects/MyProject/MyProject.wdp",
+			wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+			wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
 			wdpText: "",
 			wdtText: "",
 			wdlText: "",
@@ -482,12 +482,12 @@ function mockProjectData(
 			{
 				id: "row-1",
 				projectId: "project-1",
-				fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-				relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+				fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				absolutePath:
-					"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 				fileType: "dwg",
-				drawingNumber: "R3P-25074-E0-0001",
+				drawingNumber: "PROJ-00001-E0-0001",
 				title: "Drawing Index",
 				revision: "A",
 				source: "title_block_sync",
@@ -503,12 +503,12 @@ function mockProjectData(
 				warnings: [],
 				rawRow: {
 					id: "raw-1",
-					fileName: "R3P-25074-E0-0001 - DRAWING INDEX.dwg",
-					relativePath: "Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+					fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+					relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					absolutePath:
-						"C:/Projects/Nanulak/Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+						"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 					fileType: "dwg",
-					filenameDrawingNumber: "R3P-25074-E0-0001",
+					filenameDrawingNumber: "PROJ-00001-E0-0001",
 					filenameTitle: "Drawing Index",
 					filenameRevision: "A",
 					titleBlockFound: true,
@@ -529,7 +529,7 @@ function mockProjectData(
 					issues: [],
 					warnings: [],
 					revisionEntryCount: 0,
-					drawingNumber: "R3P-25074-E0-0001",
+					drawingNumber: "PROJ-00001-E0-0001",
 					drawingTitle: "Drawing Index",
 					acadeValues: {},
 					suiteUpdates: {},
@@ -565,7 +565,7 @@ describe("ProjectIssueSetManager", () => {
 			</MemoryRouter>,
 		);
 
-		expect(await screen.findByText("Nanulak IFC package")).toBeTruthy();
+		expect(await screen.findByText("MyProject IFC package")).toBeTruthy();
 		expect(screen.getByText(/current package snapshot/i)).toBeTruthy();
 		expect(screen.getByText("IFC-01")).toBeTruthy();
 		expect(screen.getByText(/1 ready/i)).toBeTruthy();
@@ -575,9 +575,9 @@ describe("ProjectIssueSetManager", () => {
 		fireEvent.click(screen.getByRole("button", { name: /view details/i }));
 		expect(screen.getByText(/Package scope/i)).toBeTruthy();
 		expect(screen.getAllByText(/^Automation$/i).length).toBeGreaterThan(0);
-		expect(screen.getByText(/R3P-25074-E0-0001/i)).toBeTruthy();
+		expect(screen.getByText(/PROJ-00001-E0-0001/i)).toBeTruthy();
 		expect(fetchProjectStandardsEvidence).toHaveBeenCalledWith("project-1", [
-			"Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg",
+			"Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
 		]);
 	});
 
@@ -586,7 +586,7 @@ describe("ProjectIssueSetManager", () => {
 			createSavedIssueSet(),
 			createSavedIssueSet({
 				id: "issue-set-2",
-				name: "Nanulak final issue",
+				name: "MyProject final issue",
 				issueTag: "IFC-02",
 				transmittalNumber: "XMTL-002",
 				transmittalDocumentName: "Final IFC package",
@@ -605,7 +605,7 @@ describe("ProjectIssueSetManager", () => {
 			</MemoryRouter>,
 		);
 
-		expect(await screen.findByText("Nanulak IFC package")).toBeTruthy();
+		expect(await screen.findByText("MyProject IFC package")).toBeTruthy();
 		expect(
 			screen
 				.getByRole("link", { name: /Title block review/i })
@@ -626,7 +626,7 @@ describe("ProjectIssueSetManager", () => {
 		vi.mocked(projectIssueSetService.saveIssueSet).mockResolvedValue({
 			data: createSavedIssueSet({
 				id: "issue-set-2",
-				name: "Nanulak issued package",
+				name: "MyProject issued package",
 				issueTag: "ISSUE-01",
 				status: "draft",
 				summary:
@@ -660,7 +660,7 @@ describe("ProjectIssueSetManager", () => {
 			expect(screen.getByLabelText(/issue set name/i)).toBeTruthy(),
 		);
 		fireEvent.change(screen.getByLabelText(/issue set name/i), {
-			target: { value: "Nanulak issued package" },
+			target: { value: "MyProject issued package" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: /create issue set/i }));
 
@@ -670,8 +670,8 @@ describe("ProjectIssueSetManager", () => {
 		expect(projectIssueSetService.saveIssueSet).toHaveBeenCalledWith(
 			expect.objectContaining({
 				projectId: "project-1",
-				name: "Nanulak issued package",
-				selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+				name: "MyProject issued package",
+				selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 					snapshot: expect.objectContaining({
 						drawingCount: 4,
 						selectedDrawingCount: 1,
@@ -722,7 +722,7 @@ describe("ProjectIssueSetManager", () => {
 		vi.mocked(projectIssueSetService.saveIssueSet).mockResolvedValue({
 			data: createSavedIssueSet({
 				id: "issue-set-2",
-				name: "Nanulak issued package",
+				name: "MyProject issued package",
 				issueTag: "ISSUE-01",
 				status: "draft",
 				summary: "2 blockers still need review before issue.",
@@ -761,7 +761,7 @@ describe("ProjectIssueSetManager", () => {
 			expect(screen.getByLabelText(/issue set name/i)).toBeTruthy(),
 		);
 		fireEvent.change(screen.getByLabelText(/issue set name/i), {
-			target: { value: "Nanulak issued package" },
+			target: { value: "MyProject issued package" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: /create issue set/i }));
 

@@ -73,7 +73,7 @@ function createProject(): Project {
 	return {
 		id: "project-1",
 		user_id: "user-1",
-		name: "Nanulak",
+		name: "MyProject",
 		description: "Issue package setup",
 		status: "active",
 		priority: "high",
@@ -81,7 +81,7 @@ function createProject(): Project {
 		category: "Substation",
 		created_at: "2026-03-20T00:00:00.000Z",
 		updated_at: "2026-03-20T00:00:00.000Z",
-		watchdog_root_path: "C:/Projects/Nanulak",
+		watchdog_root_path: "C:/Projects/MyProject",
 	} as Project;
 }
 

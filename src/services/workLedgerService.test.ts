@@ -154,7 +154,7 @@ describe("workLedgerService", () => {
 				json: async () => ({
 					ok: true,
 					publisher: "worktale",
-					workstationId: "DUSTIN-HOME",
+					workstationId: "DEV-WORKSTATION",
 					ready: true,
 					checks: {
 						cliInstalled: true,
@@ -202,7 +202,7 @@ describe("workLedgerService", () => {
 						publisher: "worktale",
 						mode: "note",
 						status: "succeeded",
-						workstation_id: "DUSTIN-HOME",
+						workstation_id: "DEV-WORKSTATION",
 						repo_path: "C:\\repo",
 						artifact_dir: "C:\\artifacts\\job-1",
 						stdout_excerpt: "",
@@ -220,7 +220,7 @@ describe("workLedgerService", () => {
 						jsonPath: "C:\\artifacts\\job-1\\entry.json",
 					},
 					publisher: "worktale",
-					workstationId: "DUSTIN-HOME",
+					workstationId: "DEV-WORKSTATION",
 					ready: true,
 					checks: {
 						cliInstalled: true,
@@ -250,7 +250,7 @@ describe("workLedgerService", () => {
 							publisher: "worktale",
 							mode: "note",
 							status: "succeeded",
-							workstation_id: "DUSTIN-HOME",
+							workstation_id: "DEV-WORKSTATION",
 							repo_path: "C:\\repo",
 							artifact_dir: "C:\\artifacts\\job-1",
 							stdout_excerpt: "",

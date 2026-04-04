@@ -11,11 +11,11 @@ function makeTitleBlockSyncRow(
 ): TitleBlockSyncRow {
 	return {
 		id: "row-1",
-		fileName: "R3P-25074-E6-0001.dwg",
-		relativePath: "Drawings/R3P-25074-E6-0001.dwg",
-		absolutePath: "C:/Projects/R3P-25074/Drawings/R3P-25074-E6-0001.dwg",
+		fileName: "PROJ-00001-E6-0001.dwg",
+		relativePath: "Drawings/PROJ-00001-E6-0001.dwg",
+		absolutePath: "C:/Projects/PROJ-00001/Drawings/PROJ-00001-E6-0001.dwg",
 		fileType: "dwg",
-		filenameDrawingNumber: "R3P-25074-E6-0001",
+		filenameDrawingNumber: "PROJ-00001-E6-0001",
 		filenameTitle: "Overall Single Line Diagram",
 		filenameRevision: "A",
 		titleBlockFound: true,
@@ -24,7 +24,7 @@ function makeTitleBlockSyncRow(
 		titleBlockHandle: "ABCD",
 		hasWdTbConflict: false,
 		currentAttributes: {
-			DWGNO: "R3P-25074-E6-0001",
+			DWGNO: "PROJ-00001-E6-0001",
 			TITLE3: "Overall Single Line Diagram",
 			REV: "A",
 		},
@@ -40,7 +40,7 @@ function makeTitleBlockSyncRow(
 		issues: [],
 		warnings: [],
 		revisionEntryCount: 0,
-		drawingNumber: "R3P-25074-E6-0001",
+		drawingNumber: "PROJ-00001-E6-0001",
 		drawingTitle: "Overall Single Line Diagram",
 		acadeValues: {},
 		suiteUpdates: {},
@@ -56,9 +56,9 @@ describe("projectDocumentMetadataService", () => {
 		const rows = [
 			makeTitleBlockSyncRow({
 				id: "pdf-1",
-				fileName: "R3P-25074-E6-0001.pdf",
-				relativePath: "Issued/R3P-25074-E6-0001.pdf",
-				absolutePath: "C:/Projects/R3P-25074/Issued/R3P-25074-E6-0001.pdf",
+				fileName: "PROJ-00001-E6-0001.pdf",
+				relativePath: "Issued/PROJ-00001-E6-0001.pdf",
+				absolutePath: "C:/Projects/PROJ-00001/Issued/PROJ-00001-E6-0001.pdf",
 				fileType: "pdf",
 				titleBlockFound: false,
 				layoutName: "",
@@ -70,8 +70,8 @@ describe("projectDocumentMetadataService", () => {
 		];
 		const reportRows = [
 			{
-				fileName: "R3P-25074-E6-0001.pdf",
-				drawingNumber: "R3P-25074-E6-0001",
+				fileName: "PROJ-00001-E6-0001.pdf",
+				drawingNumber: "PROJ-00001-E6-0001",
 				title: "Overall Single Line Diagram",
 				revision: "A",
 			},
@@ -81,14 +81,14 @@ describe("projectDocumentMetadataService", () => {
 
 		expect(row.source).toBe("acade_report");
 		expect(row.reviewState).toBe("fallback");
-		expect(row.drawingNumber).toBe("R3P-25074-E6-0001");
+		expect(row.drawingNumber).toBe("PROJ-00001-E6-0001");
 	});
 
 	it("adds mismatch issues when ACADE report metadata disagrees with title-block metadata", () => {
 		const rows = [
 			makeTitleBlockSyncRow({
 				currentAttributes: {
-					DWGNO: "R3P-25074-E6-0001",
+					DWGNO: "PROJ-00001-E6-0001",
 					TITLE3: "Old Title",
 					REV: "A",
 				},
@@ -100,8 +100,8 @@ describe("projectDocumentMetadataService", () => {
 		];
 		const reportRows = [
 			{
-				fileName: "R3P-25074-E6-0001.dwg",
-				drawingNumber: "R3P-25074-E6-0001",
+				fileName: "PROJ-00001-E6-0001.dwg",
+				drawingNumber: "PROJ-00001-E6-0001",
 				title: "Overall Single Line Diagram",
 				revision: "B",
 			},
@@ -122,8 +122,8 @@ describe("projectDocumentMetadataService", () => {
 			makeTitleBlockSyncRow(),
 		]);
 		const pdfFiles = [
-			new File([""], "R3P-25074-E6-0001.pdf", { type: "application/pdf" }),
-			new File([""], "R3P-25074-E6-9999.pdf", { type: "application/pdf" }),
+			new File([""], "PROJ-00001-E6-0001.pdf", { type: "application/pdf" }),
+			new File([""], "PROJ-00001-E6-9999.pdf", { type: "application/pdf" }),
 		];
 
 		const documents = buildStandardDocumentsFromProjectMetadata(
@@ -143,7 +143,7 @@ describe("projectDocumentMetadataService", () => {
 			[
 				[
 					"File Name,Drawing Number,Title,Revision",
-					"R3P-25074-E6-0001.pdf,R3P-25074-E6-0001,Overall Single Line Diagram,A",
+					"PROJ-00001-E6-0001.pdf,PROJ-00001-E6-0001,Overall Single Line Diagram,A",
 				].join("\n"),
 			],
 			"drawing-list-report.csv",
@@ -154,8 +154,8 @@ describe("projectDocumentMetadataService", () => {
 
 		expect(rows).toEqual([
 			{
-				fileName: "R3P-25074-E6-0001.pdf",
-				drawingNumber: "R3P-25074-E6-0001",
+				fileName: "PROJ-00001-E6-0001.pdf",
+				drawingNumber: "PROJ-00001-E6-0001",
 				title: "Overall Single Line Diagram",
 				revision: "A",
 			},

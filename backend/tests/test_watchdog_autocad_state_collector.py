@@ -51,7 +51,7 @@ def make_config(temp_dir: str, state_json_path: Path) -> AutoCadStateCollectorCo
         backend_url="http://127.0.0.1:5000",
         api_key="valid-key",
         collector_id="collector-a",
-        workstation_id="DUSTIN-HOME",
+        workstation_id="DEV-WORKSTATION",
         state_json_path=state_json_path,
         buffer_dir=Path(temp_dir) / "collector-state",
         poll_interval_ms=1_000,
@@ -75,7 +75,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
                         "backendUrl": "http://127.0.0.1:5000",
                         "apiKey": "valid-key",
                         "collectorId": "collector-a",
-                        "workstationId": "DUSTIN-HOME",
+                        "workstationId": "DEV-WORKSTATION",
                         "stateJsonPath": str(state_path),
                     },
                     indent=2,
@@ -86,7 +86,7 @@ class TestAutoCadStateCollector(unittest.TestCase):
             config = load_autocad_state_collector_config(config_path=config_path)
 
             self.assertEqual(config.collector_id, "collector-a")
-            self.assertEqual(config.workstation_id, "DUSTIN-HOME")
+            self.assertEqual(config.workstation_id, "DEV-WORKSTATION")
             self.assertEqual(config.state_json_path, state_path.resolve())
 
     def test_missing_state_file_reports_source_unavailable(self) -> None:

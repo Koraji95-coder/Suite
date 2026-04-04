@@ -41,7 +41,12 @@ fs.mkdirSync(path.dirname(pidFilePath), {
 });
 const pidTmpPath = `${pidFilePath}.tmp`;
 fs.writeFileSync(pidTmpPath, process.pid.toString());
-fs.renameSync(pidTmpPath, pidFilePath);
+try {
+  fs.renameSync(pidTmpPath, pidFilePath);
+} catch (err) {
+  try { fs.unlinkSync(pidTmpPath); } catch { /* best-effort cleanup */ }
+  throw err;
+}
 logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath();

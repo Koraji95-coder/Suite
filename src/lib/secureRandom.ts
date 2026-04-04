@@ -10,7 +10,7 @@
 export function secureRandom(): number {
 	const buf = new Uint32Array(1);
 	crypto.getRandomValues(buf);
-	return buf[0] / (0xffffffff + 1);
+	return buf[0] / 0x100000000;
 }
 
 /** Return a random integer in [min, max] (inclusive on both ends). */

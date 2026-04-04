@@ -394,7 +394,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="G:\\Shared drives\\Root 3 Power\\Projects\\Nanulak"
+										placeholder="G:\\Shared drives\\Company\\Projects\\ProjectName"
 									/>
 									<button
 										type="button"
@@ -428,7 +428,7 @@ export function ProjectFormModal({
 											})
 										}
 										className={styles.input}
-										placeholder="G:\\Shared drives\\Root 3 Power\\Projects\\Nanulak\\Issued PDFs"
+										placeholder="G:\\Shared drives\\Company\\Projects\\ProjectName\\Issued PDFs"
 									/>
 									<button
 										type="button"

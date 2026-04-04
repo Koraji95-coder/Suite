@@ -511,7 +511,7 @@ export function BatchFindReplaceApp() {
 									onChange={(event) =>
 										setCleanupSourcePath(event.target.value)
 									}
-									placeholder="C:\\Projects\\incoming\\dirty-export.dxf"
+									placeholder="C:\\Projects\\incoming\\source-file.dxf"
 									className={styles.textInput}
 									name="batchfindreplace_cleanup_source_path"
 								/>

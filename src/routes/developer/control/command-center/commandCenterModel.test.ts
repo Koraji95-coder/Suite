@@ -77,7 +77,6 @@ describe("commandCenterModel", () => {
 		const ids = COMMAND_GROUPS.flatMap((group) =>
 			group.presets.map((preset) => preset.id),
 		);
-		expect(ids).not.toContain("zeroclaw");
 		expect(ids).not.toContain("flask");
 		expect(ids).not.toContain("build");
 		expect(ids).not.toContain("check");

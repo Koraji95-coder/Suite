@@ -52,7 +52,7 @@ try {
         -Trigger @($repeatTrigger, $logonTrigger) `
         -Principal $principal `
         -Settings $settings `
-        -Description "Mirror Suite local Codex/ZeroClaw/backend learning state into Dropbox." `
+        -Description "Mirror Suite local Codex/backend learning state into Dropbox." `
         -ErrorAction Stop `
         -Force | Out-Null
 

@@ -2,6 +2,7 @@ version: 2
 updates:
   - package-ecosystem: "npm"
     directory: "/"
+    target-branch: "dependabot-updates"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -13,6 +14,7 @@ updates:
 
   - package-ecosystem: "pip"
     directory: "/backend"
+    target-branch: "dependabot-updates"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -24,6 +26,7 @@ updates:
 
   - package-ecosystem: "pip"
     directory: "/backend/Transmittal-Builder"
+    target-branch: "dependabot-updates"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -35,6 +38,7 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/docker/runtime-core"
+    target-branch: "dependabot-updates"
     schedule:
       interval: "weekly"
       day: "monday"

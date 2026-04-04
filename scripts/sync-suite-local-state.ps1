@@ -358,7 +358,7 @@ function Write-MirrorReadme {
     $lines += "- The restore flow now re-stamps the workstation profile and bootstraps local runtime services automatically."
     $lines += "- Review codex-handoff.md in the mirror root for the latest repo/session handoff summary."
     $lines += ""
-    $lines += "For the freshest transfer snapshot, close Codex/ZeroClaw/Suite processes first and rerun the sync script once manually."
+    $lines += "For the freshest transfer snapshot, close Codex and Suite processes first and rerun the sync script once manually."
     $lines += "The scheduled sync keeps this folder close to 1:1, but live SQLite/WAL files can still reflect in-use state."
     $lines += ""
     $lines += "Generated: $(Get-Date -Format o)"

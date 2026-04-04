@@ -3,8 +3,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict, Optional
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from flask import Flask, g
 from flask_limiter import Limiter
@@ -465,7 +466,11 @@ class TestApiWorkLedger(unittest.TestCase):
         job_id = str(((publish_payload.get("job") or {}).get("id")) or "").strip()
         self.assertTrue(job_id)
 
-        with patch("backend.route_groups.api_work_ledger.os.startfile") as startfile:
+        startfile = Mock()
+        with patch(
+            "backend.route_groups.api_work_ledger.os",
+            SimpleNamespace(name="nt", startfile=startfile),
+        ):
             open_response = self.client.post(
                 f"/api/work-ledger/entries/ledger-ready/publish-jobs/{job_id}/open-artifact-folder",
                 headers={"Authorization": "Bearer user-token"},
@@ -475,6 +480,34 @@ class TestApiWorkLedger(unittest.TestCase):
         payload = open_response.get_json() or {}
         self.assertEqual(payload.get("jobId"), job_id)
         self.assertTrue(str(payload.get("artifactDir") or "").strip())
+
+    def test_open_artifact_folder_requires_windows(self) -> None:
+        self.subprocess_stub.mark_bootstrapped()
+        self.subprocess_stub.install_hooks()
+        publish_response = self.client.post(
+            "/api/work-ledger/entries/ledger-ready/publish/worktale",
+            headers={"Authorization": "Bearer user-token"},
+        )
+        self.assertEqual(publish_response.status_code, 200)
+        publish_payload = publish_response.get_json() or {}
+        job_id = str(((publish_payload.get("job") or {}).get("id")) or "").strip()
+        self.assertTrue(job_id)
+
+        with patch(
+            "backend.route_groups.api_work_ledger.os",
+            SimpleNamespace(name="posix"),
+        ):
+            open_response = self.client.post(
+                f"/api/work-ledger/entries/ledger-ready/publish-jobs/{job_id}/open-artifact-folder",
+                headers={"Authorization": "Bearer user-token"},
+            )
+
+        self.assertEqual(open_response.status_code, 501)
+        payload = open_response.get_json() or {}
+        self.assertEqual(
+            payload.get("code"),
+            "WORK_LEDGER_ARTIFACT_FOLDER_UNSUPPORTED",
+        )
 
     def test_publish_failure_leaves_entry_ready(self) -> None:
         self.subprocess_stub.mark_bootstrapped()

@@ -22,7 +22,7 @@ pillow==12.1.1
     # via -r backend/Transmittal-Builder/requirements.in
 pyqt6==6.10.2
     # via -r backend/Transmittal-Builder/requirements.in
-pyqt6-qt6==6.10.2
+pyqt6-qt6==6.11.0
     # via
     #   -r backend/Transmittal-Builder/requirements.in
     #   pyqt6

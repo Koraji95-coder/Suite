@@ -1,4 +1,5 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
@@ -29,10 +30,7 @@ type AuthLookupError = {
 	code?: string;
 };
 
-const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `activity-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const createId = () => localId();
 
 const emit = (entry: ActivityLogRow) => {
 	listeners.forEach((listener) => listener(entry));

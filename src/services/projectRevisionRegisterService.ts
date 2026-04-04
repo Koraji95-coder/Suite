@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { looksLikeUuid } from "@/lib/uuid";
 import { supabase } from "@/supabase/client";
@@ -76,10 +77,7 @@ const revisionEntryFetchCache = createProjectScopedFetchCache<{
 	error: Error | null;
 }>();
 
-const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `revision-register-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const createId = () => localId();
 
 function normalizeIssueStatus(
 	value: string | null | undefined,

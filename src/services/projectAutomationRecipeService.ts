@@ -8,6 +8,7 @@ import {
 	mapFetchErrorMessage,
 	parseResponseErrorMessage,
 } from "@/lib/fetchWithTimeout";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import type { CadReplaceRule } from "@/services/cadBatchFindReplaceService";
 import type { ProjectMarkupSnapshotRecord } from "@/services/projectMarkupSnapshotService";
@@ -254,10 +255,8 @@ type ProjectAutomationRunRow =
 type ProjectAutomationRunInsert =
 	Database["public"]["Tables"]["project_automation_runs"]["Insert"];
 
-function createId(prefix: string) {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createId() {
+	return localId();
 }
 
 function normalizeText(value: unknown) {
@@ -377,7 +376,7 @@ function toRecipeStep(value: unknown): ProjectAutomationRecipeStep | null {
 		return null;
 	}
 	return {
-		id: normalizeText(candidate.id) || createId("recipe-step"),
+		id: normalizeText(candidate.id) || createId(),
 		source: normalizeStepSource(candidate.source),
 		label,
 		enabled: candidate.enabled !== false,
@@ -439,7 +438,7 @@ function toPreflightIssue(value: unknown): CadPreflightIssue | null {
 	}
 	const severity = normalizeText(candidate.severity).toLowerCase();
 	return {
-		id: normalizeText(candidate.id) || createId("preflight-issue"),
+		id: normalizeText(candidate.id) || createId(),
 		severity:
 			severity === "blocker"
 				? "blocker"
@@ -465,7 +464,7 @@ function toVerificationArtifact(
 	}
 	const kind = normalizeText(candidate.kind).toLowerCase();
 	return {
-		id: normalizeText(candidate.id) || createId("artifact"),
+		id: normalizeText(candidate.id) || createId(),
 		label,
 		kind:
 			kind === "json-manifest"
@@ -493,7 +492,7 @@ function normalizeWorkPackage(
 		return null;
 	}
 	return {
-		id: normalizeText(candidate.id) || createId("work-package"),
+		id: normalizeText(candidate.id) || createId(),
 		projectId,
 		issueSetId: normalizeNullableText(candidate.issueSetId),
 		issueSetLabel: normalizeNullableText(candidate.issueSetLabel),
@@ -529,7 +528,7 @@ function normalizeRecipe(value: unknown): ProjectAutomationRecipeRecord | null {
 		return null;
 	}
 	return {
-		id: normalizeText(candidate.id) || createId("recipe"),
+		id: normalizeText(candidate.id) || createId(),
 		projectId,
 		issueSetId: normalizeNullableText(candidate.issueSetId),
 		workPackageId: normalizeNullableText(candidate.workPackageId),
@@ -559,7 +558,7 @@ function normalizeRun(value: unknown): ProjectAutomationRunRecord | null {
 	}
 	const status = normalizeText(candidate.status).toLowerCase();
 	return {
-		id: normalizeText(candidate.id) || createId("recipe-run"),
+		id: normalizeText(candidate.id) || createId(),
 		projectId,
 		issueSetId: normalizeNullableText(candidate.issueSetId),
 		workPackageId: normalizeNullableText(candidate.workPackageId),

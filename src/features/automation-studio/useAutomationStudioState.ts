@@ -289,7 +289,7 @@ export function useAutomationStudioState(args: {
       },
       {
         label: "Transmittal",
-        to: `/app/apps/transmittal-builder?project=${encodeURIComponent(selectedProjectId)}${
+        to: `/app/projects/transmittal-builder?project=${encodeURIComponent(selectedProjectId)}${
           selectedIssueSet?.id
             ? `&issueSet=${encodeURIComponent(selectedIssueSet.id)}`
             : ""

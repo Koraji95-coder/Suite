@@ -1,6 +1,6 @@
 import { Check, Copy, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import {
 	ARCHITECTURE_AUTOGEN,
 	ARCHITECTURE_DEPENDENCIES,
@@ -12,7 +12,7 @@ import {
 	type ArchitectureFlow,
 } from "@/data/architectureModel";
 import { cn } from "@/lib/utils";
-import styles from "@/routes/architecture/ArchitectureMapRoutePage.module.css";
+import styles from "@/routes/developer/architecture/map/ArchitectureMapRoutePage.module.css";
 
 type DomainFilter = "all" | ArchitectureDomainId;
 
@@ -282,7 +282,7 @@ export function ArchitectureMapPanel() {
 
 			<Section
 				title="Critical Flows"
-				description="Key end-to-end paths across frontend, backend, data, and agent systems."
+				description="Key end-to-end paths across frontend, backend, local data, and runtime systems."
 			>
 				<div className={styles.flowList}>
 					{filteredFlows.length === 0 && (

@@ -24,10 +24,10 @@ const WORKSPACE_META = {
     ],
   },
   runtime: {
-    label: "Suite Runtime",
+    label: "Runtime Control",
     shellTitle: "Runtime Control",
-    heading: "Runtime control, service health, diagnostics, and project readiness.",
-    summary: "Operational control surface for local services, watchdog coverage, support, and ACADE readiness.",
+    heading: "Machine-local control, container observability, diagnostics, and project readiness.",
+    summary: "Operational control surface for local services, Docker-backed runtime core, support export, and ACADE readiness.",
     views: [
       { id: "runtime", label: "Runtime", title: "Start, stop, and review local services." },
       { id: "watchdog", label: "Watchdog", title: "Collector health, telemetry coverage, and trust status." },
@@ -788,7 +788,7 @@ function getShellStatusTone(shell = getShellHealth()) {
 
 function getRuntimeOwnershipSummary() {
   const services = getOrderedServices();
-  const runtimeCoreServices = services.filter((item) => ["backend", "gateway", "frontend"].includes(item.id));
+  const runtimeCoreServices = services.filter((item) => ["backend", "frontend"].includes(item.id));
   const dockerManagedCount = runtimeCoreServices.filter((item) => item.service?.startupMode === "docker_compose" && item.state === "running").length;
   const nativeDriftCount = runtimeCoreServices.filter((item) => item.service?.startupMode === "native_process").length;
   const supabase = services.find((item) => item.id === "supabase");
@@ -2067,7 +2067,7 @@ function renderRuntimeView() {
         <div class="button-row">
           ${docker.supabaseStudioUrl ? renderActionButton("Open Supabase Studio", { kind: "path", path: docker.supabaseStudioUrl, label: "Open Supabase Studio" }, "action-btn") : ""}
           ${docker.dockerDesktopPath ? renderActionButton("Open Docker Desktop", { kind: "path", path: docker.dockerDesktopPath, label: "Open Docker Desktop" }, "action-btn ghost") : ""}
-          ${renderActionButton("Focus gateway logs", { kind: "local", action: "open_logs", logSourceId: "gateway", label: "Focus gateway logs" }, "action-btn ghost")}
+          ${renderActionButton("Focus backend logs", { kind: "local", action: "open_logs", logSourceId: "backend", label: "Focus backend logs" }, "action-btn ghost")}
         </div>
       </article>
       <article class="content-panel quiet">

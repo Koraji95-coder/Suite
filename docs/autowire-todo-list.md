@@ -87,7 +87,7 @@ What was validated today:
   - Validation snapshot (2026-03-05):
     - `backend/route_groups/api_autocad.py` (`layerPreset` + preset catalog + merge logic)
     - `backend/tests/test_api_autocad_dotnet_provider.py`
-    - `src/components/apps/conduit-route/ConduitRouteApp.tsx`
+    - `src/features/autowire/ui/ConduitRouteApp.tsx`
 - [x] Improve no-match diagnostics in responses (which layers were scanned, why entities were skipped).
   - Validation snapshot (2026-03-05):
     - `backend/route_groups/api_conduit_route_obstacle_scan.py`
@@ -106,9 +106,9 @@ What was validated today:
     - `backend/tests/test_api_autocad_terminal_scan.py`
 - [x] Render real CAD geometry in Terminal Strips map (fallback to synthetic rails when geometry unavailable).
   - Validation snapshot (2026-03-05):
-    - `src/components/apps/conduit-route/conduitTerminalEngine.ts`
-    - `src/components/apps/conduit-route/ConduitTerminalWorkflow.tsx`
-    - `src/components/apps/conduit-route/conduitTerminalTypes.ts`
+    - `src/features/autowire/ui/conduitTerminalEngine.ts`
+    - `src/features/autowire/ui/ConduitTerminalWorkflow.tsx`
+    - `src/features/autowire/ui/conduitTerminalTypes.ts`
 
 ## Security / Auth
 

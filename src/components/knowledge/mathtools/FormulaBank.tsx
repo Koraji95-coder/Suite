@@ -1,6 +1,6 @@
 import { BookOpen, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useId, useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";

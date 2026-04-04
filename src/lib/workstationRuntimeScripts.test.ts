@@ -5,6 +5,10 @@ import { describe, expect, test } from "vitest";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(currentDir, "..", "..");
+const runWorkstationIntegration =
+	process.platform === "win32" &&
+	process.env.SUITE_RUN_WORKSTATION_INTEGRATION === "1";
+const workstationIntegrationTest = test.runIf(runWorkstationIntegration);
 
 function runPowerShellJson(scriptRelativePath: string, args: string[] = []) {
 	const scriptPath = resolve(repoRoot, scriptRelativePath);
@@ -22,7 +26,7 @@ function runPowerShellJson(scriptRelativePath: string, args: string[] = []) {
 }
 
 describe("workstation runtime PowerShell contracts", () => {
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"get-suite-runtime-status returns the six primary service ids",
 		() => {
 			const payload = runPowerShellJson("scripts/get-suite-runtime-status.ps1", [
@@ -32,7 +36,6 @@ describe("workstation runtime PowerShell contracts", () => {
 			expect(typeof payload.support?.workstation?.workstationId).toBe("string");
 			expect(typeof payload.support?.config?.codexConfigPresent).toBe("boolean");
 			expect(typeof payload.support?.paths?.statusDir).toBe("string");
-			expect(payload.support?.config?.gatewayMode).toBe("suite_native");
 			expect(typeof payload.support?.config?.stableSuiteRoot).toBe("string");
 			expect(typeof payload.support?.config?.dailyRoot).toBe("string");
 			expect(typeof payload.support?.config?.officeExecutablePath).toBe("string");
@@ -50,26 +53,19 @@ describe("workstation runtime PowerShell contracts", () => {
 			expect(typeof office?.configSource).toBe("string");
 			expect(typeof office?.configPath).toBe("string");
 			expect(Array.isArray(payload.services)).toBe(true);
-			expect(payload.services).toHaveLength(6);
+			expect(payload.services).toHaveLength(5);
 			expect(payload.services.map((service: { id: string }) => service.id)).toEqual([
 				"supabase",
 				"backend",
-				"gateway",
 				"frontend",
 				"watchdog-filesystem",
 				"watchdog-autocad",
 			]);
-			const gateway = payload.services.find(
-				(service: { id: string }) => service.id === "gateway",
-			);
-			expect(typeof gateway?.notes?.find((note: { label: string }) => note.label === "Gateway mode")?.value).toBe(
-				"string",
-			);
 		},
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"workstation-doctor returns shared shell health",
 		() => {
 			const payload = runPowerShellJson("scripts/workstation-doctor.ps1", [
@@ -83,7 +79,7 @@ describe("workstation runtime PowerShell contracts", () => {
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"bootstrap-suite-workstation validate mode returns structured bring-up data",
 		() => {
 			const dailyRoot = process.env.USERPROFILE
@@ -111,7 +107,7 @@ describe("workstation runtime PowerShell contracts", () => {
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"control-suite-companion-app status returns structured Office data",
 		() => {
 			const payload = runPowerShellJson(
@@ -128,7 +124,7 @@ describe("workstation runtime PowerShell contracts", () => {
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"legacy runtime control snapshot preserves compatibility component ids",
 		() => {
 			const payload = runPowerShellJson("scripts/open-suite-runtime-control.ps1", [
@@ -140,7 +136,6 @@ describe("workstation runtime PowerShell contracts", () => {
 				"docker",
 				"supabase",
 				"backend",
-				"gateway",
 				"watchdogFilesystem",
 				"watchdogAutoCad",
 				"autocadPlugin",
@@ -150,26 +145,24 @@ describe("workstation runtime PowerShell contracts", () => {
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
-		"control-suite-runtime-service status returns structured service data",
+	workstationIntegrationTest(
+		"control-suite-runtime-service status returns structured backend service data",
 		() => {
 			const payload = runPowerShellJson(
 				"scripts/control-suite-runtime-service.ps1",
-				["-Service", "gateway", "-Action", "status", "-Json"],
+				["-Service", "backend", "-Action", "status", "-Json"],
 			);
-			expect(payload.service).toBe("gateway");
+			expect(payload.service).toBe("backend");
 			expect(payload.action).toBe("status");
-			expect(payload.status?.id).toBe("gateway");
+			expect(payload.status?.id).toBe("backend");
 			expect(typeof payload.summary).toBe("string");
 			expect(payload.logTarget?.kind).toBe("path");
-			expect(typeof payload.status?.notes?.find((note: { label: string }) => note.label === "Gateway mode")?.value).toBe(
-				"string",
-			);
+			expect(typeof payload.logTarget?.target).toBe("string");
 		},
 		20_000,
 	);
 
-	test.runIf(process.platform === "win32")(
+	workstationIntegrationTest(
 		"frontend status exposes a concrete log target",
 		() => {
 			const payload = runPowerShellJson(

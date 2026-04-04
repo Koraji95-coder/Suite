@@ -1,8 +1,8 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
+import { PageFrame } from "@/components/system/PageFrame";
+import { useRegisterPageHeader } from "@/components/system/PageHeaderContext";
 import AppShell from "./AppShell";
 
 const mockState = vi.hoisted(() => ({
@@ -95,10 +95,10 @@ function AutoWireRouteFixture() {
 	);
 }
 
-function CalendarFallbackFixture() {
+function ShellFallbackFixture({ label }: { label: string }) {
 	return (
 		<PageFrame maxWidth="full">
-			<div>Calendar body</div>
+			<div>{label}</div>
 		</PageFrame>
 	);
 }
@@ -128,12 +128,15 @@ describe("AppShell", () => {
 		};
 	});
 
-	it("uses registered route headers as the shell title and avoids a duplicate PageFrame hero", async () => {
+	it("uses registered route headers while keeping the developer family and area rails visible", async () => {
 		render(
-			<MemoryRouter initialEntries={["/app/apps/autowire"]}>
+			<MemoryRouter initialEntries={["/app/developer/labs/autowire"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="apps/autowire" element={<AutoWireRouteFixture />} />
+						<Route
+							path="developer/labs/autowire"
+							element={<AutoWireRouteFixture />}
+						/>
 					</Route>
 				</Routes>
 			</MemoryRouter>,
@@ -146,26 +149,32 @@ describe("AppShell", () => {
 			screen.getByText("Unified routing workspace for conduit and cable runs."),
 		).toBeTruthy();
 		expect(screen.getByText("AutoWire body")).toBeTruthy();
-		expect(screen.getAllByText("AutoWire")).toHaveLength(1);
-		expect(screen.getByText("Suite workspace")).toBeTruthy();
+		expect(screen.getByText("Suite board")).toBeTruthy();
+		const familyRail = screen.getByText("Family").closest("div");
+		expect(familyRail).toBeTruthy();
+		expect(
+			within(familyRail as HTMLDivElement).getByText("Developer"),
+		).toBeTruthy();
 		const areaRail = screen.getByText("Area").closest("div");
 		expect(areaRail).toBeTruthy();
-		expect(
-			within(areaRail as HTMLDivElement).getByText("Automation Lab"),
-		).toBeTruthy();
+		expect(within(areaRail as HTMLDivElement).getByText("Labs")).toBeTruthy();
 		const diagnosticsButton = screen.getByRole("button", {
 			name: /Diagnostics all checks clear, 0 items/i,
 		});
 		expect(within(diagnosticsButton).getByText("Diagnostics")).toBeTruthy();
 		expect(within(diagnosticsButton).getByText("0")).toBeTruthy();
+		expect(screen.getAllByText("AutoWire")).toHaveLength(1);
 	});
 
-	it("falls back to section metadata when a route does not register a custom header", async () => {
+	it("falls back to family metadata when a route does not register a custom header", async () => {
 		render(
-			<MemoryRouter initialEntries={["/app/calendar"]}>
+			<MemoryRouter initialEntries={["/app/projects"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="calendar" element={<CalendarFallbackFixture />} />
+						<Route
+							path="projects"
+							element={<ShellFallbackFixture label="Projects body" />}
+						/>
 					</Route>
 				</Routes>
 			</MemoryRouter>,
@@ -173,17 +182,17 @@ describe("AppShell", () => {
 
 		await waitFor(() => {
 			expect(
-				screen.getByRole("heading", { level: 1, name: "Calendar" }),
+				screen.getByRole("heading", { level: 1, name: "Projects" }),
 			).toBeTruthy();
 		});
 		expect(
 			screen.getByText(
-				"Scheduling, commitments, and upcoming delivery timing.",
+				"Project notebook for notes, meetings, files, stage status, review, and release context.",
 			),
 		).toBeTruthy();
 	});
 
-	it("keeps diagnostics state inside the fixed rail without rendering a separate runtime drift chip", async () => {
+	it("keeps diagnostics state inside the fixed rail without rendering a separate runtime chip", async () => {
 		mockState.runtimeReport = {
 			checkedAt: "2026-03-21T18:05:00.000Z",
 			ok: false,
@@ -200,10 +209,13 @@ describe("AppShell", () => {
 		};
 
 		render(
-			<MemoryRouter initialEntries={["/app/apps/autowire"]}>
+			<MemoryRouter initialEntries={["/app/developer/labs/autowire"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="apps/autowire" element={<AutoWireRouteFixture />} />
+						<Route
+							path="developer/labs/autowire"
+							element={<AutoWireRouteFixture />}
+						/>
 					</Route>
 				</Routes>
 			</MemoryRouter>,
@@ -215,12 +227,10 @@ describe("AppShell", () => {
 		expect(within(diagnosticsButton).getByText("Diagnostics")).toBeTruthy();
 		expect(within(diagnosticsButton).getByText("1")).toBeTruthy();
 		expect(screen.queryByText("Runtime drift")).toBeNull();
-		expect(screen.getByText("Suite workspace")).toBeTruthy();
+		expect(screen.getByText("Suite board")).toBeTruthy();
 		const areaRail = screen.getByText("Area").closest("div");
 		expect(areaRail).toBeTruthy();
-		expect(
-			within(areaRail as HTMLDivElement).getByText("Automation Lab"),
-		).toBeTruthy();
+		expect(within(areaRail as HTMLDivElement).getByText("Labs")).toBeTruthy();
 	});
 
 	it("keeps background runtime warnings out of the diagnostics chip count", async () => {
@@ -241,10 +251,13 @@ describe("AppShell", () => {
 		};
 
 		render(
-			<MemoryRouter initialEntries={["/app/apps/autowire"]}>
+			<MemoryRouter initialEntries={["/app/developer/labs/autowire"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="apps/autowire" element={<AutoWireRouteFixture />} />
+						<Route
+							path="developer/labs/autowire"
+							element={<AutoWireRouteFixture />}
+						/>
 					</Route>
 				</Routes>
 			</MemoryRouter>,
@@ -256,28 +269,36 @@ describe("AppShell", () => {
 		expect(within(diagnosticsButton).getByText("0")).toBeTruthy();
 	});
 
-	it("shows only customer-facing navigation for non-dev users", async () => {
+	it("shows only customer families for non-dev users", async () => {
 		render(
-			<MemoryRouter initialEntries={["/app/dashboard"]}>
+			<MemoryRouter initialEntries={["/app/home"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="dashboard" element={<CalendarFallbackFixture />} />
+						<Route path="home" element={<ShellFallbackFixture label="Home body" />} />
 					</Route>
 				</Routes>
 			</MemoryRouter>,
 		);
 
 		await waitFor(() => {
-			expect(screen.getByText("Workspace")).toBeTruthy();
+			expect(
+				screen.getByRole("heading", { level: 1, name: "Home" }),
+			).toBeTruthy();
 		});
-		expect(screen.queryByText("Developer")).toBeNull();
-		expect(screen.queryByText("Changelog")).toBeNull();
-		expect(screen.queryByText("Agents")).toBeNull();
-		expect(screen.queryByText("Architecture")).toBeNull();
-		expect(screen.queryByText("Command Center")).toBeNull();
+		const navigation = document.querySelector("nav");
+		expect(navigation).toBeTruthy();
+		expect(within(navigation as HTMLElement).getByText("Home")).toBeTruthy();
+		expect(
+			within(navigation as HTMLElement).getByText("Projects"),
+		).toBeTruthy();
+		expect(within(navigation as HTMLElement).getByText("Draft")).toBeTruthy();
+		expect(within(navigation as HTMLElement).getByText("Review")).toBeTruthy();
+		expect(
+			within(navigation as HTMLElement).queryByText("Developer"),
+		).toBeNull();
 	});
 
-	it("shows a compact developer group when the user can access dev surfaces", async () => {
+	it("shows the developer family when the user can access dev surfaces", async () => {
 		mockState.auth.user = {
 			id: "admin-1",
 			email: "admin@example.com",
@@ -291,24 +312,37 @@ describe("AppShell", () => {
 		mockState.allowCommandCenter = true;
 
 		render(
-			<MemoryRouter initialEntries={["/app/dashboard"]}>
+			<MemoryRouter initialEntries={["/app/home"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="dashboard" element={<CalendarFallbackFixture />} />
+						<Route path="home" element={<ShellFallbackFixture label="Home body" />} />
 					</Route>
 				</Routes>
 			</MemoryRouter>,
 		);
 
 		await waitFor(() => {
-			expect(screen.getAllByText("Developer").length).toBeGreaterThan(0);
+			expect(
+				screen.getByRole("heading", { level: 1, name: "Home" }),
+			).toBeTruthy();
 		});
-		expect(screen.getAllByText("Developer").length).toBeGreaterThan(0);
-		expect(screen.queryByText("Internal")).toBeNull();
-		expect(screen.queryByText("Changelog")).toBeNull();
-		expect(screen.queryByText("Agents")).toBeNull();
-		expect(screen.queryByText("Architecture")).toBeNull();
-		expect(screen.queryByText("Command Center")).toBeNull();
+		const navigation = document.querySelector("nav");
+		expect(navigation).toBeTruthy();
+		expect(
+			within(navigation as HTMLElement).getAllByText("Developer").length,
+		).toBeGreaterThan(0);
+		expect(
+			within(navigation as HTMLElement).queryByText("Internal"),
+		).toBeNull();
+		expect(
+			within(navigation as HTMLElement).queryByText("Changelog"),
+		).toBeNull();
+		expect(
+			within(navigation as HTMLElement).queryByText("Architecture"),
+		).toBeNull();
+		expect(
+			within(navigation as HTMLElement).queryByText("Command Center"),
+		).toBeNull();
 	});
 
 	it("does not flash the first-login prompt while the profile is still hydrating", async () => {
@@ -322,17 +356,19 @@ describe("AppShell", () => {
 		mockState.auth.profileHydrating = true;
 
 		render(
-			<MemoryRouter initialEntries={["/app/dashboard"]}>
+			<MemoryRouter initialEntries={["/app/home"]}>
 				<Routes>
 					<Route path="/app" element={<AppShell />}>
-						<Route path="dashboard" element={<CalendarFallbackFixture />} />
+						<Route path="home" element={<ShellFallbackFixture label="Home body" />} />
 					</Route>
 				</Routes>
 			</MemoryRouter>,
 		);
 
 		await waitFor(() => {
-			expect(screen.getByText("Workspace")).toBeTruthy();
+			expect(
+				screen.getByRole("heading", { level: 1, name: "Home" }),
+			).toBeTruthy();
 		});
 		expect(screen.queryByText("Thanks for signing up!")).toBeNull();
 		expect(screen.queryByText("What should we call you?")).toBeNull();

@@ -4,7 +4,7 @@ AutoCAD .NET plugin project for the Suite Watchdog tracker.
 
 This project compiles the tracker source from:
 
-- `src/components/apps/watchdog/DrawingTracker.cs`
+- `dotnet/watchdog-cad-tracker/DrawingTracker.cs`
 
 The plugin runs inside AutoCAD and exports tracker state to:
 

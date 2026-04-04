@@ -1,9 +1,9 @@
 import { ClipboardList, FileCheck2, ShieldCheck, Workflow } from "lucide-react";
 import { Link } from "react-router-dom";
-import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
-import { Badge } from "@/components/primitives/Badge";
-import { Button } from "@/components/primitives/Button";
-import { Panel } from "@/components/primitives/Panel";
+import { TrustStateBadge } from "@/components/system/TrustStateBadge";
+import { Badge } from "@/components/system/base/Badge";
+import { Button } from "@/components/system/base/Button";
+import { Panel } from "@/components/system/base/Panel";
 import {
 	REVIEW_INBOX_FILTER_OPTIONS,
 	useProjectReviewWorkspaceState,

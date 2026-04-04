@@ -1,3 +1,5 @@
+import { getSessionStorageApi } from "@/lib/browserStorage";
+
 export type SessionAuthMethod = "email_link" | "passkey";
 
 const PASSKEY_PENDING_KEY = "suite-passkey-signin-pending";
@@ -13,13 +15,6 @@ type SessionMethodPayload = {
 	method: SessionAuthMethod;
 	updatedAt: number;
 };
-
-function canUseSessionStorage(): boolean {
-	return (
-		typeof window !== "undefined" &&
-		typeof window.sessionStorage !== "undefined"
-	);
-}
 
 function safeParseJson<T>(raw: string | null): T | null {
 	if (!raw) return null;
@@ -43,20 +38,22 @@ export function buildSessionAuthKey(
 }
 
 export function markPasskeySignInPending(): void {
-	if (!canUseSessionStorage()) return;
+	const storage = getSessionStorageApi();
+	if (!storage) return;
 	const payload: PasskeyPendingPayload = {
 		verifiedAt: Date.now(),
 	};
-	window.sessionStorage.setItem(PASSKEY_PENDING_KEY, JSON.stringify(payload));
+	storage.setItem(PASSKEY_PENDING_KEY, JSON.stringify(payload));
 }
 
 export function consumePasskeySignInPending(): boolean {
-	if (!canUseSessionStorage()) return false;
+	const storage = getSessionStorageApi();
+	if (!storage) return false;
 
 	const parsed = safeParseJson<PasskeyPendingPayload>(
-		window.sessionStorage.getItem(PASSKEY_PENDING_KEY),
+		storage.getItem(PASSKEY_PENDING_KEY),
 	);
-	window.sessionStorage.removeItem(PASSKEY_PENDING_KEY);
+	storage.removeItem(PASSKEY_PENDING_KEY);
 	if (!parsed || typeof parsed.verifiedAt !== "number") return false;
 
 	const ageMs = Date.now() - parsed.verifiedAt;
@@ -67,28 +64,31 @@ export function storeSessionAuthMethod(
 	sessionKey: string,
 	method: SessionAuthMethod,
 ): void {
-	if (!canUseSessionStorage()) return;
+	const storage = getSessionStorageApi();
+	if (!storage) return;
 	const payload: SessionMethodPayload = {
 		sessionKey,
 		method,
 		updatedAt: Date.now(),
 	};
-	window.sessionStorage.setItem(SESSION_METHOD_KEY, JSON.stringify(payload));
+	storage.setItem(SESSION_METHOD_KEY, JSON.stringify(payload));
 }
 
 export function readSessionAuthMethod(
 	sessionKey: string,
 ): SessionAuthMethod | null {
-	if (!canUseSessionStorage()) return null;
+	const storage = getSessionStorageApi();
+	if (!storage) return null;
 	const parsed = safeParseJson<SessionMethodPayload>(
-		window.sessionStorage.getItem(SESSION_METHOD_KEY),
+		storage.getItem(SESSION_METHOD_KEY),
 	);
 	if (!parsed || parsed.sessionKey !== sessionKey) return null;
 	return parsed.method === "passkey" ? "passkey" : "email_link";
 }
 
 export function clearSessionAuthMarkers(): void {
-	if (!canUseSessionStorage()) return;
-	window.sessionStorage.removeItem(PASSKEY_PENDING_KEY);
-	window.sessionStorage.removeItem(SESSION_METHOD_KEY);
+	const storage = getSessionStorageApi();
+	if (!storage) return;
+	storage.removeItem(PASSKEY_PENDING_KEY);
+	storage.removeItem(SESSION_METHOD_KEY);
 }

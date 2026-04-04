@@ -68,8 +68,6 @@ alter table if exists public.formulas enable row level security;
 alter table if exists public.saved_calculations enable row level security;
 alter table if exists public.saved_circuits enable row level security;
 alter table if exists public.whiteboards enable row level security;
-alter table if exists public.ai_conversations enable row level security;
-alter table if exists public.ai_memory enable row level security;
 alter table if exists public.block_library enable row level security;
 alter table if exists public.automation_workflows enable row level security;
 alter table if exists public.drawing_annotations enable row level security;
@@ -140,16 +138,6 @@ for each row execute function public.set_user_id_from_auth();
 drop trigger if exists set_user_id_whiteboards on public.whiteboards;
 create trigger set_user_id_whiteboards
 before insert on public.whiteboards
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_ai_conversations on public.ai_conversations;
-create trigger set_user_id_ai_conversations
-before insert on public.ai_conversations
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_ai_memory on public.ai_memory;
-create trigger set_user_id_ai_memory
-before insert on public.ai_memory
 for each row execute function public.set_user_id_from_auth();
 
 drop trigger if exists set_user_id_block_library on public.block_library;
@@ -498,48 +486,6 @@ with check (user_id = auth.uid());
 
 drop policy if exists whiteboards_delete_own on public.whiteboards;
 create policy whiteboards_delete_own on public.whiteboards
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists ai_conversations_select_own on public.ai_conversations;
-create policy ai_conversations_select_own on public.ai_conversations
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists ai_conversations_insert_own on public.ai_conversations;
-create policy ai_conversations_insert_own on public.ai_conversations
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists ai_conversations_update_own on public.ai_conversations;
-create policy ai_conversations_update_own on public.ai_conversations
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists ai_conversations_delete_own on public.ai_conversations;
-create policy ai_conversations_delete_own on public.ai_conversations
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists ai_memory_select_own on public.ai_memory;
-create policy ai_memory_select_own on public.ai_memory
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists ai_memory_insert_own on public.ai_memory;
-create policy ai_memory_insert_own on public.ai_memory
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists ai_memory_update_own on public.ai_memory;
-create policy ai_memory_update_own on public.ai_memory
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists ai_memory_delete_own on public.ai_memory;
-create policy ai_memory_delete_own on public.ai_memory
 for delete to authenticated
 using (user_id = auth.uid());
 

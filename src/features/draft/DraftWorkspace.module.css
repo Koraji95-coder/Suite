@@ -1,0 +1,178 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.hero {
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--primary) 14%, transparent),
+			transparent 60%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-feature) 94%, transparent),
+			color-mix(in srgb, var(--surface) 95%, transparent)
+		);
+}
+
+.heroSummary {
+	max-width: 48rem;
+	line-height: 1.6;
+}
+
+.heroMeta,
+.heroActions,
+.labPreviewList {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.primaryLink,
+.secondaryLink,
+.toolAction {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	text-decoration: none;
+	border-radius: 999px;
+	padding: 0.65rem 0.95rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	transition:
+		transform 140ms ease,
+		border-color 140ms ease,
+		background 140ms ease,
+		color 140ms ease;
+}
+
+.primaryLink {
+	border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--text);
+}
+
+.secondaryLink,
+.toolAction {
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--surface) 68%, transparent);
+	color: var(--text-muted);
+}
+
+.primaryLink:hover,
+.secondaryLink:hover,
+.toolAction:hover {
+	transform: translateY(-1px);
+}
+
+.signalStrip {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.signalCard,
+.toolCard,
+.supportCard {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.signalCard {
+	padding: 0.9rem 0.95rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--surface) 66%, transparent);
+	font-size: 0.8rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.toolGrid,
+.supportGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.9rem;
+}
+
+.toolHeader,
+.supportHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.toolIdentity,
+.supportHeader {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.iconShell {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.4rem;
+	height: 2.4rem;
+	border-radius: 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-strong) 72%, transparent);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--surface) 78%, transparent),
+			color-mix(in srgb, var(--surface-2) 90%, transparent)
+		),
+		var(--surface);
+	color: var(--text);
+}
+
+.toolEyebrow {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.toolTitle {
+	margin: 0.15rem 0 0;
+	font-size: 1rem;
+	line-height: 1.2;
+	color: var(--text);
+}
+
+.toolSummary,
+.signalList,
+.labPreviewList {
+	margin: 0;
+	font-size: 0.83rem;
+	line-height: 1.6;
+	color: var(--text-muted);
+}
+
+.signalList {
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.45rem;
+}
+
+@media (max-width: 960px) {
+	.signalStrip,
+	.toolGrid,
+	.supportGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.toolHeader,
+	.supportHeader {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}

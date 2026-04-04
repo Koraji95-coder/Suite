@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { TrustState } from "@/components/apps/ui/TrustStateBadge";
+import type { TrustState } from "@/components/system/TrustStateBadge";
 import type { Project } from "@/features/project-core";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { projectDocumentMetadataService } from "@/features/project-documents";

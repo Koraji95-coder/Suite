@@ -17,25 +17,26 @@ test.describe("authenticated shell routes", () => {
 	test.skip(!hasStorageState, "Run `npm run auth:playwright:bootstrap` first.");
 
 	const customerRoutes = [
-		{ path: "/app/calendar", title: "Calendar" },
-		{ path: "/app/dashboard", title: "Dashboard" },
-		{ path: "/app/apps/drawing-list-manager", title: "Drawing List Manager" },
-		{ path: "/app/knowledge", title: "Knowledge" },
+		{ path: "/app/home", title: "Home" },
 		{ path: "/app/projects", title: "Projects" },
+		{ path: "/app/draft", title: "Draft" },
+		{ path: "/app/draft/drawing-list-manager", title: "Drawing List Manager" },
+		{ path: "/app/draft/block-library", title: "Block Library" },
+		{ path: "/app/review", title: "Review" },
+		{ path: "/app/review/standards-checker", title: "Standards Checker" },
+		{ path: "/app/review/math-tools", title: "Math tools" },
+		{ path: "/app/projects/transmittal-builder", title: "Transmittal Builder" },
 		{ path: "/app/settings", title: "Settings" },
-		{ path: "/app/apps/standards-checker", title: "Standards Checker" },
-		{ path: "/app/apps/transmittal-builder", title: "Transmittal Builder" },
-		{ path: "/app/watchdog", title: "Watchdog" },
 	] as const;
 
 	const devRoutes = [
-		"/app/agent",
-		"/app/developer/automation-studio",
-		"/app/apps/autowire",
-		"/app/changelog",
-		"/app/command-center",
-		"/app/operations",
 		"/app/developer",
+		"/app/developer/control/watchdog",
+		"/app/developer/control/changelog",
+		"/app/developer/control/command-center",
+		"/app/developer/architecture/map",
+		"/app/developer/labs/automation-studio",
+		"/app/developer/labs/autowire",
 	] as const;
 
 	for (const route of customerRoutes) {
@@ -49,10 +50,10 @@ test.describe("authenticated shell routes", () => {
 			).toBeVisible({ timeout: 15_000 });
 			await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 			await expect(
-				page.getByText("Suite workspace", { exact: true }).first(),
+				page.getByText("Suite board", { exact: true }).first(),
 			).toBeVisible();
 			await expect(
-				page.getByText("Area", { exact: true }).first(),
+				page.getByText("Family", { exact: true }).first(),
 			).toBeVisible();
 			await expect(
 				page.getByRole("button", { name: /Diagnostics/i }),
@@ -80,10 +81,10 @@ test.describe("authenticated shell routes", () => {
 			page,
 		}) => {
 			await page.goto(route, { waitUntil: "domcontentloaded" });
-			await page.waitForURL("**/app/dashboard");
+			await page.waitForURL("**/app/home");
 
 			await expect(
-				page.getByRole("heading", { level: 1, name: "Dashboard" }),
+				page.getByRole("heading", { level: 1, name: "Home" }),
 			).toBeVisible({ timeout: 15_000 });
 			await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 		});

@@ -65,72 +65,6 @@ export type Database = {
           },
         ]
       }
-      ai_conversations: {
-        Row: {
-          context_data: Json
-          created_at: string
-          id: string
-          messages: Json
-          panel_context: string | null
-          title: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          context_data?: Json
-          created_at?: string
-          id?: string
-          messages?: Json
-          panel_context?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          context_data?: Json
-          created_at?: string
-          id?: string
-          messages?: Json
-          panel_context?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ai_memory: {
-        Row: {
-          connections: Json
-          content: Json
-          created_at: string
-          id: string
-          last_accessed: string
-          memory_type: Database["public"]["Enums"]["memory_type"]
-          strength: number
-          user_id: string
-        }
-        Insert: {
-          connections?: Json
-          content: Json
-          created_at?: string
-          id?: string
-          last_accessed?: string
-          memory_type: Database["public"]["Enums"]["memory_type"]
-          strength?: number
-          user_id: string
-        }
-        Update: {
-          connections?: Json
-          content?: Json
-          created_at?: string
-          id?: string
-          last_accessed?: string
-          memory_type?: Database["public"]["Enums"]["memory_type"]
-          strength?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
       automation_workflows: {
         Row: {
           created_at: string
@@ -1574,7 +1508,6 @@ export type Database = {
     Enums: {
       annotation_status: "pending" | "reviewed" | "approved" | "rejected"
       event_type: "deadline" | "milestone" | "reminder"
-      memory_type: "preference" | "knowledge" | "pattern" | "relationship"
       project_priority: "low" | "medium" | "high" | "urgent"
       project_status: "active" | "completed" | "archived" | "on-hold"
       task_priority: "low" | "medium" | "high" | "urgent"
@@ -1708,7 +1641,6 @@ export const Constants = {
     Enums: {
       annotation_status: ["pending", "reviewed", "approved", "rejected"],
       event_type: ["deadline", "milestone", "reminder"],
-      memory_type: ["preference", "knowledge", "pattern", "relationship"],
       project_priority: ["low", "medium", "high", "urgent"],
       project_status: ["active", "completed", "archived", "on-hold"],
       task_priority: ["low", "medium", "high", "urgent"],

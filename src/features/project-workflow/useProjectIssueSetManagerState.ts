@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { TrustState } from "@/components/apps/ui/TrustStateBadge";
+import type { TrustState } from "@/components/system/TrustStateBadge";
 import type { Project } from "@/features/project-core";
 import type { ProjectWatchdogTelemetry } from "@/features/project-watchdog";
 import {
@@ -886,17 +886,17 @@ export function useProjectIssueSetManagerState(args: {
 				} in scope. Save a draft package to lock the current review snapshot.`;
 
 	const drawingListHref = buildProjectIssueSetAppHref(
-		"/app/apps/drawing-list-manager",
+		"/app/draft/drawing-list-manager",
 		project.id,
 		activeIssueSetContextId,
 	);
 	const standardsHref = buildProjectIssueSetAppHref(
-		"/app/apps/standards-checker",
+		"/app/review/standards-checker",
 		project.id,
 		activeIssueSetContextId,
 	);
 	const transmittalHref = buildProjectIssueSetAppHref(
-		"/app/apps/transmittal-builder",
+		"/app/projects/transmittal-builder",
 		project.id,
 		activeIssueSetContextId,
 	);

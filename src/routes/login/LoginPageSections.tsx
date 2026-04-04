@@ -3,19 +3,17 @@ import { Link } from "react-router-dom";
 import AuthEnvDebugCard from "../../auth/AuthEnvDebugCard";
 import AuthShell from "../../auth/AuthShell";
 import CaptchaChallenge from "../../auth/CaptchaChallenge";
-import { AgentPixelMark } from "../../components/agent/AgentPixelMark";
-import { AGENT_PROFILE_IDS } from "../../components/agent/agentProfiles";
-import { Badge } from "../../components/primitives/Badge";
-import { Button } from "../../components/primitives/Button";
-import { Input } from "../../components/primitives/Input";
-import { Panel } from "../../components/primitives/Panel";
-import { Progress } from "../../components/primitives/Progress";
-import { HStack, Stack } from "../../components/primitives/Stack";
-import { Text } from "../../components/primitives/Text";
+import { Badge } from "../../components/system/base/Badge";
+import { Button } from "../../components/system/base/Button";
+import { Input } from "../../components/system/base/Input";
+import { Panel } from "../../components/system/base/Panel";
+import { Progress } from "../../components/system/base/Progress";
+import { HStack, Stack } from "../../components/system/base/Stack";
+import { Text } from "../../components/system/base/Text";
 import { cn } from "../../lib/utils";
 import styles from "../LoginPage.module.css";
 
-const AGENT_IDS = AGENT_PROFILE_IDS;
+const SHOWCASE_LABELS = ["Projects", "Draft", "Review"];
 type LoginPageFrameProps = { children: ReactNode };
 
 type LoginSessionStateProps = {
@@ -51,7 +49,7 @@ export function LoginPageFrame({ children }: LoginPageFrameProps) {
 	return (
 		<AuthShell navLink={{ to: "/", label: "Back to landing" }}>
 			<div className={styles.pageRoot}>
-				<LoginPageAgentShowcase />
+				<LoginPageShowcase />
 				<Stack gap={6}>{children}</Stack>
 			</div>
 		</AuthShell>
@@ -74,7 +72,7 @@ export function LoginSessionState({
 				</Badge>
 
 				<Text as="h1" size="2xl" weight="semibold" block>
-					{redirecting ? "Opening your dashboard" : "Checking your account"}
+					{redirecting ? "Opening your workspace" : "Checking your account"}
 				</Text>
 
 				<Text color="muted" size="sm" className={styles.headerCopy} block>
@@ -283,29 +281,37 @@ export function LoginForm({
 	);
 }
 
-function LoginPageAgentShowcase() {
+function LoginPageShowcase() {
 	return (
-		<div className={styles.agentShowcase}>
-			<div className={styles.mainAgentWrap}>
-				<div className={styles.agentGlow} />
-				<div className={styles.mainAgentInner}>
-					<AgentPixelMark
-						profileId="koro"
-						size={80}
-						detailLevel="hero"
-						expression="active"
-					/>
+		<div className={styles.showcase}>
+			<div className={styles.showcasePanelWrap}>
+				<div className={styles.showcaseGlow} />
+				<div className={styles.showcasePanelInner}>
+					<Panel variant="elevated" padding="lg">
+						<Stack gap={2} align="center">
+							<Badge color="primary" variant="soft">
+								Suite
+							</Badge>
+							<Text size="lg" weight="semibold">
+								Workspace access
+							</Text>
+							<Text size="xs" color="muted" align="center">
+								Open your project notebook, released tools, and review surfaces
+								from one secure sign-in.
+							</Text>
+						</Stack>
+					</Panel>
 				</div>
 			</div>
 
 			<HStack gap={2} justify="center">
-				{AGENT_IDS.filter((id) => id !== "koro")
-					.slice(0, 3)
-					.map((id) => (
-						<div key={id} className={styles.secondaryAgent}>
-							<AgentPixelMark profileId={id} size={20} detailLevel="hero" />
-						</div>
-					))}
+				{SHOWCASE_LABELS.map((label) => (
+					<div key={label} className={styles.secondaryPill}>
+						<Text size="xs" weight="semibold">
+							{label}
+						</Text>
+					</div>
+				))}
 			</HStack>
 		</div>
 	);

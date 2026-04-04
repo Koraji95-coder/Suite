@@ -1,9 +1,10 @@
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
+import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import { safeSupabaseQuery } from "@/supabase/utils";
-import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 
 export type ProjectCadWritePassRow =
 	Database["public"]["Tables"]["project_cad_write_passes"]["Row"];
@@ -92,7 +93,9 @@ function normalizeArtifactRefs(value: unknown) {
 	if (!Array.isArray(value)) {
 		return [] as Record<string, unknown>[];
 	}
-	return value.filter((entry): entry is Record<string, unknown> => isRecord(entry));
+	return value.filter((entry): entry is Record<string, unknown> =>
+		isRecord(entry),
+	);
 }
 
 function buildLocalStorageKey(projectId: string) {
@@ -186,11 +189,10 @@ function sortPasses(entries: ProjectCadWritePassRecord[]) {
 }
 
 function readLocalPasses(projectId: string) {
-	if (typeof localStorage === "undefined") {
-		return [] as ProjectCadWritePassRecord[];
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return [] as ProjectCadWritePassRecord[];
 	try {
-		const raw = localStorage.getItem(buildLocalStorageKey(projectId));
+		const raw = storage.getItem(buildLocalStorageKey(projectId));
 		if (!raw) {
 			return [] as ProjectCadWritePassRecord[];
 		}
@@ -217,11 +219,10 @@ function writeLocalPasses(
 	projectId: string,
 	entries: ProjectCadWritePassRecord[],
 ) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(projectId),
 			JSON.stringify(sortPasses(entries)),
 		);
@@ -251,10 +252,10 @@ function isMissingPassTable(error: unknown) {
 				: String(error || "");
 	const normalized = message.toLowerCase();
 	return (
-		normalized.includes("project_cad_write_passes")
-		&& (normalized.includes("does not exist")
-			|| normalized.includes("not found")
-			|| normalized.includes("schema cache"))
+		normalized.includes("project_cad_write_passes") &&
+		(normalized.includes("does not exist") ||
+			normalized.includes("not found") ||
+			normalized.includes("schema cache"))
 	);
 }
 
@@ -332,7 +333,9 @@ export const projectCadWritePassService = {
 			const normalized = sortPasses(
 				stored
 					.map((entry) => normalizePass(entry))
-					.filter((entry): entry is ProjectCadWritePassRecord => entry !== null),
+					.filter(
+						(entry): entry is ProjectCadWritePassRecord => entry !== null,
+					),
 			);
 			writeLocalPasses(normalizedProjectId, normalized);
 			return { data: normalized, error: null };
@@ -407,10 +410,12 @@ export const projectCadWritePassService = {
 				const saved = (result.data as ProjectCadWritePassRow[]).map((row) =>
 					fromRow(row),
 				);
-				writeLocalPasses(
-					projectId,
-					[...saved, ...existing.data.filter((entry) => !saved.some((next) => next.id === entry.id))],
-				);
+				writeLocalPasses(projectId, [
+					...saved,
+					...existing.data.filter(
+						(entry) => !saved.some((next) => next.id === entry.id),
+					),
+				]);
 				return { data: saved, error: null };
 			}
 			if (result.error && !isMissingPassTable(result.error)) {
@@ -420,7 +425,9 @@ export const projectCadWritePassService = {
 					error:
 						persistError ||
 						new Error(
-							String(result.error.message || "Unable to persist CAD write passes."),
+							String(
+								result.error.message || "Unable to persist CAD write passes.",
+							),
 						),
 				};
 			}

@@ -5,7 +5,7 @@ Use this when setting up Suite on a new Windows workstation or when standardizin
 This bring-up keeps:
 
 - `Suite` as its own repo at `C:\Users\<you>\Documents\GitHub\Suite`
-- `Office / DailyDesk` as its own repo or workspace at `C:\Users\<you>\Documents\GitHub\Office`
+- `Office` as its own repo or workspace at `C:\Users\<you>\Documents\GitHub\Office`
 - Office live knowledge/state in Dropbox:
   - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\Knowledge`
   - `%USERPROFILE%\Dropbox\SuiteWorkspace\Office\State`
@@ -39,11 +39,31 @@ Optional:
 ## Repo Ownership Model
 
 - `Suite` remains the main repo and owns Runtime Control, startup tasks, and workstation profile stamping.
-- `DailyDesk` remains separate from `Suite`.
+- `Office` remains separate from `Suite`.
 - Runtime Control resolves Office in this order:
   1. workstation-local companion config
   2. canonical `Documents\GitHub\Office` repo root
   3. compatibility overrides / legacy fallbacks
+
+## Hybrid Ownership Model
+
+This bring-up is intentionally hybrid:
+
+- Docker owns the reproducible runtime-core lane:
+  - frontend
+  - backend
+  - Redis
+  - local Supabase development services
+- workstation-local ownership stays with:
+  - Runtime Control
+  - Office companion
+  - watchdog collectors
+  - AutoCAD and plugin execution
+  - startup tasks
+  - workstation identity
+  - local learning, SQLite, JSONL, and promoted local model artifacts
+
+Workstation switching is still Git + bootstrap + workstation sync + mirror/restore. Docker improves parity and observability, but it is not the full migration mechanism.
 
 ## First-Time Bring-Up
 
@@ -78,7 +98,7 @@ npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
 
 That is the preferred path. The bootstrap script will detect the existing `Documents\GitHub\Office` workspace and use it without needing `-DailyRepoUrl`.
 
-If `DailyDesk` is not yet in its own Git repo, you can hydrate the Daily workspace from an existing local source path instead:
+If `Office` is not yet in its own Git repo, you can hydrate the workspace from an existing local source path instead:
 
 ```powershell
 npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\Users\koraj\OneDrive\Desktop\Daily"
@@ -249,6 +269,12 @@ The mirror intentionally does not copy Codex auth or the full Codex SQLite datab
 5. Run `npm run workstation:bringup -- -WorkstationId ...` from `C:\Users\<you>\Documents\GitHub\Suite`.
 6. Run `npm run workstation:restore -- ...` if you carried local-only state.
 7. Open Runtime Control and confirm Office + runtime + watchdog health.
+
+The key distinction:
+
+- Docker reconstructs the shared runtime core
+- Runtime Control reconstructs machine-local ownership
+- mirror/restore carries the local-only artifacts that should not live in containers
 
 ## Failure Recovery
 

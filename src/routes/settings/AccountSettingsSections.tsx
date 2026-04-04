@@ -9,12 +9,12 @@ import {
 	ShieldCheck,
 	User,
 } from "lucide-react";
-import { Badge } from "@/components/primitives/Badge";
-import { Button } from "@/components/primitives/Button";
-import { Input } from "@/components/primitives/Input";
-import { Panel } from "@/components/primitives/Panel";
-import { HStack, Stack } from "@/components/primitives/Stack";
-import { Text } from "@/components/primitives/Text";
+import { Badge } from "@/components/system/base/Badge";
+import { Button } from "@/components/system/base/Button";
+import { Input } from "@/components/system/base/Input";
+import { Panel } from "@/components/system/base/Panel";
+import { HStack, Stack } from "@/components/system/base/Stack";
+import { Text } from "@/components/system/base/Text";
 import styles from "./AccountSettings.module.css";
 import { SectionHeader, StatusTile } from "./accountSettingsShared";
 import type { StatusDescriptor } from "./accountSettingsUtils";

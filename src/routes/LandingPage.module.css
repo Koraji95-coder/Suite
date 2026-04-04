@@ -184,7 +184,7 @@
 			color-mix(in srgb, var(--surface-2) 82%, transparent)
 		),
 		var(--surface);
-	box-shadow: var(--agent-shadow-soft);
+	box-shadow: var(--surface-shadow-soft);
 }
 
 .heroBackground {
@@ -262,7 +262,7 @@
 	margin-bottom: 0.58rem;
 }
 
-.agentsBadge {
+.productBadge {
 	margin-bottom: 0.58rem;
 	justify-self: center;
 }
@@ -431,13 +431,13 @@
 	line-height: 1.42;
 }
 
-.agentsSection {
+.productSection {
 	margin-top: 1.3rem;
 	display: grid;
 	justify-items: center;
 }
 
-.agentsPanel {
+.productPanel {
 	width: min(100%, var(--landing-panel-max-width));
 	border: 1px solid var(--line-soft);
 	background:
@@ -450,7 +450,7 @@
 	box-shadow: 0 14px 28px rgb(0 0 0 / 20%);
 }
 
-.agentsHeader {
+.productHeader {
 	display: grid;
 	gap: 0.42rem;
 	justify-items: center;
@@ -459,13 +459,13 @@
 	margin-inline: auto;
 }
 
-.agentsCopy {
+.productCopy {
 	margin-top: 0.18rem;
 	max-width: 34rem;
 	line-height: 1.65;
 }
 
-.agentGrid {
+.surfaceGrid {
 	margin-top: 1rem;
 	display: grid;
 	gap: 0.62rem;
@@ -473,7 +473,7 @@
 	margin-inline: auto;
 }
 
-.agentCard {
+.surfaceCard {
 	display: grid;
 	gap: 0.48rem;
 	justify-items: center;
@@ -488,22 +488,22 @@
 		opacity 220ms ease;
 }
 
-.agentCard:hover {
+.surfaceCard:hover {
 	border-color: color-mix(in srgb, var(--accent) 28%, var(--line-soft));
 	background: color-mix(in srgb, var(--surface-2) 84%, transparent);
 }
 
-.agentMark {
+.surfaceMark {
 	transition: none;
 }
 
-.agentCardCopy {
+.surfaceCardCopy {
 	display: grid;
 	gap: 0.08rem;
 	justify-items: center;
 }
 
-.agentTagline {
+.surfaceTagline {
 	margin-top: 0.08rem;
 }
 
@@ -587,7 +587,7 @@
 		justify-self: stretch;
 	}
 
-	.agentGrid {
+	.surfaceGrid {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }

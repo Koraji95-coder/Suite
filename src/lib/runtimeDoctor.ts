@@ -1,4 +1,5 @@
 import { recordAppDiagnostic } from "@/lib/appDiagnostics";
+import { getSessionStorageApi } from "@/lib/browserStorage";
 import {
 	fetchWithTimeout,
 	parseResponseErrorMessage,
@@ -59,7 +60,6 @@ export interface SuiteSupportConfigSnapshot {
 	codexConfigPresent?: boolean;
 	supabaseConfigPath?: string;
 	supabaseConfigPresent?: boolean;
-	gatewayStartupCheckScript?: string;
 	runtimeBootstrapScript?: string;
 	watchdogCollectorConfigPath?: string;
 	watchdogCollectorStartupCheckScript?: string;
@@ -68,7 +68,6 @@ export interface SuiteSupportConfigSnapshot {
 	watchdogAutoCadPluginBundleRoot?: string;
 	watchdogAutoCadStartupCheckScript?: string;
 	watchdogBackendStartupCheckScript?: string;
-	gatewayMode?: "suite_native";
 }
 
 export interface SuiteSupportPathSnapshot {
@@ -204,8 +203,11 @@ function readCachedRuntimeDoctorReport(): SuiteRuntimeDoctorReport | null {
 		cachedRuntimeDoctorReportAt = 0;
 	}
 
+	const storage = getSessionStorageApi();
+	if (!storage) return null;
+
 	try {
-		const raw = sessionStorage.getItem(RUNTIME_DOCTOR_CACHE_KEY);
+		const raw = storage.getItem(RUNTIME_DOCTOR_CACHE_KEY);
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as {
 			updatedAt?: number;
@@ -216,7 +218,7 @@ function readCachedRuntimeDoctorReport(): SuiteRuntimeDoctorReport | null {
 			!parsed.report ||
 			Date.now() - parsed.updatedAt > RUNTIME_DOCTOR_CACHE_TTL_MS
 		) {
-			sessionStorage.removeItem(RUNTIME_DOCTOR_CACHE_KEY);
+			storage.removeItem(RUNTIME_DOCTOR_CACHE_KEY);
 			return null;
 		}
 		cachedRuntimeDoctorReport = parsed.report;
@@ -230,8 +232,10 @@ function readCachedRuntimeDoctorReport(): SuiteRuntimeDoctorReport | null {
 function writeCachedRuntimeDoctorReport(report: SuiteRuntimeDoctorReport) {
 	cachedRuntimeDoctorReport = report;
 	cachedRuntimeDoctorReportAt = Date.now();
+	const storage = getSessionStorageApi();
+	if (!storage) return;
 	try {
-		sessionStorage.setItem(
+		storage.setItem(
 			RUNTIME_DOCTOR_CACHE_KEY,
 			JSON.stringify({
 				updatedAt: cachedRuntimeDoctorReportAt,
@@ -243,7 +247,9 @@ function writeCachedRuntimeDoctorReport(report: SuiteRuntimeDoctorReport) {
 	}
 }
 
-function isSuiteDoctorState(value: string | undefined): value is SuiteDoctorState {
+function isSuiteDoctorState(
+	value: string | undefined,
+): value is SuiteDoctorState {
 	return (
 		value === "ready" ||
 		value === "background" ||
@@ -321,7 +327,9 @@ function normalizeRuntimeCheck(
 	};
 }
 
-function groupChecksBySubsystem(checks: RuntimeCheckResult[]): SuiteDoctorGroup[] {
+function groupChecksBySubsystem(
+	checks: RuntimeCheckResult[],
+): SuiteDoctorGroup[] {
 	const groups = new Map<string, SuiteDoctorGroup>();
 	for (const check of checks) {
 		const subsystem = check.subsystem || "runtime";
@@ -545,7 +553,8 @@ function normalizeRuntimeStatusSnapshot(
 										? payload.support.workstation.userName
 										: undefined,
 								codexConfigPath:
-									typeof payload.support.workstation.codexConfigPath === "string"
+									typeof payload.support.workstation.codexConfigPath ===
+									"string"
 										? payload.support.workstation.codexConfigPath
 										: undefined,
 							}
@@ -574,11 +583,6 @@ function normalizeRuntimeStatusSnapshot(
 									"boolean"
 										? payload.support.config.supabaseConfigPresent
 										: undefined,
-								gatewayStartupCheckScript:
-									typeof payload.support.config.gatewayStartupCheckScript ===
-									"string"
-										? payload.support.config.gatewayStartupCheckScript
-										: undefined,
 								runtimeBootstrapScript:
 									typeof payload.support.config.runtimeBootstrapScript ===
 									"string"
@@ -592,8 +596,7 @@ function normalizeRuntimeStatusSnapshot(
 								watchdogCollectorStartupCheckScript:
 									typeof payload.support.config
 										.watchdogCollectorStartupCheckScript === "string"
-										? payload.support.config
-												.watchdogCollectorStartupCheckScript
+										? payload.support.config.watchdogCollectorStartupCheckScript
 										: undefined,
 								watchdogAutoCadCollectorConfigPath:
 									typeof payload.support.config
@@ -613,17 +616,12 @@ function normalizeRuntimeStatusSnapshot(
 								watchdogAutoCadStartupCheckScript:
 									typeof payload.support.config
 										.watchdogAutoCadStartupCheckScript === "string"
-										? payload.support.config
-												.watchdogAutoCadStartupCheckScript
+										? payload.support.config.watchdogAutoCadStartupCheckScript
 										: undefined,
 								watchdogBackendStartupCheckScript:
 									typeof payload.support.config
 										.watchdogBackendStartupCheckScript === "string"
 										? payload.support.config.watchdogBackendStartupCheckScript
-										: undefined,
-								gatewayMode:
-									payload.support.config.gatewayMode === "suite_native"
-										? payload.support.config.gatewayMode
 										: undefined,
 							}
 						: undefined,
@@ -666,9 +664,7 @@ function normalizeRuntimeStatusSnapshot(
 		groupedChecks: groupChecksBySubsystem(checks),
 		severityCounts,
 		ok:
-			typeof payload.ok === "boolean"
-				? payload.ok
-				: actionableIssueCount === 0,
+			typeof payload.ok === "boolean" ? payload.ok : actionableIssueCount === 0,
 		actionableIssueCount,
 		checks,
 		recommendations,
@@ -708,7 +704,9 @@ export async function runSuiteRuntimeDoctor(
 					severity: report.overallState === "unavailable" ? "error" : "warning",
 					title: "Runtime doctor detected environment drift",
 					message: report.checks
-						.filter((check) => check.actionable !== false && check.status !== "ok")
+						.filter(
+							(check) => check.actionable !== false && check.status !== "ok",
+						)
 						.map((check) => `${check.label}: ${check.detail}`)
 						.join(" | "),
 					context: "SuiteRuntimeDoctor",

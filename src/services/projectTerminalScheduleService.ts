@@ -1,6 +1,11 @@
 import ExcelJS from "exceljs";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
-import { deleteSetting, loadSetting, saveSetting } from "@/settings/userSettings";
+import {
+	deleteSetting,
+	loadSetting,
+	saveSetting,
+} from "@/settings/userSettings";
 
 export interface ProjectTerminalStripRow {
 	id: string;
@@ -134,7 +139,9 @@ function normalizeCellText(value: ExcelJS.CellValue | undefined): string {
 }
 
 function readHeaders(worksheet: ExcelJS.Worksheet) {
-	const values = worksheet.getRow(1).values as Array<ExcelJS.CellValue | undefined>;
+	const values = worksheet.getRow(1).values as Array<
+		ExcelJS.CellValue | undefined
+	>;
 	return values.slice(1).map((value) => normalizeCellText(value));
 }
 
@@ -143,7 +150,9 @@ function readCell(
 	rowNumber: number,
 	columnIndex: number,
 ) {
-	return normalizeCellText(worksheet.getRow(rowNumber).getCell(columnIndex + 1).value);
+	return normalizeCellText(
+		worksheet.getRow(rowNumber).getCell(columnIndex + 1).value,
+	);
 }
 
 function findHeaderIndex(headers: string[], ...labels: string[]) {
@@ -293,9 +302,7 @@ function normalizeConnectionRow(
 		toStripId: normalizeText(candidate.toStripId),
 		toTerminal: Math.max(1, Number(candidate.toTerminal || 1)),
 		annotateRef:
-			typeof candidate.annotateRef === "boolean"
-				? candidate.annotateRef
-				: true,
+			typeof candidate.annotateRef === "boolean" ? candidate.annotateRef : true,
 		routeKey:
 			normalizeText(candidate.routeKey) ||
 			buildRouteKey(
@@ -379,7 +386,10 @@ async function parseWorkbook(
 
 	const stripHeaders = readHeaders(stripSheet);
 	const stripDrawingPathIndex = findHeaderIndex(stripHeaders, "DrawingPath");
-	const stripDrawingNumberIndex = findHeaderIndex(stripHeaders, "DrawingNumber");
+	const stripDrawingNumberIndex = findHeaderIndex(
+		stripHeaders,
+		"DrawingNumber",
+	);
 	const panelIdIndex = findHeaderIndex(stripHeaders, "PanelId");
 	const sideIndex = findHeaderIndex(stripHeaders, "Side");
 	const stripIdIndex = findHeaderIndex(stripHeaders, "StripId");
@@ -400,7 +410,9 @@ async function parseWorkbook(
 
 	for (let rowNumber = 2; rowNumber <= stripSheet.rowCount; rowNumber += 1) {
 		const drawingPath =
-			stripDrawingPathIndex >= 0 ? readCell(stripSheet, rowNumber, stripDrawingPathIndex) : "";
+			stripDrawingPathIndex >= 0
+				? readCell(stripSheet, rowNumber, stripDrawingPathIndex)
+				: "";
 		const drawingNumber =
 			stripDrawingNumberIndex >= 0
 				? readCell(stripSheet, rowNumber, stripDrawingNumberIndex)
@@ -498,20 +510,31 @@ async function parseWorkbook(
 			rowNumber += 1
 		) {
 			const drawingPath =
-				drawingPathIndex >= 0 ? readCell(connectionSheet, rowNumber, drawingPathIndex) : "";
+				drawingPathIndex >= 0
+					? readCell(connectionSheet, rowNumber, drawingPathIndex)
+					: "";
 			const drawingNumber =
 				drawingNumberIndex >= 0
 					? readCell(connectionSheet, rowNumber, drawingNumberIndex)
 					: "";
 			const routeRef = readCell(connectionSheet, rowNumber, routeRefIndex);
 			const routeType =
-				normalizeText(readCell(connectionSheet, rowNumber, routeTypeIndex)).toLowerCase() ===
-				"jumper"
+				normalizeText(
+					readCell(connectionSheet, rowNumber, routeTypeIndex),
+				).toLowerCase() === "jumper"
 					? "jumper"
 					: "conductor";
 			const cableType = readCell(connectionSheet, rowNumber, cableTypeIndex);
-			const wireFunction = readCell(connectionSheet, rowNumber, wireFunctionIndex);
-			const fromStripId = readCell(connectionSheet, rowNumber, fromStripIdIndex);
+			const wireFunction = readCell(
+				connectionSheet,
+				rowNumber,
+				wireFunctionIndex,
+			);
+			const fromStripId = readCell(
+				connectionSheet,
+				rowNumber,
+				fromStripIdIndex,
+			);
 			const fromTerminal = parsePositiveInteger(
 				readCell(connectionSheet, rowNumber, fromTerminalIndex),
 			);
@@ -521,7 +544,9 @@ async function parseWorkbook(
 			);
 			const annotateRef =
 				annotateRefIndex >= 0
-					? normalizeAnnotateRef(readCell(connectionSheet, rowNumber, annotateRefIndex))
+					? normalizeAnnotateRef(
+							readCell(connectionSheet, rowNumber, annotateRefIndex),
+						)
 					: true;
 			const drawingRef = drawingPath || drawingNumber;
 			if (!drawingRef && !routeRef && !fromStripId && !toStripId) {
@@ -533,7 +558,13 @@ async function parseWorkbook(
 				);
 				continue;
 			}
-			if (!routeRef || !fromStripId || !toStripId || fromTerminal <= 0 || toTerminal <= 0) {
+			if (
+				!routeRef ||
+				!fromStripId ||
+				!toStripId ||
+				fromTerminal <= 0 ||
+				toTerminal <= 0
+			) {
 				warnings.push(
 					`TerminalConnections row ${rowNumber} is missing RouteRef, strip ids, or valid terminal numbers.`,
 				);
@@ -573,7 +604,9 @@ async function parseWorkbook(
 	}
 
 	if (stripRows.length <= 0) {
-		throw new Error("Terminal schedule workbook did not produce any valid strip rows.");
+		throw new Error(
+			"Terminal schedule workbook did not produce any valid strip rows.",
+		);
 	}
 
 	return {
@@ -593,11 +626,10 @@ async function parseWorkbook(
 function readLocalSnapshot(
 	projectId: string,
 ): ProjectTerminalScheduleSnapshot | null {
-	if (typeof localStorage === "undefined") {
-		return null;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return null;
 	try {
-		const raw = localStorage.getItem(buildLocalStorageKey(projectId));
+		const raw = storage.getItem(buildLocalStorageKey(projectId));
 		return raw ? normalizeSnapshot(JSON.parse(raw)) : null;
 	} catch (error) {
 		logger.warn(
@@ -610,11 +642,10 @@ function readLocalSnapshot(
 }
 
 function writeLocalSnapshot(snapshot: ProjectTerminalScheduleSnapshot) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(snapshot.projectId),
 			JSON.stringify(snapshot),
 		);
@@ -716,9 +747,10 @@ export const projectTerminalScheduleService = {
 				error: new Error("Project id is required."),
 			};
 		}
-		if (typeof localStorage !== "undefined") {
+		const storage = getLocalStorageApi();
+		if (storage) {
 			try {
-				localStorage.removeItem(buildLocalStorageKey(normalizedProjectId));
+				storage.removeItem(buildLocalStorageKey(normalizedProjectId));
 			} catch {
 				// Ignore local cleanup failures.
 			}

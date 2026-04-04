@@ -31,5 +31,5 @@ The project feature slices are now consumers of this shared project boundary. Th
 
 ## Transitional Notes
 
-- `src/components/apps/projects/projectmanagertypes.ts`, `projectManagerSelectors.ts`, and `projectmanagerutils.ts` have been removed from active code.
+- The old shared project app tree type and selector utilities have been removed from active code.
 - This slice is browser-owned only. Hosted-core authority still lives in backend domain and route layers.

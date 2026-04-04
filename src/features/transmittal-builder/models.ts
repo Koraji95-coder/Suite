@@ -1,9 +1,10 @@
 import { FileArchive, FileText } from "lucide-react";
+import type { ProjectDeliverableRegisterRow } from "@/features/project-delivery";
 import {
 	buildProjectMetadataRowsForFiles,
 	type ProjectDocumentMetadataRow,
 } from "@/features/project-documents";
-import type { ProjectDeliverableRegisterRow } from "@/features/project-delivery";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import {
 	DEFAULT_FIRM,
 	DEFAULT_PE,
@@ -291,7 +292,9 @@ export const safeTrim = (value: string | undefined | null) =>
 	value ? value.trim() : "";
 
 const normalizeDrawingKey = (value: string | undefined | null) =>
-	safeTrim(value).toUpperCase().replace(/[^A-Z0-9]+/g, "");
+	safeTrim(value)
+		.toUpperCase()
+		.replace(/[^A-Z0-9]+/g, "");
 
 const normalizeFileStem = (value: string | undefined | null) =>
 	safeTrim(value)
@@ -490,7 +493,10 @@ export const buildProjectMetadataDocuments = (
 		const metadataWarnings = [...row.issues, ...row.warnings];
 		const needsReview = row.reviewState !== "ready";
 
-		if (existing && (existing.source === "manual_review" || safeTrim(existing.overrideReason))) {
+		if (
+			existing &&
+			(existing.source === "manual_review" || safeTrim(existing.overrideReason))
+		) {
 			return {
 				...existing,
 				fileName: row.fileName,
@@ -577,7 +583,9 @@ export const buildRegisterBackedDocuments = (
 			(registerRow.dwgMatches.length === 1 ? registerRow.dwgMatches[0] : null);
 		const metadataRow =
 			(preferredDwgMatch
-				? metadataByFileKey.get(normalizeFileStem(preferredDwgMatch.relativePath))
+				? metadataByFileKey.get(
+						normalizeFileStem(preferredDwgMatch.relativePath),
+					)
 				: null) ??
 			(preferredDwgMatch
 				? metadataByFileKey.get(normalizeFileStem(preferredDwgMatch.fileName))
@@ -619,8 +627,8 @@ export const buildRegisterBackedDocuments = (
 			registerRow.pdfPairingStatus !== "manual"
 				? true
 				: registerRow.titleBlockVerificationState !== "matched" ||
-				  registerRow.acadeVerificationState !== "matched" ||
-				  metadataWarnings.length > 0;
+					registerRow.acadeVerificationState !== "matched" ||
+					metadataWarnings.length > 0;
 		const existing = current.find(
 			(doc) =>
 				doc.drawingNumber === registerRow.drawingNumber ||
@@ -834,8 +842,11 @@ export const buildPayload = (
 			draft.transmittalType === "standard"
 				? draft.standardDocuments.map((doc) => ({
 						file_name: safeTrim(doc.attachmentFileName || doc.fileName),
-						attachment_file_name: safeTrim(doc.attachmentFileName || doc.fileName),
-						project_relative_path: safeTrim(doc.projectRelativePath) || undefined,
+						attachment_file_name: safeTrim(
+							doc.attachmentFileName || doc.fileName,
+						),
+						project_relative_path:
+							safeTrim(doc.projectRelativePath) || undefined,
 						drawing_number: safeTrim(doc.drawingNumber),
 						title: safeTrim(doc.title),
 						revision: safeTrim(doc.revision),
@@ -856,9 +867,10 @@ export const buildPayload = (
 };
 
 export const loadDraft = (): DraftState => {
-	if (typeof window === "undefined") return buildDefaultDraft();
+	const storage = getLocalStorageApi();
+	if (!storage) return buildDefaultDraft();
 	try {
-		const raw = window.localStorage.getItem(AUTOSAVE_KEY);
+		const raw = storage.getItem(AUTOSAVE_KEY);
 		if (!raw) return buildDefaultDraft();
 		const parsed = JSON.parse(raw) as Partial<DraftState>;
 		const base = buildDefaultDraft();
@@ -977,7 +989,10 @@ export const buildFormData = (
 		formData.append("cid_index_data", JSON.stringify(payload.cid_index_data));
 	}
 	if (payload.pdf_document_data) {
-		formData.append("pdf_document_data", JSON.stringify(payload.pdf_document_data));
+		formData.append(
+			"pdf_document_data",
+			JSON.stringify(payload.pdf_document_data),
+		);
 	}
 
 	if (files.template) {

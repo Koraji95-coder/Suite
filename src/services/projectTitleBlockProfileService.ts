@@ -1,8 +1,9 @@
+import { projectSetupBackendService } from "@/features/project-setup";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
 import { looksLikeUuid } from "@/lib/uuid";
-import type { Database } from "@/supabase/database";
-import { projectSetupBackendService } from "@/features/project-setup";
 import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
+import type { Database } from "@/supabase/database";
 
 export type ProjectTitleBlockProfileRow =
 	Database["public"]["Tables"]["project_title_block_profiles"]["Row"];
@@ -58,12 +59,11 @@ function isMissingAcadeProjectFilePathColumn(error: unknown) {
 }
 
 function readLocalProfiles(): ProjectTitleBlockProfileRow[] {
-	if (typeof localStorage === "undefined") {
-		return [];
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return [];
 
 	try {
-		const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+		const raw = storage.getItem(LOCAL_STORAGE_KEY);
 		if (!raw) {
 			return [];
 		}
@@ -79,12 +79,11 @@ function readLocalProfiles(): ProjectTitleBlockProfileRow[] {
 }
 
 function writeLocalProfiles(entries: ProjectTitleBlockProfileRow[]) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 
 	try {
-		localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+		storage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
 	} catch (error) {
 		logger.warn(
 			"ProjectTitleBlockProfileService",
@@ -273,10 +272,13 @@ export const projectTitleBlockProfileService = {
 		}
 
 		try {
-			return (await projectSetupBackendService.saveProfile(normalizedProjectId, {
-				...payloadBase,
-				userId,
-			})) as ProjectTitleBlockProfileRow;
+			return (await projectSetupBackendService.saveProfile(
+				normalizedProjectId,
+				{
+					...payloadBase,
+					userId,
+				},
+			)) as ProjectTitleBlockProfileRow;
 		} catch (error) {
 			if (isMissingAcadeProjectFilePathColumn(error)) {
 				logger.warn(
@@ -285,23 +287,23 @@ export const projectTitleBlockProfileService = {
 					{
 						projectId: normalizedProjectId,
 						userId,
-						error:
-							error instanceof Error
-								? error.message
-								: String(error),
+						error: error instanceof Error ? error.message : String(error),
 					},
 				);
-				return (await projectSetupBackendService.saveProfile(normalizedProjectId, {
-					projectId: normalizedProjectId,
-					blockName: payloadBase.block_name,
-					projectRootPath: payloadBase.project_root_path,
-					acadeLine1: payloadBase.acade_line1,
-					acadeLine2: payloadBase.acade_line2,
-					acadeLine4: payloadBase.acade_line4,
-					signerDrawnBy: payloadBase.signer_drawn_by,
-					signerCheckedBy: payloadBase.signer_checked_by,
-					signerEngineer: payloadBase.signer_engineer,
-				})) as ProjectTitleBlockProfileRow;
+				return (await projectSetupBackendService.saveProfile(
+					normalizedProjectId,
+					{
+						projectId: normalizedProjectId,
+						blockName: payloadBase.block_name,
+						projectRootPath: payloadBase.project_root_path,
+						acadeLine1: payloadBase.acade_line1,
+						acadeLine2: payloadBase.acade_line2,
+						acadeLine4: payloadBase.acade_line4,
+						signerDrawnBy: payloadBase.signer_drawn_by,
+						signerCheckedBy: payloadBase.signer_checked_by,
+						signerEngineer: payloadBase.signer_engineer,
+					},
+				)) as ProjectTitleBlockProfileRow;
 			}
 		}
 

@@ -60,10 +60,6 @@ from werkzeug.utils import secure_filename
 import requests
 import jwt
 from jwt import PyJWKClient
-try:
-    import redis
-except Exception:
-    redis = None  # type: ignore[assignment]
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -105,20 +101,6 @@ from route_groups.api_auth_runtime import (
 from route_groups.api_passkey_runtime import (
     create_passkey_runtime as passkey_create_runtime_helper,
 )
-from route_groups.api_agent_runtime import (
-    create_agent_runtime as agent_create_runtime_helper,
-)
-from route_groups.api_agent_config import (
-    agent_broker_config_status as agent_config_status_helper,
-)
-from route_groups.api_agent_profiles import (
-    build_agent_profile_catalog as agent_profile_build_catalog_helper,
-    list_agent_profiles as agent_profile_list_helper,
-    resolve_agent_profile_route as agent_profile_resolve_route_helper,
-)
-from route_groups.api_agent_orchestration_runtime import (
-    AgentRunOrchestrator,
-)
 from route_groups.api_supabase_jwks import (
     get_supabase_jwks_client as supabase_jwks_get_client_helper,
     looks_like_uuid as supabase_jwks_looks_like_uuid_helper,
@@ -145,7 +127,6 @@ from route_groups.api_runtime_config import (
     derive_default_passkey_rp_id as runtime_config_derive_default_passkey_rp_id_helper,
     normalize_auth_passkey_provider as runtime_config_normalize_auth_passkey_provider_helper,
     normalize_autodraft_execute_provider as runtime_config_normalize_autodraft_execute_provider_helper,
-    resolve_agent_webhook_secret as runtime_config_resolve_agent_webhook_secret_helper,
     resolve_api_key as runtime_config_resolve_api_key_helper,
     resolve_autodraft_dotnet_api_url as runtime_config_resolve_autodraft_dotnet_api_url_helper,
     resolve_auth_email_require_turnstile as runtime_config_resolve_auth_email_require_turnstile_helper,
@@ -162,15 +143,10 @@ from route_groups.api_http_hardening import (
 from route_groups.api_server_state import (
     create_server_state as server_state_create_helper,
 )
-from route_groups.api_redis_json_store import (
-    RedisJsonTtlStore,
-)
 from route_groups.api_bootstrap_runtime import (
     create_bootstrap_runtime as bootstrap_create_runtime_helper,
 )
 from route_groups.api_dependency_bundle import (
-    AGENT_DEP_KEYS,
-    build_agent_deps as dependency_bundle_build_agent_deps_helper,
     build_passkey_deps as dependency_bundle_build_passkey_deps_helper,
     build_transmittal_render_deps as dependency_bundle_build_transmittal_render_deps_helper,
 )
@@ -648,203 +624,6 @@ SUPABASE_JWKS_URL = (
 )
 _SUPABASE_JWKS_CLIENT: Optional[PyJWKClient] = None
 
-AGENT_GATEWAY_URL = (
-    (os.environ.get("AGENT_GATEWAY_URL") or "").strip()
-    or (os.environ.get("VITE_AGENT_GATEWAY_URL") or "").strip()
-    or "http://127.0.0.1:3001"
-)
-AGENT_WEBHOOK_SECRET = runtime_config_resolve_agent_webhook_secret_helper(
-    os_module=os,
-    logger=logger,
-)
-AGENT_REQUIRE_WEBHOOK_SECRET = (
-    (os.environ.get("AGENT_REQUIRE_WEBHOOK_SECRET") or "true").strip().lower()
-    != "false"
-)
-AGENT_PROFILE_CATALOG = agent_profile_build_catalog_helper(
-    environ=os.environ,
-    logger=logger,
-)
-
-
-def _list_agent_profiles() -> List[Dict[str, Any]]:
-    return agent_profile_list_helper(AGENT_PROFILE_CATALOG)
-
-
-def _resolve_agent_profile_route(profile_id: str) -> Optional[Dict[str, Any]]:
-    return agent_profile_resolve_route_helper(AGENT_PROFILE_CATALOG, profile_id)
-
-AGENT_SESSION_COOKIE = (os.environ.get("AGENT_SESSION_COOKIE") or "suite_agent_session").strip()
-AGENT_SESSION_SAMESITE = (os.environ.get("AGENT_SESSION_SAMESITE") or "Strict").strip()
-AGENT_SESSION_SECURE = (os.environ.get("AGENT_SESSION_SECURE") or "false").strip().lower() == "true"
-AGENT_SESSION_TTL_SECONDS = _parse_int_env(
-    "AGENT_SESSION_TTL_SECONDS",
-    6 * 60 * 60,
-    minimum=300,
-)
-AGENT_DEFAULT_TIMEOUT_SECONDS = _parse_int_env("AGENT_TIMEOUT_SECONDS", 30, minimum=3)
-AGENT_MAX_TIMEOUT_SECONDS = _parse_int_env("AGENT_MAX_TIMEOUT_SECONDS", 300, minimum=30)
-AGENT_HEALTH_PROXY_TIMEOUT_SECONDS = _parse_int_env(
-    "AGENT_HEALTH_PROXY_TIMEOUT_SECONDS",
-    8,
-    minimum=2,
-)
-
-
-def _resolve_agent_orchestration_parallel_profiles_default() -> int:
-    provider_mode = (os.environ.get("SUITE_AGENT_PROVIDER_MODE") or "local").strip().lower()
-    local_provider = (os.environ.get("SUITE_LOCAL_PROVIDER") or "ollama").strip().lower()
-    if local_provider == "ollama" and provider_mode in {"", "local", "auto"}:
-        return 2
-    return 4
-
-
-AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES = _parse_int_env(
-    "AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES",
-    _resolve_agent_orchestration_parallel_profiles_default(),
-    minimum=1,
-)
-AGENT_ORCHESTRATION_VERBOSE_LOGS = _parse_bool_env(
-    "AGENT_ORCHESTRATION_VERBOSE_LOGS",
-    False,
-)
-
-def _looks_like_redis_storage_uri(value: str) -> bool:
-    normalized = str(value or "").strip().lower()
-    return normalized.startswith("redis://") or normalized.startswith("rediss://")
-
-
-def _resolve_agent_session_redis_url() -> str:
-    explicit = (os.environ.get("AGENT_SESSION_REDIS_URL") or "").strip()
-    if explicit:
-        return explicit
-    if _looks_like_redis_storage_uri(LIMITER_STORAGE_URI):
-        return LIMITER_STORAGE_URI
-    redis_url = (os.environ.get("REDIS_URL") or "").strip()
-    if _looks_like_redis_storage_uri(redis_url):
-        return redis_url
-    return ""
-
-
-AGENT_SESSION_REDIS_ENABLED = _parse_bool_env("AGENT_SESSION_REDIS_ENABLED", True)
-AGENT_SESSION_REDIS_REQUIRED = _parse_bool_env("AGENT_SESSION_REDIS_REQUIRED", False)
-AGENT_SESSION_REDIS_URL = _resolve_agent_session_redis_url()
-AGENT_SESSION_REDIS_KEY_PREFIX = (
-    (os.environ.get("AGENT_SESSION_REDIS_KEY_PREFIX") or "suite:agent:session:").strip()
-    or "suite:agent:session:"
-)
-AGENT_SESSION_REDIS_TIMEOUT_MS = _parse_int_env(
-    "AGENT_SESSION_REDIS_TIMEOUT_MS",
-    800,
-    minimum=100,
-)
-
-AGENT_SESSIONS: Any = server_state.agent_sessions
-AGENT_SESSION_STORE_STATUS: Dict[str, Any] = {
-    "mode": "memory",
-    "reason": "in_memory_default",
-}
-if AGENT_SESSION_REDIS_ENABLED:
-    if not AGENT_SESSION_REDIS_URL:
-        message = (
-            "AGENT_SESSION_REDIS_ENABLED=true but no Redis URL was resolved. "
-            "Set AGENT_SESSION_REDIS_URL (or REDIS_URL/API_LIMITER_STORAGE_URI) to enable persistent session storage."
-        )
-        if AGENT_SESSION_REDIS_REQUIRED:
-            raise RuntimeError(message)
-        logger.warning("%s Falling back to in-memory agent sessions.", message)
-        AGENT_SESSION_STORE_STATUS["reason"] = "redis_url_missing"
-    elif redis is None:
-        message = (
-            "redis package is unavailable; cannot enable AGENT_SESSION_REDIS_* persistent session storage."
-        )
-        if AGENT_SESSION_REDIS_REQUIRED:
-            raise RuntimeError(message)
-        logger.warning("%s Falling back to in-memory agent sessions.", message)
-        AGENT_SESSION_STORE_STATUS["reason"] = "redis_package_unavailable"
-    else:
-        timeout_seconds = max(AGENT_SESSION_REDIS_TIMEOUT_MS / 1000.0, 0.1)
-        try:
-            session_redis_client = redis.Redis.from_url(
-                AGENT_SESSION_REDIS_URL,
-                socket_connect_timeout=timeout_seconds,
-                socket_timeout=timeout_seconds,
-            )
-            session_redis_client.ping()
-            AGENT_SESSIONS = RedisJsonTtlStore(
-                redis_client=session_redis_client,
-                key_prefix=AGENT_SESSION_REDIS_KEY_PREFIX,
-                now_fn=time.time,
-            )
-            AGENT_SESSION_STORE_STATUS = {
-                "mode": "redis",
-                "reason": "redis_connected",
-                "redis_url": AGENT_SESSION_REDIS_URL,
-                "key_prefix": AGENT_SESSION_REDIS_KEY_PREFIX,
-            }
-            logger.info(
-                "Agent session storage using Redis (url=%s, key_prefix=%s).",
-                AGENT_SESSION_REDIS_URL,
-                AGENT_SESSION_REDIS_KEY_PREFIX,
-            )
-        except Exception as exc:
-            message = (
-                "Unable to connect to Redis for AGENT_SESSION_REDIS_URL=%s (%s)."
-                % (AGENT_SESSION_REDIS_URL, exc)
-            )
-            if AGENT_SESSION_REDIS_REQUIRED:
-                raise RuntimeError(message) from exc
-            logger.warning(
-                "%s Falling back to in-memory agent sessions.",
-                message,
-            )
-            AGENT_SESSION_STORE_STATUS["reason"] = "redis_unreachable_fallback_memory"
-else:
-    AGENT_SESSION_STORE_STATUS["reason"] = "redis_disabled"
-
-app.config["AGENT_SESSION_STORE_STATUS"] = AGENT_SESSION_STORE_STATUS
-
-AGENT_PAIRING_CHALLENGES = server_state.agent_pairing_challenges
-AGENT_PAIRING_CHALLENGE_LOCK = server_state.agent_pairing_challenge_lock
-AGENT_PAIRING_CHALLENGE_TTL_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_CHALLENGE_TTL_SECONDS",
-    15 * 60,
-    minimum=60,
-)
-AGENT_PAIRING_CHALLENGE_MAX_ENTRIES = _parse_int_env(
-    "AGENT_PAIRING_CHALLENGE_MAX_ENTRIES",
-    10_000,
-    minimum=100,
-)
-AGENT_PAIRING_REDIRECT_PATH = (
-    (os.environ.get("AGENT_PAIRING_REDIRECT_PATH") or "/login").strip()
-    or "/login"
-)
-AGENT_RUN_LEDGER_PATH = Path(
-    (os.environ.get("AGENT_RUN_LEDGER_PATH") or "").strip()
-    or str(Path(__file__).resolve().parent / "agent-runs.sqlite3")
-).expanduser().resolve()
-AGENT_RUN_ORCHESTRATOR = AgentRunOrchestrator(
-    ledger_path=AGENT_RUN_LEDGER_PATH,
-    requests_module=requests,
-    logger=logger,
-    agent_gateway_url=AGENT_GATEWAY_URL,
-    agent_webhook_secret=AGENT_WEBHOOK_SECRET,
-    agent_require_webhook_secret=AGENT_REQUIRE_WEBHOOK_SECRET,
-    list_agent_profiles_fn=_list_agent_profiles,
-    resolve_agent_profile_route_fn=_resolve_agent_profile_route,
-    default_timeout_ms=AGENT_DEFAULT_TIMEOUT_SECONDS * 1000,
-    max_timeout_ms=AGENT_MAX_TIMEOUT_SECONDS * 1000,
-    max_parallel_profiles=AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES,
-    verbose_logging=AGENT_ORCHESTRATION_VERBOSE_LOGS,
-)
-logger.info(
-    "Agent orchestration configured (max_parallel_profiles=%s, verbose_logs=%s, provider_mode=%s, local_provider=%s).",
-    AGENT_ORCHESTRATION_MAX_PARALLEL_PROFILES,
-    AGENT_ORCHESTRATION_VERBOSE_LOGS,
-    (os.environ.get("SUITE_AGENT_PROVIDER_MODE") or "local").strip().lower() or "local",
-    (os.environ.get("SUITE_LOCAL_PROVIDER") or "ollama").strip().lower() or "ollama",
-)
 AUTH_PASSKEY_ENABLED = _parse_bool_env("AUTH_PASSKEY_ENABLED", False)
 AUTH_PASSKEY_PROVIDER = runtime_config_normalize_auth_passkey_provider_helper(
     raw_value=(os.environ.get("AUTH_PASSKEY_PROVIDER") or "supabase"),
@@ -930,41 +709,6 @@ AUTH_PASSKEY_REQUIRE_RESIDENT_KEY = _parse_bool_env(
     "AUTH_PASSKEY_REQUIRE_RESIDENT_KEY",
     True,
 )
-AGENT_PAIRING_ACTION_WINDOW_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_ACTION_WINDOW_SECONDS",
-    900,
-    minimum=60,
-)
-AGENT_PAIRING_ACTION_MAX_ATTEMPTS = _parse_int_env(
-    "AGENT_PAIRING_ACTION_MAX_ATTEMPTS",
-    8,
-    minimum=1,
-)
-AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS",
-    20,
-    minimum=0,
-)
-AGENT_PAIRING_ACTION_BLOCK_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_ACTION_BLOCK_SECONDS",
-    1800,
-    minimum=60,
-)
-AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS",
-    900,
-    minimum=60,
-)
-AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS = _parse_int_env(
-    "AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS",
-    6,
-    minimum=1,
-)
-AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS = _parse_int_env(
-    "AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS",
-    1800,
-    minimum=60,
-)
 
 # ── Auth Email Abuse Controls ────────────────────────────────────
 AUTH_EMAIL_WINDOW_SECONDS = _parse_int_env("AUTH_EMAIL_WINDOW_SECONDS", 900, minimum=60)
@@ -1018,87 +762,8 @@ PASSKEY_CALLBACK_STATES = server_state.passkey_callback_states
 PASSKEY_CALLBACK_STATES_LOCK = server_state.passkey_callback_states_lock
 PASSKEY_WEBAUTHN_STATES = server_state.passkey_webauthn_states
 PASSKEY_WEBAUTHN_STATES_LOCK = server_state.passkey_webauthn_states_lock
-AGENT_PAIRING_ACTION_WINDOW = server_state.agent_pairing_action_window
-AGENT_PAIRING_ACTION_LAST_ATTEMPT = server_state.agent_pairing_action_last_attempt
-AGENT_PAIRING_ACTION_BLOCKED_UNTIL = server_state.agent_pairing_action_blocked_until
-AGENT_PAIRING_ACTION_ABUSE_LOCK = server_state.agent_pairing_action_abuse_lock
-AGENT_PAIRING_CONFIRM_FAILURE_WINDOW = server_state.agent_pairing_confirm_failure_window
-AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL = server_state.agent_pairing_confirm_blocked_until
-AGENT_PAIRING_CONFIRM_ABUSE_LOCK = server_state.agent_pairing_confirm_abuse_lock
 WEBSOCKET_TICKETS = server_state.websocket_tickets
 WEBSOCKET_TICKETS_LOCK = server_state.websocket_tickets_lock
-
-
-# Agent runtime wiring
-agent_runtime = agent_create_runtime_helper(
-    now_fn=time.time,
-    token_urlsafe_fn=secrets.token_urlsafe,
-    agent_sessions_store=AGENT_SESSIONS,
-    agent_pairing_challenges_store=AGENT_PAIRING_CHALLENGES,
-    agent_pairing_challenge_lock=AGENT_PAIRING_CHALLENGE_LOCK,
-    agent_pairing_challenge_ttl_seconds=AGENT_PAIRING_CHALLENGE_TTL_SECONDS,
-    agent_pairing_challenge_max_entries=AGENT_PAIRING_CHALLENGE_MAX_ENTRIES,
-    agent_pairing_action_abuse_lock=AGENT_PAIRING_ACTION_ABUSE_LOCK,
-    agent_pairing_action_window=AGENT_PAIRING_ACTION_WINDOW,
-    agent_pairing_action_last_attempt=AGENT_PAIRING_ACTION_LAST_ATTEMPT,
-    agent_pairing_action_blocked_until=AGENT_PAIRING_ACTION_BLOCKED_UNTIL,
-    agent_pairing_action_window_seconds=AGENT_PAIRING_ACTION_WINDOW_SECONDS,
-    agent_pairing_action_max_attempts=AGENT_PAIRING_ACTION_MAX_ATTEMPTS,
-    agent_pairing_action_min_interval_seconds=AGENT_PAIRING_ACTION_MIN_INTERVAL_SECONDS,
-    agent_pairing_action_block_seconds=AGENT_PAIRING_ACTION_BLOCK_SECONDS,
-    agent_pairing_confirm_abuse_lock=AGENT_PAIRING_CONFIRM_ABUSE_LOCK,
-    agent_pairing_confirm_failure_window=AGENT_PAIRING_CONFIRM_FAILURE_WINDOW,
-    agent_pairing_confirm_blocked_until=AGENT_PAIRING_CONFIRM_BLOCKED_UNTIL,
-    agent_pairing_confirm_failure_window_seconds=AGENT_PAIRING_CONFIRM_FAILURE_WINDOW_SECONDS,
-    agent_pairing_confirm_failure_max_attempts=AGENT_PAIRING_CONFIRM_FAILURE_MAX_ATTEMPTS,
-    agent_pairing_confirm_failure_block_seconds=AGENT_PAIRING_CONFIRM_FAILURE_BLOCK_SECONDS,
-    agent_gateway_url=AGENT_GATEWAY_URL,
-    agent_webhook_secret=AGENT_WEBHOOK_SECRET,
-    pairing_code_pattern=PAIRING_CODE_PATTERN,
-    jsonify_fn=jsonify,
-    agent_session_cookie=AGENT_SESSION_COOKIE,
-    agent_session_samesite=AGENT_SESSION_SAMESITE,
-    agent_session_secure=AGENT_SESSION_SECURE,
-    agent_session_ttl_seconds=AGENT_SESSION_TTL_SECONDS,
-    requests_module=requests,
-    logger=logger,
-)
-
-
-def _purge_expired_agent_sessions() -> None:
-    return agent_runtime.purge_expired_agent_sessions()
-
-
-def _purge_expired_agent_pairing_challenges(now: Optional[float] = None) -> None:
-    return agent_runtime.purge_expired_agent_pairing_challenges(now)
-
-
-def _create_agent_pairing_challenge(
-    action: str,
-    user_id: str,
-    email: str,
-    pairing_code: str,
-    client_ip: str,
-) -> Tuple[str, int]:
-    return agent_runtime.create_agent_pairing_challenge(
-        action,
-        user_id,
-        email,
-        pairing_code,
-        client_ip,
-    )
-
-
-def _consume_agent_pairing_challenge(
-    challenge_id: str,
-    user_id: str,
-    email: str,
-) -> Tuple[Optional[Dict[str, Any]], str]:
-    return agent_runtime.consume_agent_pairing_challenge(
-        challenge_id,
-        user_id,
-        email,
-    )
 
 
 # Passkey runtime wiring
@@ -1257,39 +922,6 @@ def _verify_passkey_callback_signature(
         timestamp_raw,
     )
 
-
-def _agent_pairing_action_key(user_id: str, action: str) -> str:
-    return agent_runtime.agent_pairing_action_key(user_id, action)
-
-
-def _compact_agent_pairing_action_state(now: float) -> None:
-    return agent_runtime.compact_agent_pairing_action_state(now)
-
-
-def _is_agent_pairing_action_allowed(user_id: str, action: str) -> Tuple[bool, str, int]:
-    return agent_runtime.is_agent_pairing_action_allowed(user_id, action)
-
-
-def _agent_pairing_confirm_key(user_id: str, client_ip: str) -> str:
-    return agent_runtime.agent_pairing_confirm_key(user_id, client_ip)
-
-
-def _compact_agent_pairing_confirm_state(now: float) -> None:
-    return agent_runtime.compact_agent_pairing_confirm_state(now)
-
-
-def _is_agent_pairing_confirm_blocked(user_id: str, client_ip: str) -> Tuple[bool, int]:
-    return agent_runtime.is_agent_pairing_confirm_blocked(user_id, client_ip)
-
-
-def _register_agent_pairing_confirm_failure(user_id: str, client_ip: str) -> Tuple[bool, int]:
-    return agent_runtime.register_agent_pairing_confirm_failure(user_id, client_ip)
-
-
-def _clear_agent_pairing_confirm_failures(user_id: str, client_ip: str) -> None:
-    return agent_runtime.clear_agent_pairing_confirm_failures(user_id, client_ip)
-
-
 def _looks_like_uuid(value: str) -> bool:
     return supabase_jwks_looks_like_uuid_helper(value)
 
@@ -1303,30 +935,12 @@ def _get_supabase_jwks_client() -> Optional[PyJWKClient]:
     )
     return _SUPABASE_JWKS_CLIENT
 
-
-def _agent_broker_config_status() -> Dict[str, Any]:
-    return agent_config_status_helper(
-        supabase_url=SUPABASE_URL,
-        agent_gateway_url=AGENT_GATEWAY_URL,
-        agent_require_webhook_secret=AGENT_REQUIRE_WEBHOOK_SECRET,
-        agent_webhook_secret=AGENT_WEBHOOK_SECRET,
-        supabase_jwt_secret=SUPABASE_JWT_SECRET,
-        supabase_api_key=SUPABASE_API_KEY,
-        supabase_anon_key=SUPABASE_ANON_KEY,
-        looks_like_uuid_fn=_looks_like_uuid,
-    )
-
-
 def _auth_passkey_capability() -> Dict[str, Any]:
     return passkey_runtime.auth_passkey_capability()
 
 
 def _get_supabase_user_id(user: Dict[str, Any]) -> Optional[str]:
     return auth_runtime.get_supabase_user_id(user)
-
-
-def _get_supabase_user_email(user: Dict[str, Any]) -> Optional[str]:
-    return auth_runtime.get_supabase_user_email(user)
 
 
 def _get_bearer_token() -> Optional[str]:
@@ -1677,12 +1291,6 @@ auth_runtime = auth_create_runtime_helper(
     jsonify_fn=jsonify,
     g_obj=g,
     is_valid_email_fn=email_validation_is_valid_email_helper,
-    purge_expired_agent_sessions_fn=_purge_expired_agent_sessions,
-    token_urlsafe_fn=secrets.token_urlsafe,
-    now_fn=time.time,
-    agent_session_ttl_seconds=AGENT_SESSION_TTL_SECONDS,
-    agent_sessions_store=AGENT_SESSIONS,
-    agent_session_cookie=AGENT_SESSION_COOKIE,
     supabase_jwt_secret=SUPABASE_JWT_SECRET,
     supabase_url=SUPABASE_URL,
     supabase_api_key=SUPABASE_API_KEY,
@@ -1725,31 +1333,6 @@ def _verify_supabase_user_token(token: str) -> Optional[Dict[str, Any]]:
 def require_supabase_user(f):
     """Decorator to require a valid Supabase access token."""
     return auth_runtime.require_supabase_user(f)
-
-
-def _is_admin_user(user: Dict[str, Any]) -> bool:
-    return agent_runtime.is_admin_user(user)
-
-
-def _is_agent_task_allowed(task_name: str, user: Dict[str, Any]) -> bool:
-    return agent_runtime.is_agent_task_allowed(task_name, user)
-
-
-def _create_agent_session(token: str, user_id: str) -> Tuple[str, int]:
-    return auth_runtime.create_agent_session(token, user_id)
-
-
-def _get_agent_session() -> Optional[Dict[str, Any]]:
-    return auth_runtime.get_agent_session()
-
-
-def _clear_agent_session_for_request() -> None:
-    auth_runtime.clear_agent_session_for_request()
-
-
-def require_agent_session(f):
-    """Decorator to require a valid agent session cookie."""
-    return auth_runtime.require_agent_session(f)
 
 
 def is_valid_api_key(provided_key: Optional[str]) -> bool:
@@ -1923,37 +1506,6 @@ def get_manager() -> Any:
 
 # ========== AGENT BROKER ENDPOINTS ==========
 
-def _request_gateway_pairing_code() -> Tuple[Optional[str], Optional[str], int]:
-    return agent_runtime.request_gateway_pairing_code()
-
-
-def _pair_agent_session_for_user(
-    pairing_code: str,
-    user_id: str,
-    extra_payload: Optional[Dict[str, Any]] = None,
-):
-    return agent_runtime.pair_agent_session_for_user(
-        pairing_code,
-        user_id,
-        _create_agent_session,
-        extra_payload,
-    )
-
-
-def _revoke_gateway_agent_token(token: str):
-    return agent_runtime.revoke_gateway_agent_token(token)
-
-
-AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION = [
-    key for key in AGENT_DEP_KEYS if key not in globals()
-]
-if AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION:
-    raise RuntimeError(
-        "Agent dependency bundle keys missing before route registration: "
-        + ", ".join(AGENT_DEP_KEYS_MISSING_BEFORE_REGISTRATION)
-    )
-
-
 # ── Split Route Groups ──────────────────────────────────────────
 register_route_groups(
     app,
@@ -1990,13 +1542,8 @@ register_route_groups(
     batch_session_cookie=BATCH_SESSION_COOKIE,
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,
     require_supabase_user=require_supabase_user,
-    require_agent_session=require_agent_session,
     get_supabase_user_id=_get_supabase_user_id,
-    get_supabase_user_email=_get_supabase_user_email,
-    is_admin_user=_is_admin_user,
     passkey_deps=dependency_bundle_build_passkey_deps_helper(globals()),
-    agent_deps=dependency_bundle_build_agent_deps_helper(globals()),
-    agent_run_orchestrator=AGENT_RUN_ORCHESTRATOR,
     transmittal_render_deps=dependency_bundle_build_transmittal_render_deps_helper(
         globals()
     ),
@@ -2040,7 +1587,7 @@ if __name__ == '__main__':
         "API_ALLOW_FLASK_DEV_SERVER",
         dev_server_allowed_default,
     )
-    # Keep the dev server responsive while long-running agent webhook calls are in flight.
+    # Keep the dev server responsive while long-running local CAD and file workflows are in flight.
     dev_server_threaded = _parse_bool_env("API_DEV_SERVER_THREADED", True)
 
     server_entrypoint_run_helper(

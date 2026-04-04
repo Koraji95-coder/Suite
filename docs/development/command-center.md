@@ -20,7 +20,7 @@ Command Center stays focused on:
 
 ## Route
 
-- `/app/command-center`
+- `/app/developer/control/command-center`
 
 ## Access Rules
 
@@ -105,6 +105,6 @@ worktale digest
 
 To add a command preset, update `COMMAND_GROUPS` in:
 
-- `src/routes/command-center/commandCenterModel.ts`
+- `src/routes/developer/control/command-center/commandCenterModel.ts`
 
 Keep presets scoped to diagnostics, hosted push, and evidence workflows only.

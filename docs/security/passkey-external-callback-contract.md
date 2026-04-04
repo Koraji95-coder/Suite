@@ -9,11 +9,11 @@ This document is the Suite-side source of truth for external passkey callback wi
 
 Suite can start passkey sign-in or enrollment through an external provider flow. After the provider completes, the callback must return enough verified context for Suite to resume auth safely.
 
-The current Suite-native gateway implementation exposes:
+The current Suite callback bridge exposes:
 
 - `GET /suite/passkey/callback`
 
-That implementation detail may change later. This document describes the contract Suite expects regardless of which bridge or gateway serves it.
+That implementation detail may change later. This document describes the contract Suite expects regardless of which external bridge serves it.
 
 ## Endpoint role
 
@@ -132,6 +132,4 @@ Suite consumes callback state once, then continues sign-in or enrollment through
 
 ## Current implementation note
 
-Today, the Suite-native gateway provides the callback bridge endpoint by default, and the isolated legacy fallback remains available only as a diagnostic escape hatch.
-
-Use this document as the canonical Suite contract. Treat legacy bridge implementation paths as replaceable.
+Use this document as the canonical Suite contract. Treat callback bridge implementation details as replaceable.

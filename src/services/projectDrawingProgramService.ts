@@ -1,7 +1,12 @@
 import ExcelJS from "exceljs";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
-import { deleteSetting, loadSetting, saveSetting } from "@/settings/userSettings";
 import type { WatchdogCollectorEvent } from "@/services/watchdogService";
+import {
+	deleteSetting,
+	loadSetting,
+	saveSetting,
+} from "@/settings/userSettings";
 
 export type ProjectDrawingProgramRowStatus =
 	| "planned"
@@ -70,7 +75,8 @@ export interface ProjectDrawingStandardCatalogEntry {
 	warnings: string[];
 }
 
-export type ProjectDrawingStandardStarterRow = ProjectDrawingStandardCatalogEntry;
+export type ProjectDrawingStandardStarterRow =
+	ProjectDrawingStandardCatalogEntry;
 
 export interface ProjectDrawingStandardSnapshot {
 	id: string;
@@ -584,9 +590,7 @@ function normalizeStatus(value: unknown): ProjectDrawingProgramRowStatus {
 	}
 }
 
-function normalizeProvisionState(
-	value: unknown,
-): ProjectDrawingProvisionState {
+function normalizeProvisionState(value: unknown): ProjectDrawingProvisionState {
 	switch (normalizeText(value).toLowerCase()) {
 		case "provisioned":
 			return "provisioned";
@@ -641,7 +645,11 @@ function formatDrawingNumber(
 	)}`;
 }
 
-function formatSequenceBand(start: number, end: number, digits = DEFAULT_SEQUENCE_DIGITS) {
+function formatSequenceBand(
+	start: number,
+	end: number,
+	digits = DEFAULT_SEQUENCE_DIGITS,
+) {
 	return `${String(Math.max(0, start)).padStart(Math.max(1, digits), "0")}-${String(
 		Math.max(0, end),
 	).padStart(Math.max(1, digits), "0")}`;
@@ -766,7 +774,9 @@ function sortCatalogEntries(entries: ProjectDrawingStandardCatalogEntry[]) {
 	});
 }
 
-function buildBuiltinStandardSnapshot(projectId: string): ProjectDrawingStandardSnapshot {
+function buildBuiltinStandardSnapshot(
+	projectId: string,
+): ProjectDrawingStandardSnapshot {
 	const catalogEntries = sortCatalogEntries(
 		BUILTIN_R3P_ELECTRICAL_CATALOG.map((entry, index) => ({
 			id: `${BUILTIN_STANDARD_ID}:${entry.familyKey}`,
@@ -840,12 +850,17 @@ function inferLegacyCatalogMetadata(args: {
 	const parsed = parseStructuredDrawingNumber(args.drawingNumber);
 	const typeCode = normalizeText(args.typeCode) || parsed?.typeCode || "";
 	const sequenceNumber =
-		typeof args.sequenceNumber === "number" && Number.isFinite(args.sequenceNumber)
+		typeof args.sequenceNumber === "number" &&
+		Number.isFinite(args.sequenceNumber)
 			? args.sequenceNumber
-			: parsed?.sequenceNumber ?? 1;
+			: (parsed?.sequenceNumber ?? 1);
 	const builtInSnapshot = buildBuiltinStandardSnapshot("legacy");
 	const matchingEntries = typeCode
-		? findCatalogEntriesByTypeAndSequence(typeCode, sequenceNumber, builtInSnapshot)
+		? findCatalogEntriesByTypeAndSequence(
+				typeCode,
+				sequenceNumber,
+				builtInSnapshot,
+			)
 		: [];
 	if (matchingEntries.length === 1) {
 		return matchingEntries[0];
@@ -886,9 +901,7 @@ function normalizeStringArray(value: unknown) {
 	if (!Array.isArray(value)) {
 		return [] as string[];
 	}
-	return value
-		.map((entry) => normalizeText(entry))
-		.filter(Boolean);
+	return value.map((entry) => normalizeText(entry)).filter(Boolean);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -932,12 +945,17 @@ function normalizeStarterRow(
 		Number(
 			value.sequenceBandStart ??
 				value.sequenceStart ??
-				parseDrawingNumberParts(normalizeText(value.numberPrefix)).sequenceNumber,
+				parseDrawingNumberParts(normalizeText(value.numberPrefix))
+					.sequenceNumber,
 		),
 	);
 	const fallbackSequenceEnd = Math.max(
 		fallbackSequenceStart,
-		Number(value.sequenceBandEnd ?? fallbackSequenceStart + Math.max(0, Number(value.defaultCount || 1) - 1)),
+		Number(
+			value.sequenceBandEnd ??
+				fallbackSequenceStart +
+					Math.max(0, Number(value.defaultCount || 1) - 1),
+		),
 	);
 	if (!sheetFamily || !familyKey || !typeCode || !templateKey) {
 		return null;
@@ -953,7 +971,10 @@ function normalizeStarterRow(
 		defaultCount: Math.max(1, Number(value.defaultCount || 1)),
 		sequenceBandStart: fallbackSequenceStart,
 		sequenceBandEnd: fallbackSequenceEnd,
-		sequenceDigits: Math.max(1, Number(value.sequenceDigits || DEFAULT_SEQUENCE_DIGITS)),
+		sequenceDigits: Math.max(
+			1,
+			Number(value.sequenceDigits || DEFAULT_SEQUENCE_DIGITS),
+		),
 		bootstrapDefaultCount: Math.max(
 			0,
 			Number(value.bootstrapDefaultCount ?? value.defaultCount ?? 0),
@@ -982,18 +1003,22 @@ function normalizeStandardSnapshot(
 	}
 	const importedAt = normalizeText(value.importedAt) || nowIso();
 	const source =
-		normalizeText(value.source) === "project-import" ? "project-import" : "builtin";
+		normalizeText(value.source) === "project-import"
+			? "project-import"
+			: "builtin";
 	const catalogEntries = Array.isArray(value.catalogEntries)
 		? value.catalogEntries
 				.map((entry) => normalizeStarterRow(entry, id))
 				.filter(
-					(entry): entry is ProjectDrawingStandardCatalogEntry => entry !== null,
+					(entry): entry is ProjectDrawingStandardCatalogEntry =>
+						entry !== null,
 				)
 		: Array.isArray(value.starterRows)
 			? value.starterRows
 					.map((entry) => normalizeStarterRow(entry, id))
 					.filter(
-						(entry): entry is ProjectDrawingStandardCatalogEntry => entry !== null,
+						(entry): entry is ProjectDrawingStandardCatalogEntry =>
+							entry !== null,
 					)
 			: [];
 	return {
@@ -1040,7 +1065,11 @@ function normalizeProgramRow(
 		drawingNumber,
 		sheetFamily: normalizeText(value.sheetFamily),
 		typeCode: normalizeText(value.typeCode),
-		sequenceNumber: Number(value.sequenceNumber || structured?.sequenceNumber || parts.sequenceNumber),
+		sequenceNumber: Number(
+			value.sequenceNumber ||
+				structured?.sequenceNumber ||
+				parts.sequenceNumber,
+		),
 	});
 	return {
 		id: normalizeText(value.id) || createId("drawing-row"),
@@ -1076,31 +1105,41 @@ function normalizeProgramRow(
 		acadeSection: normalizeNullableText(value.acadeSection),
 		acadeGroup: normalizeNullableText(value.acadeGroup),
 		workbookSyncedAt: normalizeNullableText(value.workbookSyncedAt),
-		workbookDriftDetectedAt: normalizeNullableText(value.workbookDriftDetectedAt),
+		workbookDriftDetectedAt: normalizeNullableText(
+			value.workbookDriftDetectedAt,
+		),
 		numberPrefix:
 			normalizeNumberPrefix(value.numberPrefix) ||
-			(structured?.projectNumber && (normalizeText(value.typeCode) || legacyCatalog.typeCode)
+			(structured?.projectNumber &&
+			(normalizeText(value.typeCode) || legacyCatalog.typeCode)
 				? buildDrawingNumberPrefix(
 						structured.projectNumber,
-						normalizeText(value.typeCode).toUpperCase() || legacyCatalog.typeCode,
-				  )
+						normalizeText(value.typeCode).toUpperCase() ||
+							legacyCatalog.typeCode,
+					)
 				: parts.numberPrefix),
 		sequenceDigits: Math.max(
 			1,
-			Number(value.sequenceDigits || structured?.sequenceDigits || parts.sequenceDigits),
+			Number(
+				value.sequenceDigits ||
+					structured?.sequenceDigits ||
+					parts.sequenceDigits,
+			),
 		),
 		sequenceNumber: Math.max(
 			0,
-			Number(value.sequenceNumber || structured?.sequenceNumber || parts.sequenceNumber),
+			Number(
+				value.sequenceNumber ||
+					structured?.sequenceNumber ||
+					parts.sequenceNumber,
+			),
 		),
 		createdAt,
 		updatedAt,
 	};
 }
 
-function normalizeWorkbookMirror(
-	value: unknown,
-): ProjectDrawingWorkbookMirror {
+function normalizeWorkbookMirror(value: unknown): ProjectDrawingWorkbookMirror {
 	if (!isRecord(value)) {
 		return {
 			workbookRelativePath: DEFAULT_WORKBOOK_RELATIVE_PATH,
@@ -1145,16 +1184,18 @@ function normalizeProgramRecord(
 					value.rows
 						.map((entry) => normalizeProgramRow(entry, normalizedProjectId))
 						.filter(
-						(entry): entry is ProjectDrawingProgramRow => entry !== null,
-					),
-			  )
+							(entry): entry is ProjectDrawingProgramRow => entry !== null,
+						),
+				)
 			: [],
 		pendingTitleBlockSyncPaths: Array.isArray(value.pendingTitleBlockSyncPaths)
 			? value.pendingTitleBlockSyncPaths
 					.map((entry) => normalizeWorkbookPath(entry))
 					.filter(Boolean)
 			: [],
-		pendingTitleBlockSyncAt: normalizeNullableText(value.pendingTitleBlockSyncAt),
+		pendingTitleBlockSyncAt: normalizeNullableText(
+			value.pendingTitleBlockSyncAt,
+		),
 		lastAcadeSyncAt: normalizeNullableText(value.lastAcadeSyncAt),
 		acadeSyncPending: Boolean(value.acadeSyncPending),
 		lastProvisionReceiptId: normalizeNullableText(value.lastProvisionReceiptId),
@@ -1231,11 +1272,10 @@ function createEmptyProgram(projectId: string): ProjectDrawingProgramRecord {
 }
 
 function readLocalStandard(projectId: string) {
-	if (typeof localStorage === "undefined") {
-		return null;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return null;
 	try {
-		const raw = localStorage.getItem(
+		const raw = storage.getItem(
 			buildLocalStorageKey(LOCAL_STANDARD_PREFIX, projectId),
 		);
 		if (!raw) {
@@ -1256,16 +1296,15 @@ function writeLocalStandard(
 	projectId: string,
 	snapshot: ProjectDrawingStandardSnapshot | null,
 ) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
 		const key = buildLocalStorageKey(LOCAL_STANDARD_PREFIX, projectId);
 		if (!snapshot) {
-			localStorage.removeItem(key);
+			storage.removeItem(key);
 			return;
 		}
-		localStorage.setItem(key, JSON.stringify(snapshot));
+		storage.setItem(key, JSON.stringify(snapshot));
 	} catch (error) {
 		logger.warn(
 			"Unable to persist local drawing standard snapshot.",
@@ -1276,11 +1315,10 @@ function writeLocalStandard(
 }
 
 function readLocalProgram(projectId: string) {
-	if (typeof localStorage === "undefined") {
-		return createEmptyProgram(projectId);
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return createEmptyProgram(projectId);
 	try {
-		const raw = localStorage.getItem(
+		const raw = storage.getItem(
 			buildLocalStorageKey(LOCAL_PROGRAM_PREFIX, projectId),
 		);
 		if (!raw) {
@@ -1300,12 +1338,14 @@ function readLocalProgram(projectId: string) {
 	}
 }
 
-function writeLocalProgram(projectId: string, program: ProjectDrawingProgramRecord) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+function writeLocalProgram(
+	projectId: string,
+	program: ProjectDrawingProgramRecord,
+) {
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(LOCAL_PROGRAM_PREFIX, projectId),
 			JSON.stringify(program),
 		);
@@ -1319,11 +1359,10 @@ function writeLocalProgram(projectId: string, program: ProjectDrawingProgramReco
 }
 
 function readLocalReceipts(projectId: string) {
-	if (typeof localStorage === "undefined") {
-		return [] as ProjectDrawingProvisionReceipt[];
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return [] as ProjectDrawingProvisionReceipt[];
 	try {
-		const raw = localStorage.getItem(
+		const raw = storage.getItem(
 			buildLocalStorageKey(LOCAL_RECEIPT_PREFIX, projectId),
 		);
 		if (!raw) {
@@ -1354,11 +1393,10 @@ function writeLocalReceipts(
 	projectId: string,
 	receipts: ProjectDrawingProvisionReceipt[],
 ) {
-	if (typeof localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			buildLocalStorageKey(LOCAL_RECEIPT_PREFIX, projectId),
 			JSON.stringify(sortReceipts(receipts)),
 		);
@@ -1415,7 +1453,9 @@ async function persistReceipts(
 	const result = await saveSetting(RECEIPT_SETTING_KEY, sorted, projectId);
 	writeLocalReceipts(projectId, sorted);
 	if (!result.success) {
-		return new Error(result.error || "Unable to persist drawing program receipts.");
+		return new Error(
+			result.error || "Unable to persist drawing program receipts.",
+		);
 	}
 	return null;
 }
@@ -1452,7 +1492,9 @@ function normalizeCellText(value: ExcelJS.CellValue | undefined): string {
 }
 
 function readHeaders(worksheet: ExcelJS.Worksheet) {
-	const values = worksheet.getRow(1).values as Array<ExcelJS.CellValue | undefined>;
+	const values = worksheet.getRow(1).values as Array<
+		ExcelJS.CellValue | undefined
+	>;
 	return values.slice(1).map((value) => normalizeCellText(value));
 }
 
@@ -1461,13 +1503,12 @@ function readCell(
 	rowNumber: number,
 	columnIndex: number,
 ) {
-	return normalizeCellText(worksheet.getRow(rowNumber).getCell(columnIndex + 1).value);
+	return normalizeCellText(
+		worksheet.getRow(rowNumber).getCell(columnIndex + 1).value,
+	);
 }
 
-function findSheet(
-	workbook: ExcelJS.Workbook,
-	candidates: string[],
-) {
+function findSheet(workbook: ExcelJS.Workbook, candidates: string[]) {
 	for (const candidate of candidates) {
 		const sheet = workbook.getWorksheet(candidate);
 		if (sheet) {
@@ -1533,7 +1574,10 @@ async function parseStandardWorkbook(
 		"ACADE Subtype",
 	);
 	const acadeGroupIndex = findHeaderIndex(starterHeaders, "ACADE Group");
-	const directTemplatePathIndex = findHeaderIndex(starterHeaders, "Template Path");
+	const directTemplatePathIndex = findHeaderIndex(
+		starterHeaders,
+		"Template Path",
+	);
 
 	const missingRequiredColumns = [
 		{ label: "Sheet Family", index: sheetFamilyIndex },
@@ -1571,9 +1615,17 @@ async function parseStandardWorkbook(
 		);
 		const sectionIndex = findHeaderIndex(templateHeaders, "ACADE Section");
 		const groupIndex = findHeaderIndex(templateHeaders, "ACADE Group");
-		const templateDisciplineIndex = findHeaderIndex(templateHeaders, "Discipline");
-		for (let rowNumber = 2; rowNumber <= templateSheet.rowCount; rowNumber += 1) {
-			const templateKey = keyIndex >= 0 ? readCell(templateSheet, rowNumber, keyIndex) : "";
+		const templateDisciplineIndex = findHeaderIndex(
+			templateHeaders,
+			"Discipline",
+		);
+		for (
+			let rowNumber = 2;
+			rowNumber <= templateSheet.rowCount;
+			rowNumber += 1
+		) {
+			const templateKey =
+				keyIndex >= 0 ? readCell(templateSheet, rowNumber, keyIndex) : "";
 			if (!templateKey) {
 				continue;
 			}
@@ -1582,7 +1634,9 @@ async function parseStandardWorkbook(
 				templateKey,
 				templatePath:
 					pathIndex >= 0
-						? normalizeNullableText(readCell(templateSheet, rowNumber, pathIndex))
+						? normalizeNullableText(
+								readCell(templateSheet, rowNumber, pathIndex),
+							)
 						: null,
 				discipline:
 					templateDisciplineIndex >= 0
@@ -1590,11 +1644,15 @@ async function parseStandardWorkbook(
 						: "",
 				acadeSection:
 					sectionIndex >= 0
-						? normalizeNullableText(readCell(templateSheet, rowNumber, sectionIndex))
+						? normalizeNullableText(
+								readCell(templateSheet, rowNumber, sectionIndex),
+							)
 						: null,
 				acadeGroup:
 					groupIndex >= 0
-						? normalizeNullableText(readCell(templateSheet, rowNumber, groupIndex))
+						? normalizeNullableText(
+								readCell(templateSheet, rowNumber, groupIndex),
+							)
 						: null,
 				warnings: [],
 			});
@@ -1617,7 +1675,9 @@ async function parseStandardWorkbook(
 		const parsedPrefixMatch = normalizeText(numberPrefix).match(/(E\d)\s*-?$/i);
 		const typeCode =
 			(typeCodeIndex >= 0
-				? normalizeText(readCell(starterSheet, rowNumber, typeCodeIndex)).toUpperCase()
+				? normalizeText(
+						readCell(starterSheet, rowNumber, typeCodeIndex),
+					).toUpperCase()
 				: "") ||
 			(parsedPrefixMatch?.[1]?.toUpperCase() ?? "");
 		const sequenceBandStart = Math.max(
@@ -1637,7 +1697,10 @@ async function parseStandardWorkbook(
 					: sequenceBandStart +
 							Math.max(
 								0,
-								parsePositiveInt(readCell(starterSheet, rowNumber, countIndex), 1) - 1,
+								parsePositiveInt(
+									readCell(starterSheet, rowNumber, countIndex),
+									1,
+								) - 1,
 							),
 				sequenceBandStart,
 			),
@@ -1648,13 +1711,20 @@ async function parseStandardWorkbook(
 			rowNumber,
 			familyKey:
 				(familyKeyIndex >= 0
-					? normalizeCatalogKey(readCell(starterSheet, rowNumber, familyKeyIndex))
+					? normalizeCatalogKey(
+							readCell(starterSheet, rowNumber, familyKeyIndex),
+						)
 					: "") || normalizeCatalogKey(sheetFamily || templateKey),
 			typeCode,
 			sheetFamily: sheetFamily || `Sheet ${rowNumber - 1}`,
 			defaultTitle:
-				readCell(starterSheet, rowNumber, titleIndex) || sheetFamily || `Sheet ${rowNumber - 1}`,
-			defaultCount: parsePositiveInt(readCell(starterSheet, rowNumber, countIndex), 1),
+				readCell(starterSheet, rowNumber, titleIndex) ||
+				sheetFamily ||
+				`Sheet ${rowNumber - 1}`,
+			defaultCount: parsePositiveInt(
+				readCell(starterSheet, rowNumber, countIndex),
+				1,
+			),
 			sequenceBandStart,
 			sequenceBandEnd,
 			sequenceDigits: Math.max(
@@ -1687,7 +1757,9 @@ async function parseStandardWorkbook(
 			discipline:
 				(disciplineIndex >= 0
 					? readCell(starterSheet, rowNumber, disciplineIndex)
-					: "") || mapping?.discipline || "",
+					: "") ||
+				mapping?.discipline ||
+				"",
 			acadeSection:
 				(acadeSectionIndex >= 0
 					? normalizeNullableText(
@@ -1698,7 +1770,9 @@ async function parseStandardWorkbook(
 				null,
 			acadeGroup:
 				(acadeGroupIndex >= 0
-					? normalizeNullableText(readCell(starterSheet, rowNumber, acadeGroupIndex))
+					? normalizeNullableText(
+							readCell(starterSheet, rowNumber, acadeGroupIndex),
+						)
 					: null) ??
 				mapping?.acadeGroup ??
 				null,
@@ -1730,15 +1804,16 @@ async function parseStandardWorkbook(
 	}
 
 	if (catalogEntries.length === 0) {
-		throw new Error("Drawing standard workbook did not produce any catalog entries.");
+		throw new Error(
+			"Drawing standard workbook did not produce any catalog entries.",
+		);
 	}
 
 	return {
 		id: snapshotId,
 		projectId: input.projectId,
 		source: "project-import",
-		standardKey:
-			`project-import:${normalizeCatalogKey(input.fileName || "override") || "override"}`,
+		standardKey: `project-import:${normalizeCatalogKey(input.fileName || "override") || "override"}`,
 		catalogVersion: "1",
 		disciplineScope: "E",
 		workbookFileName: input.fileName,
@@ -1800,7 +1875,11 @@ async function parseWorkbookMirror(
 	const sequenceBandIndex = findHeaderIndex(headers, "Sequence Band");
 	const templateKeyIndex = findHeaderIndex(headers, "Template Key");
 	const provisionStateIndex = findHeaderIndex(headers, "Provision State");
-	const dwgPathIndex = findHeaderIndex(headers, "DWG Path", "DWG Relative Path");
+	const dwgPathIndex = findHeaderIndex(
+		headers,
+		"DWG Path",
+		"DWG Relative Path",
+	);
 	const acadeSectionIndex = findHeaderIndex(headers, "ACADE Section");
 	const acadeGroupIndex = findHeaderIndex(headers, "ACADE Group");
 
@@ -1833,7 +1912,10 @@ async function parseWorkbookMirror(
 					: null,
 			sortOrder: Math.max(
 				1,
-				parsePositiveInt(readCell(sheet, rowNumber, sortOrderIndex), rowNumber * 10),
+				parsePositiveInt(
+					readCell(sheet, rowNumber, sortOrderIndex),
+					rowNumber * 10,
+				),
 			),
 			drawingNumber,
 			title,
@@ -1841,23 +1923,33 @@ async function parseWorkbookMirror(
 			discipline:
 				disciplineIndex >= 0 ? readCell(sheet, rowNumber, disciplineIndex) : "",
 			sheetFamily:
-				sheetFamilyIndex >= 0 ? readCell(sheet, rowNumber, sheetFamilyIndex) : "",
+				sheetFamilyIndex >= 0
+					? readCell(sheet, rowNumber, sheetFamilyIndex)
+					: "",
 			familyKey:
 				familyKeyIndex >= 0 ? readCell(sheet, rowNumber, familyKeyIndex) : "",
 			typeCode:
 				typeCodeIndex >= 0 ? readCell(sheet, rowNumber, typeCodeIndex) : "",
 			sequenceBand:
-				sequenceBandIndex >= 0 ? readCell(sheet, rowNumber, sequenceBandIndex) : "",
+				sequenceBandIndex >= 0
+					? readCell(sheet, rowNumber, sequenceBandIndex)
+					: "",
 			templateKey:
-				templateKeyIndex >= 0 ? readCell(sheet, rowNumber, templateKeyIndex) : "",
+				templateKeyIndex >= 0
+					? readCell(sheet, rowNumber, templateKeyIndex)
+					: "",
 			provisionState:
 				provisionStateIndex >= 0
-					? normalizeProvisionState(readCell(sheet, rowNumber, provisionStateIndex))
+					? normalizeProvisionState(
+							readCell(sheet, rowNumber, provisionStateIndex),
+						)
 					: "planned",
 			dwgRelativePath:
 				dwgPathIndex >= 0 ? readCell(sheet, rowNumber, dwgPathIndex) : "",
 			acadeSection:
-				acadeSectionIndex >= 0 ? readCell(sheet, rowNumber, acadeSectionIndex) : "",
+				acadeSectionIndex >= 0
+					? readCell(sheet, rowNumber, acadeSectionIndex)
+					: "",
 			acadeGroup:
 				acadeGroupIndex >= 0 ? readCell(sheet, rowNumber, acadeGroupIndex) : "",
 		});
@@ -1965,7 +2057,10 @@ function applyFamilyBandAllocation(args: {
 			});
 			nextRows.push({
 				...entry,
-				numberPrefix: buildDrawingNumberPrefix(args.projectNumber, entry.typeCode),
+				numberPrefix: buildDrawingNumberPrefix(
+					args.projectNumber,
+					entry.typeCode,
+				),
 				sequenceNumber,
 				drawingNumber,
 				dwgRelativePath: replaceDrawingNumberInRelativePath(
@@ -2202,7 +2297,8 @@ function normalizeProgramAfterMutation(
 ) {
 	return {
 		...beforeProgram,
-		activeStandardKey: normalizeText(activeStandardKey) || beforeProgram.activeStandardKey,
+		activeStandardKey:
+			normalizeText(activeStandardKey) || beforeProgram.activeStandardKey,
 		standardSnapshotId: standardSnapshotId ?? beforeProgram.standardSnapshotId,
 		rows: sortRows(rows).map((row, index) => ({
 			...row,
@@ -2483,7 +2579,9 @@ export const projectDrawingProgramService = {
 			input.standardRowId,
 		);
 		if (!standardRow) {
-			throw new Error("Select an electrical family from the active drawing standard.");
+			throw new Error(
+				"Select an electrical family from the active drawing standard.",
+			);
 		}
 		const projectNumber = resolveProgramProjectNumberToken({
 			projectNumber: input.projectNumber,
@@ -2549,16 +2647,19 @@ export const projectDrawingProgramService = {
 						status: "inactive" as const,
 						provisionState: "inactive" as const,
 						updatedAt: nowIso(),
-				  }
+					}
 				: row,
 		);
 		const allocatedRows = projectNumber
 			? applyFamilyBandAllocation({
 					rows: nextRows,
 					projectNumber,
-			  })
+				})
 			: nextRows;
-		const afterProgram = normalizeProgramAfterMutation(input.program, allocatedRows);
+		const afterProgram = normalizeProgramAfterMutation(
+			input.program,
+			allocatedRows,
+		);
 		return buildPlanFromPrograms({
 			projectId: input.projectId,
 			mode: "deactivate",
@@ -2573,7 +2674,9 @@ export const projectDrawingProgramService = {
 		standardSnapshot?: ProjectDrawingStandardSnapshot | null;
 		file: File;
 	}) {
-		const importedRows = await parseWorkbookMirror(await args.file.arrayBuffer());
+		const importedRows = await parseWorkbookMirror(
+			await args.file.arrayBuffer(),
+		);
 		const beforeRows = sortRows(args.program.rows);
 		const beforeById = new Map(beforeRows.map((row) => [row.id, row]));
 		const nextRows: ProjectDrawingProgramRow[] = [];
@@ -2590,10 +2693,13 @@ export const projectDrawingProgramService = {
 					? beforeById.get(importedRow.suiteRowId)
 					: undefined) ?? null;
 			if (existing) {
-				const structured = parseStructuredDrawingNumber(importedRow.drawingNumber);
+				const structured = parseStructuredDrawingNumber(
+					importedRow.drawingNumber,
+				);
 				const importedBand = parseSequenceBand(importedRow.sequenceBand);
 				const effectiveTypeCode =
-					normalizeText(importedRow.typeCode).toUpperCase() || existing.typeCode;
+					normalizeText(importedRow.typeCode).toUpperCase() ||
+					existing.typeCode;
 				const effectiveSequenceNumber =
 					structured?.sequenceNumber ?? existing.sequenceNumber;
 				const matchingCatalogEntries = findCatalogEntriesByTypeAndSequence(
@@ -2606,7 +2712,9 @@ export const projectDrawingProgramService = {
 						(entry) =>
 							normalizeCatalogKey(entry.familyKey) ===
 							normalizeCatalogKey(importedRow.familyKey || existing.familyKey),
-					) ?? matchingCatalogEntries[0] ?? null;
+					) ??
+					matchingCatalogEntries[0] ??
+					null;
 				if (
 					structured &&
 					matchingCatalog &&
@@ -2656,10 +2764,12 @@ export const projectDrawingProgramService = {
 					acadeGroup:
 						normalizeNullableText(importedRow.acadeGroup) ??
 						existing.acadeGroup,
-					numberPrefix:
-						structured?.projectNumber
-							? buildDrawingNumberPrefix(structured.projectNumber, effectiveTypeCode)
-							: existing.numberPrefix,
+					numberPrefix: structured?.projectNumber
+						? buildDrawingNumberPrefix(
+								structured.projectNumber,
+								effectiveTypeCode,
+							)
+						: existing.numberPrefix,
 					sequenceDigits: structured?.sequenceDigits || existing.sequenceDigits,
 					sequenceNumber: effectiveSequenceNumber,
 					workbookDriftDetectedAt: null,
@@ -2675,7 +2785,9 @@ export const projectDrawingProgramService = {
 				);
 				continue;
 			}
-			const structured = parseStructuredDrawingNumber(importedRow.drawingNumber);
+			const structured = parseStructuredDrawingNumber(
+				importedRow.drawingNumber,
+			);
 			const importedBand = parseSequenceBand(importedRow.sequenceBand);
 			const effectiveTypeCode =
 				normalizeText(importedRow.typeCode).toUpperCase() ||
@@ -2687,14 +2799,16 @@ export const projectDrawingProgramService = {
 							effectiveTypeCode,
 							structured.sequenceNumber,
 							activeSnapshot,
-					  )
+						)
 					: [];
 			const matchingCatalog =
 				matchingCatalogEntries.find(
 					(entry) =>
 						normalizeCatalogKey(entry.familyKey) ===
 						normalizeCatalogKey(importedRow.familyKey),
-				) ?? matchingCatalogEntries[0] ?? null;
+				) ??
+				matchingCatalogEntries[0] ??
+				null;
 			if (!structured || !matchingCatalog || !projectNumber) {
 				warnings.push(
 					`Workbook row '${importedRow.drawingNumber || importedRow.title}' could not be matched to an electrical family band and was not adopted.`,
@@ -2730,7 +2844,10 @@ export const projectDrawingProgramService = {
 				acadeGroup: normalizeNullableText(importedRow.acadeGroup),
 				workbookSyncedAt: null,
 				workbookDriftDetectedAt: null,
-				numberPrefix: buildDrawingNumberPrefix(projectNumber, matchingCatalog.typeCode),
+				numberPrefix: buildDrawingNumberPrefix(
+					projectNumber,
+					matchingCatalog.typeCode,
+				),
 				sequenceDigits: structured.sequenceDigits,
 				sequenceNumber: structured.sequenceNumber,
 				createdAt: nowIso(),
@@ -2751,7 +2868,7 @@ export const projectDrawingProgramService = {
 			? applyFamilyBandAllocation({
 					rows: nextRows,
 					projectNumber,
-			  })
+				})
 			: nextRows;
 		const afterProgram = normalizeProgramAfterMutation(
 			args.program,

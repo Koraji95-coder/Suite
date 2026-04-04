@@ -1,17 +1,13 @@
 import {
 	AppWindow,
-	BookOpen,
-	Bot,
-	CalendarDays,
 	ClipboardList,
 	FolderOpen,
-	Layers3,
-	LayoutDashboard,
+	House,
 	type LucideIcon,
 	Network,
-	Radar,
+	PencilRuler,
 	Settings,
-	Sparkles,
+	ShieldCheck,
 	TerminalSquare,
 	Wrench,
 } from "lucide-react";
@@ -19,22 +15,30 @@ import {
 	DEVELOPER_TOOL_MANIFEST,
 	type DeveloperToolGroup,
 	getDeveloperToolGroup,
-} from "./developerToolsManifest";
+} from "./developer/developerToolsManifest";
+
+export type ShellFamilyId =
+	| "home"
+	| "projects"
+	| "draft"
+	| "review"
+	| "developer"
+	| "settings";
 
 export interface ShellRouteMeta {
 	match: string;
 	title: string;
 	subtitle: string;
 	areaLabel: string;
+	family: ShellFamilyId;
+	familyLabel: string;
 	icon: LucideIcon;
 }
 
 const developerGroupIconMap: Record<DeveloperToolGroup, LucideIcon> = {
-	"publishing-evidence": ClipboardList,
-	"automation-lab": Wrench,
-	"agent-lab": Bot,
-	"architecture-code": Network,
-	"developer-docs": BookOpen,
+	control: TerminalSquare,
+	architecture: Network,
+	labs: Wrench,
 };
 
 const developerToolShellMeta: readonly ShellRouteMeta[] =
@@ -45,130 +49,141 @@ const developerToolShellMeta: readonly ShellRouteMeta[] =
 			title: tool.title,
 			subtitle: tool.description,
 			areaLabel: group?.title ?? "Developer",
+			family: "developer",
+			familyLabel: "Developer",
 			icon: developerGroupIconMap[tool.group] ?? AppWindow,
 		};
 	});
 
 const shellRouteMeta: readonly ShellRouteMeta[] = [
 	{
-		match: "/app/operations",
-		title: "Developer Portal",
-		subtitle: "Compatibility redirect to the developer workshop home.",
-		areaLabel: "Developer",
-		icon: ClipboardList,
+		match: "/app/draft/drawing-list-manager",
+		title: "Drawing List Manager",
+		subtitle:
+			"Issued-set indexing, title-block scans, and drawing register control.",
+		areaLabel: "Draft",
+		family: "draft",
+		familyLabel: "Draft",
+		icon: PencilRuler,
 	},
 	{
 		match: "/app/developer",
-		title: "Developer Portal",
+		title: "Developer",
 		subtitle:
-			"Developer-only tools, staged features, and workstation workshop surfaces.",
+			"Control, architecture, and lab surfaces that stay outside the released customer shell.",
 		areaLabel: "Developer",
+		family: "developer",
+		familyLabel: "Developer",
 		icon: ClipboardList,
 	},
 	{
-		match: "/app/apps/block-library",
+		match: "/app/draft/block-library",
 		title: "Block Library",
-		subtitle: "Manage your CAD block collection.",
-		areaLabel: "Apps",
-		icon: AppWindow,
+		subtitle: "Reusable CAD block catalog for released drafting work.",
+		areaLabel: "Draft",
+		family: "draft",
+		familyLabel: "Draft",
+		icon: PencilRuler,
 	},
 	{
-		match: "/app/apps/standards-checker",
+		match: "/app/review/standards-checker",
 		title: "Standards Checker",
-		subtitle: "Verify designs against NEC, IEEE, and IEC standards.",
-		areaLabel: "Apps",
-		icon: AppWindow,
+		subtitle:
+			"Released standards validation and readiness review for engineering deliverables.",
+		areaLabel: "Review",
+		family: "review",
+		familyLabel: "Review",
+		icon: ShieldCheck,
 	},
 	{
-		match: "/app/knowledge/math-tools",
+		match: "/app/projects/transmittal-builder",
+		title: "Transmittal Builder",
+		subtitle:
+			"Project release packaging, document packets, and delivery context.",
+		areaLabel: "Projects",
+		family: "projects",
+		familyLabel: "Projects",
+		icon: FolderOpen,
+	},
+	{
+		match: "/app/review/math-tools",
 		title: "Math tools",
-		subtitle:
-			"Calculators, plots, and reference formulas tuned for electrical workflows.",
-		areaLabel: "Knowledge",
-		icon: BookOpen,
-	},
-	{
-		match: "/app/agent/pairing-callback",
-		title: "Agent Pairing",
-		subtitle:
-			"Confirm the current device before opening the developer-only agent lab.",
-		areaLabel: "Developer",
-		icon: Sparkles,
+		subtitle: "Formulas and calculators that support review and field validation work.",
+		areaLabel: "Review",
+		family: "review",
+		familyLabel: "Review",
+		icon: ShieldCheck,
 	},
 	...developerToolShellMeta,
 	{
-		match: "/app/dashboard",
-		title: "Dashboard",
+		match: "/app/home",
+		title: "Home",
 		subtitle:
-			"Mission board for active projects, drawing health, and upcoming delivery timing.",
-		areaLabel: "Dashboard",
-		icon: LayoutDashboard,
-	},
-	{
-		match: "/app/watchdog",
-		title: "Watchdog",
-		subtitle:
-			"Collector health, drawing activity, and project-attributed AutoCAD sessions.",
-		areaLabel: "Watchdog",
-		icon: Radar,
+			"Calm suite board for current work, product entry points, and restrained trust signals.",
+		areaLabel: "Home",
+		family: "home",
+		familyLabel: "Home",
+		icon: House,
 	},
 	{
 		match: "/app/projects",
 		title: "Projects",
-		subtitle: "Project setup, review, telemetry, and delivery workflows.",
+		subtitle:
+			"Project notebook for notes, meetings, files, stage status, review, and release context.",
 		areaLabel: "Projects",
+		family: "projects",
+		familyLabel: "Projects",
 		icon: FolderOpen,
 	},
 	{
-		match: "/app/calendar",
-		title: "Calendar",
-		subtitle: "Scheduling, commitments, and upcoming delivery timing.",
-		areaLabel: "Calendar",
-		icon: CalendarDays,
-	},
-	{
-		match: "/app/apps",
-		title: "Apps Hub",
+		match: "/app/draft",
+		title: "Draft",
 		subtitle:
-			"Domain tools for drafting, transmittals, and engineering workflows.",
-		areaLabel: "Apps",
-		icon: Layers3,
+			"Released drafting surfaces for drawing indexes, reusable assets, and customer-ready authoring support.",
+		areaLabel: "Draft",
+		family: "draft",
+		familyLabel: "Draft",
+		icon: PencilRuler,
 	},
 	{
-		match: "/app/knowledge",
-		title: "Knowledge",
-		subtitle: "References, formulas, standards context, and reusable guidance.",
-		areaLabel: "Knowledge",
-		icon: BookOpen,
+		match: "/app/review",
+		title: "Review",
+		subtitle:
+			"Standards validation, readiness summaries, and issue-path review work.",
+		areaLabel: "Review",
+		family: "review",
+		familyLabel: "Review",
+		icon: ShieldCheck,
 	},
 	{
 		match: "/app/settings",
 		title: "Settings",
 		subtitle: "Account controls and workspace preferences.",
 		areaLabel: "Settings",
+		family: "settings",
+		familyLabel: "Settings",
 		icon: Settings,
-	},
-	{
-		match: "/app/command-center",
-		title: "Command Center",
-		subtitle:
-			"Developer diagnostics toolshed for Suite Doctor, hosted push, and incident commands.",
-		areaLabel: "Developer",
-		icon: TerminalSquare,
 	},
 ] as const;
 
 const defaultShellMeta: ShellRouteMeta = {
 	match: "/app",
-	title: "Workspace",
-	subtitle: "Project delivery and drawing control workspace.",
-	areaLabel: "Workspace",
-	icon: AppWindow,
+	title: "Home",
+	subtitle:
+		"Calm suite board for projects, drafting, review, and developer handoff.",
+	areaLabel: "Home",
+	family: "home",
+	familyLabel: "Home",
+	icon: House,
 };
+
+const shellRouteMetaByPriority = [...shellRouteMeta].sort(
+	(left, right) => right.match.length - left.match.length,
+);
 
 export function resolveShellMeta(pathname: string): ShellRouteMeta {
 	return (
-		shellRouteMeta.find((item) => pathname.startsWith(item.match)) ??
+		shellRouteMetaByPriority.find((item) => pathname.startsWith(item.match)) ??
 		defaultShellMeta
 	);
 }

@@ -36,5 +36,5 @@ This note tracks the current browser ownership boundary for project creation and
 - Project CRUD orchestration no longer lives in the `projects` app tree; the main remaining shell work is presentation/layout cleanup.
 - Project list filtering/grouping now goes through `src/features/project-core` selectors instead of being reimplemented locally inside `ProjectList.tsx`.
 - Project list, card, header, delete-dialog, and project/task modal presentation now live under `src/features/project-manager`.
-- Shared project types, selectors, and utility helpers are no longer owned by `src/components/apps/projects`.
-- The legacy `src/components/apps/projects` entrypoint is gone; the remaining manager shell now lives inside the feature folder with the rest of the manager surface.
+- Shared project types, selectors, and utility helpers are no longer owned by the old shared project app tree.
+- The legacy shared project app entrypoint is gone; the remaining manager shell now lives inside the feature folder with the rest of the manager surface.

@@ -6,7 +6,7 @@ import { projectTitleBlockProfileService } from "@/services/projectTitleBlockPro
 import { ProjectFormModal } from "./ProjectFormModal";
 import type { ProjectFormData } from "@/features/project-core";
 
-vi.mock("@/components/apps/ui/Popover", () => ({
+vi.mock("@/components/system/Popover", () => ({
 	Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 	PopoverTrigger: ({ children }: { children: ReactNode }) => (
 		<div>{children}</div>

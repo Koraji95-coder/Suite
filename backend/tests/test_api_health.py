@@ -38,9 +38,6 @@ class TestApiHealth(unittest.TestCase):
         self.assertEqual(limiter.get("storage"), "unknown")
         self.assertFalse(bool(limiter.get("degraded")))
         self.assertEqual(limiter.get("reason"), "uninitialized")
-        agent_session_store = payload.get("agent_session_store") or {}
-        self.assertEqual(agent_session_store.get("mode"), "memory")
-        self.assertEqual(agent_session_store.get("reason"), "uninitialized")
         service = payload.get("service") or {}
         self.assertEqual(service.get("id"), "backend")
         self.assertEqual(service.get("label"), "Watchdog Backend")
@@ -49,7 +46,7 @@ class TestApiHealth(unittest.TestCase):
         self.assertEqual(service.get("version"), "1.0.0")
         self.assertEqual(service.get("actionableIssueCount"), 0)
         self.assertIsInstance(service.get("checks"), list)
-        self.assertGreaterEqual(len(service.get("checks")), 3)
+        self.assertGreaterEqual(len(service.get("checks")), 2)
         doctor = payload.get("doctor") or {}
         self.assertEqual(doctor.get("overallState"), "background")
         self.assertEqual(doctor.get("actionableIssueCount"), 0)
@@ -81,33 +78,6 @@ class TestApiHealth(unittest.TestCase):
         self.assertEqual(doctor.get("actionableIssueCount"), 1)
         recommendations = doctor.get("recommendations") or []
         self.assertGreaterEqual(len(recommendations), 1)
-
-    def test_health_payload_includes_agent_session_store_metadata(self) -> None:
-        self.client.application.config["AGENT_SESSION_STORE_STATUS"] = {
-            "mode": "redis",
-            "reason": "redis_connected",
-            "redis_url": "redis://127.0.0.1:6379/0",
-            "key_prefix": "suite:agent:session:",
-        }
-
-        response = self.client.get("/health")
-        self.assertEqual(response.status_code, 200)
-
-        payload = response.get_json() or {}
-        agent_session_store = payload.get("agent_session_store") or {}
-        self.assertEqual(agent_session_store.get("mode"), "redis")
-        self.assertEqual(agent_session_store.get("reason"), "redis_connected")
-        self.assertEqual(agent_session_store.get("redis_url"), "redis://127.0.0.1:6379/0")
-        self.assertEqual(agent_session_store.get("key_prefix"), "suite:agent:session:")
-        service = payload.get("service") or {}
-        checks = service.get("checks") or []
-        session_check = next(
-            (check for check in checks if check.get("key") == "agent-session-store"),
-            None,
-        )
-        self.assertIsNotNone(session_check)
-        self.assertEqual(session_check.get("severity"), "ready")
-        self.assertFalse(bool(session_check.get("actionable")))
 
     def test_health_endpoint_is_exempt_from_default_rate_limits(self) -> None:
         responses = [self.client.get("/health") for _ in range(4)]

@@ -25,7 +25,7 @@ Canonical sources for current rule mapping are:
 - `docs/autodraft/rule_seed_spec.json`
 - `backend/route_groups/api_autodraft.py`
 - `dotnet/autodraft-api-contract/Services/RuleBasedAutoDraftPlanner.cs`
-- `src/components/apps/autodraft-studio/autodraftData.ts`
+- `src/features/autodraft-studio/ui/autodraftData.ts`
 
 ## Goal (Current Understanding)
 
@@ -78,13 +78,12 @@ execution when the external API is available.
 - Prepare extracts annotation markups (`/Annots`) and returns normalized markup payloads plus optional measurement seed hints.
 - `POST /api/autodraft/compare` requires prepared markups and accepts:
   - compare engine (`auto|python|dotnet`) and tolerance profile (`strict|medium|loose`),
-  - default `calibration_mode=auto` (manual two-point calibration only when requested),
-  - optional `agent_review_mode=pre|off` for advisory pre-review behavior.
+  - default `calibration_mode=auto` (manual two-point calibration only when requested).
 - Compare is QA-only in v1:
   - no CAD writes,
   - deterministic plan + backcheck output,
   - strict add/delete mismatch findings with pass/warn/fail summary,
-  - bounded advisory agent boosts that never override deterministic policy.
+  - no agent advisory or broker-driven pre-review layer.
 - Engine routing:
   - `auto` prefers .NET and falls back to Python if unavailable,
   - `dotnet` is strict (no fallback),

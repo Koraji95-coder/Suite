@@ -5,12 +5,12 @@ import { Link } from "react-router-dom";
 import { APP_NAME } from "@/appMeta";
 import { cn } from "@/lib/utils";
 import AuthShell from "../auth/AuthShell";
-import { Badge } from "../components/primitives/Badge";
-import { Button } from "../components/primitives/Button";
-import { Panel } from "../components/primitives/Panel";
-import { HStack, Stack } from "../components/primitives/Stack";
+import { Badge } from "../components/system/base/Badge";
+import { Button } from "../components/system/base/Button";
+import { Panel } from "../components/system/base/Panel";
+import { HStack, Stack } from "../components/system/base/Stack";
 // Primitives
-import { Heading, Text } from "../components/primitives/Text";
+import { Heading, Text } from "../components/system/base/Text";
 import styles from "./PrivacyPage.module.css";
 
 const APP_SLUG = APP_NAME.toLowerCase().replace(/\s+/g, "");

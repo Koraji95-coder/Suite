@@ -1,9 +1,6 @@
-const ALLOWED_SUPABASE_CALLBACK_PATHS = new Set([
-	"/login",
-	"/signup",
-	"/agent/pairing-callback",
-	"/app/agent/pairing-callback",
-]);
+import { getSessionStorageApi } from "@/lib/browserStorage";
+
+const ALLOWED_SUPABASE_CALLBACK_PATHS = new Set(["/login", "/signup"]);
 
 const REQUIRED_SUPABASE_SESSION_KEYS = [
 	"access_token",
@@ -73,16 +70,20 @@ function buildCallbackFingerprint(params: SupabaseCallbackParams): string {
 }
 
 function readConsumedCallbackFingerprint(): string {
+	const storage = getSessionStorageApi();
+	if (!storage) return "";
 	try {
-		return window.sessionStorage.getItem(CALLBACK_FINGERPRINT_STORAGE_KEY) || "";
+		return storage.getItem(CALLBACK_FINGERPRINT_STORAGE_KEY) || "";
 	} catch {
 		return "";
 	}
 }
 
 function storeConsumedCallbackFingerprint(fingerprint: string): void {
+	const storage = getSessionStorageApi();
+	if (!storage) return;
 	try {
-		window.sessionStorage.setItem(CALLBACK_FINGERPRINT_STORAGE_KEY, fingerprint);
+		storage.setItem(CALLBACK_FINGERPRINT_STORAGE_KEY, fingerprint);
 	} catch {
 		// Ignore storage errors and continue without duplicate-suppression memory.
 	}

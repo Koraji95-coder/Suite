@@ -77,7 +77,7 @@ Status artifact location by default:
 
 ## Command Center
 
-`/app/command-center` now shows:
+`/app/developer/control/command-center` now shows:
 
 - the latest preflight result
 - hosted push readiness
@@ -98,5 +98,5 @@ If hosted preflight fails:
 
 If hosted push is blocked but preflight is otherwise okay:
 
-- local mode may be active while local Supabase or the gateway is not healthy
+- local mode may be active while local Supabase or the shared runtime core is not healthy
 - Command Center will still show the recorded preflight and the current block reason

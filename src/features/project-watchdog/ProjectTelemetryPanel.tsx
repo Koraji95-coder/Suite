@@ -1,6 +1,6 @@
 import { Activity, ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/primitives/Badge";
+import { Badge } from "@/components/system/base/Badge";
 import { cn } from "@/lib/utils";
 import { basenameFromPath } from "@/lib/watchdogTelemetry";
 import { buildWatchdogHref } from "@/lib/watchdogNavigation";

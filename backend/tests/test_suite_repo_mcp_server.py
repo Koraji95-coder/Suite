@@ -207,7 +207,6 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("repo.check_watchdog_autocad_readiness", tool_names)
         self.assertIn("repo.check_watchdog_backend_startup", tool_names)
         self.assertIn("repo.check_suite_workstation", tool_names)
-        self.assertIn("repo.verify_agent_routing_guardrails", tool_names)
 
     def test_initialize_and_list_resources(self) -> None:
         with _McpServerProcess() as server:
@@ -571,8 +570,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertIn("Do not add or use Tailwind", text)
         self.assertIn("Do not make major auth-flow changes", text)
         self.assertIn("AutoCAD reliability contract", text)
-        self.assertIn("npm run gateway:dev", text)
-        self.assertIn("legacy ZeroClaw CLI fallback is retired", text)
+        self.assertIn("Office owns local agent, chat, and orchestration work", text)
         self.assertIn("repo.check_watchdog_collector_startup", text)
         self.assertIn("repo.check_watchdog_autocad_collector_startup", text)
         self.assertIn("repo.check_watchdog_autocad_plugin", text)
@@ -642,63 +640,6 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
             "scripts/check-watchdog-autocad-readiness.ps1",
             text,
         )
-
-    def test_prompt_get_returns_agent_handoff_gateway_block(self) -> None:
-        with _McpServerProcess() as server:
-            server.initialize()
-            response = server.request(
-                "prompts/get",
-                {
-                    "name": "repo.agent_handoff_packet",
-                    "arguments": {},
-                },
-            )
-
-        messages = response.get("result", {}).get("messages", [])
-        self.assertTrue(messages)
-        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
-        text = str(content.get("text") or "")
-        self.assertIn("Gateway Build State (Required)", text)
-        self.assertIn("npm run gateway:dev", text)
-        self.assertIn("configured mode: <Suite-native>", text)
-
-    def test_prompt_get_returns_agent_profile_playbook(self) -> None:
-        with _McpServerProcess() as server:
-            server.initialize()
-            response = server.request(
-                "prompts/get",
-                {
-                    "name": "repo.agent_profile_playbook",
-                    "arguments": {},
-                },
-            )
-
-        messages = response.get("result", {}).get("messages", [])
-        self.assertTrue(messages)
-        content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
-        text = str(content.get("text") or "")
-        self.assertIn("Agent Profile Playbook", text)
-        self.assertIn("draftsmith", text)
-        self.assertIn("gridsage", text)
-
-    def test_tool_verify_agent_routing_guardrails(self) -> None:
-        with _McpServerProcess() as server:
-            server.initialize()
-            response = server.request(
-                "tools/call",
-                {
-                    "name": "repo.verify_agent_routing_guardrails",
-                    "arguments": {},
-                },
-                timeout=10.0,
-            )
-
-        result = response.get("result", {})
-        content = result.get("content", [])
-        self.assertTrue(content)
-        text = str(content[0].get("text") if isinstance(content[0], dict) else "")
-        self.assertIn("Profile count checked", text)
-        self.assertIn("Result:", text)
 
     def test_tool_get_workstation_context_returns_text(self) -> None:
         with _McpServerProcess(

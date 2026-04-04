@@ -5,9 +5,8 @@ $script:SuiteRuntimeBootstrapWeights = [ordered]@{
     "watchdog-filesystem" = 10
     "watchdog-autocad-startup" = 10
     "watchdog-autocad-plugin" = 5
-    "backend" = 10
-    "gateway" = 10
-    "frontend" = 10
+    "backend" = 15
+    "frontend" = 15
 }
 
 $script:SuiteRuntimeBootstrapLabels = [ordered]@{
@@ -18,7 +17,6 @@ $script:SuiteRuntimeBootstrapLabels = [ordered]@{
     "watchdog-autocad-startup" = "AutoCAD Collector"
     "watchdog-autocad-plugin" = "AutoCAD Plugins"
     "backend" = "Watchdog Backend"
-    "gateway" = "API Gateway"
     "frontend" = "Suite Frontend"
 }
 

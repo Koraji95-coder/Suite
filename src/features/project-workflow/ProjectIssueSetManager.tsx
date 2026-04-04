@@ -8,12 +8,12 @@ import {
 	Workflow,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
+import { TrustStateBadge } from "@/components/system/TrustStateBadge";
 import { useToast } from "@/components/notification-system/ToastProvider";
-import { Badge } from "@/components/primitives/Badge";
-import { Button } from "@/components/primitives/Button";
-import { Input, TextArea } from "@/components/primitives/Input";
-import { Panel } from "@/components/primitives/Panel";
+import { Badge } from "@/components/system/base/Badge";
+import { Button } from "@/components/system/base/Button";
+import { Input, TextArea } from "@/components/system/base/Input";
+import { Panel } from "@/components/system/base/Panel";
 import {
 	type ProjectIssueSetStatus,
 	formatProjectIssueSetRelativeDate as formatRelativeDate,

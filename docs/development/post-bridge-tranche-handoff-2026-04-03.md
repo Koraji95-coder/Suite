@@ -65,7 +65,7 @@ Manual AutoCAD/ACADE workstation validation was not run in this environment.
 - `docs/frontend/project-setup-title-block-runtime-flow.md`
 - `src/data/architectureModel.ts`
 - `src/data/architectureSnapshot.generated.ts`
-- `src/routes/knowledge/modules/generated/developerDocsManifest.generated.json`
+- `src/routes/developer/control/modules/generated/developerDocsManifest.generated.json`
 
 ## Next Recommended Tranche
 

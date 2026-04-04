@@ -69,25 +69,3 @@ def decorate_require_supabase_user(
         return f(*args, **kwargs)
 
     return decorated_function
-
-
-def decorate_require_agent_session(
-    f: Callable,
-    *,
-    get_agent_session_fn: Callable[[], Optional[Dict[str, Any]]],
-    get_supabase_user_id_fn: Callable[[Dict[str, Any]], Optional[str]],
-    jsonify_fn: Callable[[Dict[str, Any]], Any],
-    g_obj: Any,
-) -> Callable:
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        session = get_agent_session_fn()
-        user = getattr(g_obj, "supabase_user", None)
-        user_id = get_supabase_user_id_fn(user or {})
-        if not session or not user_id or session.get("user_id") != user_id:
-            return jsonify_fn({"error": "Agent session required"}), 401
-
-        g_obj.agent_session = session
-        return f(*args, **kwargs)
-
-    return decorated_function

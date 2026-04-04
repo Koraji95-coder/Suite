@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { TrustState } from "@/components/apps/ui/TrustStateBadge";
+import type { TrustState } from "@/components/system/TrustStateBadge";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import type { Project } from "@/features/project-core";
 import type { ProjectWatchdogTelemetry } from "@/features/project-watchdog";
@@ -214,18 +214,18 @@ export function useProjectReadinessWorkspaceState(args: {
 		previewItems,
 		setupHref: buildProjectDetailHref(project.id, "setup"),
 		drawingListHref: buildProjectIssueSetAppHref(
-			"/app/apps/drawing-list-manager",
+			"/app/draft/drawing-list-manager",
 			project.id,
 			currentIssueSetId,
 		),
 		watchdogHref: buildWatchdogHref(project.id, currentIssueSetId),
 		standardsHref: buildProjectIssueSetAppHref(
-			"/app/apps/standards-checker",
+			"/app/review/standards-checker",
 			project.id,
 			currentIssueSetId,
 		),
 		transmittalHref: buildProjectIssueSetAppHref(
-			"/app/apps/transmittal-builder",
+			"/app/projects/transmittal-builder",
 			project.id,
 			currentIssueSetId,
 		),
@@ -450,17 +450,17 @@ export function useProjectReviewWorkspaceState(args: {
 		packageFollowUpCount,
 		summaryNote,
 		drawingListHref: buildProjectIssueSetAppHref(
-			"/app/apps/drawing-list-manager",
+			"/app/draft/drawing-list-manager",
 			project.id,
 			currentIssueSetId,
 		),
 		standardsHref: buildProjectIssueSetAppHref(
-			"/app/apps/standards-checker",
+			"/app/review/standards-checker",
 			project.id,
 			currentIssueSetId,
 		),
 		transmittalHref: buildProjectIssueSetAppHref(
-			"/app/apps/transmittal-builder",
+			"/app/projects/transmittal-builder",
 			project.id,
 			currentIssueSetId,
 		),

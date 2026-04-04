@@ -15,17 +15,17 @@ import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
-} from "@/components/apps/ui/Popover";
-import { Button } from "@/components/primitives/Button";
+} from "@/components/system/Popover";
+import { Button } from "@/components/system/base/Button";
 import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/apps/calendar/Calendar";
+import { Calendar } from "@/components/system/calendar/Calendar";
 import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/apps/ui/dialog";
+} from "@/components/system/dialog";
 import styles from "./ProjectManagerFormModal.module.css";
 import {
 	PROJECT_CATEGORIES,

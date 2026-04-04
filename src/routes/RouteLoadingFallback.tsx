@@ -1,5 +1,5 @@
-import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { SurfaceSkeleton } from "@/components/apps/ui/SurfaceSkeleton";
+import { PageFrame } from "@/components/system/PageFrame";
+import { SurfaceSkeleton } from "@/components/system/SurfaceSkeleton";
 import styles from "./RouteLoadingFallback.module.css";
 
 export default function RouteLoadingFallback() {

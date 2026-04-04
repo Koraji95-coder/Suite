@@ -4,9 +4,13 @@ export function buildWatchdogHref(
 	projectId?: string | null,
 	issueSetId?: string | null,
 ): string {
-	return buildProjectScopedAppHref("/app/watchdog", projectId, {
+	return buildProjectScopedAppHref(
+		"/app/developer/control/watchdog",
+		projectId,
+		{
 		issueSet: issueSetId,
-	});
+		},
+	);
 }
 
 // Legacy helper retained for compatibility while the dedicated Watchdog page

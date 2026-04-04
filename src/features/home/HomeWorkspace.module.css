@@ -1,0 +1,352 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.hero {
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--accent) 14%, transparent),
+			transparent 56%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-feature) 94%, transparent),
+			color-mix(in srgb, var(--surface) 96%, transparent)
+		);
+}
+
+.heroSummary {
+	max-width: 50rem;
+	line-height: 1.6;
+}
+
+.heroMeta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	justify-content: flex-end;
+}
+
+.heroActions {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+}
+
+.primaryLink,
+.secondaryLink,
+.laneAction,
+.startingPoint,
+.projectRow {
+	text-decoration: none;
+}
+
+.primaryLink,
+.secondaryLink,
+.laneAction {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border-radius: 999px;
+	padding: 0.65rem 0.95rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	transition:
+		transform 140ms ease,
+		border-color 140ms ease,
+		background 140ms ease,
+		color 140ms ease;
+}
+
+.primaryLink {
+	border: 1px solid color-mix(in srgb, var(--primary) 38%, transparent);
+	background: color-mix(in srgb, var(--primary) 14%, transparent);
+	color: var(--text);
+}
+
+.primaryLink:hover,
+.secondaryLink:hover,
+.laneAction:hover,
+.startingPoint:hover,
+.projectRow:hover {
+	transform: translateY(-1px);
+}
+
+.secondaryLink,
+.laneAction {
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--surface) 68%, transparent);
+	color: var(--text-muted);
+}
+
+.factStrip {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.factCard,
+.ownershipCard {
+	display: grid;
+	gap: 0.35rem;
+	padding: 0.9rem 0.95rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--surface) 64%, transparent);
+}
+
+.factLabel,
+.ownershipLabel,
+.laneEyebrow {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.factValue {
+	font-size: clamp(1.05rem, 1.4vw, 1.5rem);
+	line-height: 1.1;
+	color: var(--text);
+}
+
+.factMeta,
+.projectMeta,
+.activityMeta,
+.projectFootnote,
+.ownershipSummary,
+.startingPoint small {
+	font-size: 0.78rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.currentGrid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.9fr);
+	gap: 0.9rem;
+}
+
+.sideStack {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.primarySurface,
+.sideSurface,
+.laneCard {
+	display: grid;
+	gap: 0.9rem;
+	min-height: 100%;
+}
+
+.panelHeader,
+.laneHeader,
+.projectRowHeader,
+.startingHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.projectList,
+.activityList {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.emptyState {
+	border: 1px dashed color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border-radius: 0.95rem;
+	padding: 1rem;
+	font-size: 0.82rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.projectRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.9rem;
+	padding: 0.95rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 76%, transparent)
+		),
+		var(--surface);
+	color: inherit;
+}
+
+.projectRowMain {
+	display: grid;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.projectTitle,
+.activityTitle,
+.laneTitle,
+.ownershipTitle {
+	margin: 0;
+	font-size: 1rem;
+	line-height: 1.2;
+	color: var(--text);
+}
+
+.projectDetail,
+.runtimeSummary,
+.laneSummary {
+	margin: 0;
+	font-size: 0.84rem;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
+.projectFootnote {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+}
+
+.activityRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.8rem;
+	padding: 0.75rem 0;
+	border-top: 1px solid color-mix(in srgb, var(--brand-border-soft) 56%, transparent);
+}
+
+.activityRow:first-child {
+	padding-top: 0;
+	border-top: none;
+}
+
+.activityTimestamp {
+	flex-shrink: 0;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+
+.runtimeFootnotes {
+	display: grid;
+	gap: 0.55rem;
+}
+
+.runtimeFootnote {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	font-size: 0.8rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.laneGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.9rem;
+}
+
+.laneIdentity {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.iconShell {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.4rem;
+	height: 2.4rem;
+	border-radius: 0.9rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-strong) 72%, transparent);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--surface) 78%, transparent),
+			color-mix(in srgb, var(--surface-2) 90%, transparent)
+		),
+		var(--surface);
+	color: var(--text);
+}
+
+.pointList {
+	margin: 0;
+	padding-left: 1rem;
+	display: grid;
+	gap: 0.45rem;
+	font-size: 0.82rem;
+	line-height: 1.55;
+	color: var(--text-muted);
+}
+
+.ownershipGrid,
+.startingGrid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.8rem;
+}
+
+.startingPoint {
+	display: grid;
+	gap: 0.45rem;
+	padding: 0.95rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--surface) 68%, transparent);
+	color: inherit;
+}
+
+.startingHeader {
+	justify-content: flex-start;
+	align-items: center;
+}
+
+@media (max-width: 1080px) {
+	.factStrip,
+	.ownershipGrid,
+	.startingGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.currentGrid,
+	.laneGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.heroMeta {
+		justify-content: flex-start;
+	}
+
+	.factStrip,
+	.ownershipGrid,
+	.startingGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.projectRow,
+	.activityRow,
+	.laneHeader,
+	.panelHeader {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.activityTimestamp {
+		align-self: flex-start;
+	}
+}

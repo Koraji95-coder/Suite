@@ -1,6 +1,6 @@
 # Suite Docs Index
 
-This is the canonical entry point for repository documentation. Humans and agents should start here, then move into the owning section README before drilling into individual notes.
+This is the canonical entry point for repository documentation. People and tooling should start here, then move into the owning section README before drilling into individual notes.
 
 ## Runtime Sections
 
@@ -15,8 +15,6 @@ This is the canonical entry point for repository documentation. Humans and agent
 
 ## Domain Sections
 
-- [Agent](./agent/README.md)
-  - Orchestration runbook, profile playbook, pairing lifecycle, model pack notes.
 - [AutoDraft](./autodraft/README.md)
   - Architecture, execute cutover, rules, and reference materials.
 
@@ -38,7 +36,6 @@ This is the canonical entry point for repository documentation. Humans and agent
 - [Post-Overhaul Feature Backlog](./development/post-overhaul-feature-backlog.md)
 - [Performance Baseline](./performance-baseline.md)
 - [Deep Repo Hardening Backlog](./deep-repo-hardening-backlog.md)
-- [Realtime Agent / AutoWire / AutoDraft State](./development/realtime-agent-autowire-autodraft-state.md)
 
 ## Working Notes
 

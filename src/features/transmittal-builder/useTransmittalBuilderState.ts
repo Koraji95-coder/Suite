@@ -6,41 +6,49 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { logger } from "@/lib/logger";
-import { logActivity } from "@/services/activityService";
+import {
+	type ProjectDeliverableRegisterRow,
+	projectDeliverableRegisterService,
+} from "@/features/project-delivery";
 import {
 	loadProjectDocumentMetadata,
 	type ProjectDocumentMetadataProjectOption,
 	type ProjectDocumentMetadataRow,
 } from "@/features/project-documents";
 import {
-	projectDeliverableRegisterService,
-	type ProjectDeliverableRegisterRow,
-} from "@/features/project-delivery";
-import { standardsCheckerBackendService } from "@/features/standards-checker/backendService";
-import {
 	type ProjectIssueSetRecord,
 	projectIssueSetService,
 } from "@/features/project-workflow/issueSetService";
+import { standardsCheckerBackendService } from "@/features/standards-checker/backendService";
+import { getLocalStorageApi } from "@/lib/browserStorage";
+import { logger } from "@/lib/logger";
+import { logActivity } from "@/services/activityService";
 import { projectTransmittalReceiptService } from "@/services/projectTransmittalReceiptService";
 import { supabase } from "@/supabase/client";
+import {
+	DEFAULT_FIRM,
+	DEFAULT_PE,
+	FIRM_NUMBERS,
+	PE_PROFILES,
+	type PeProfile,
+} from "./config";
 import {
 	AUTOSAVE_KEY,
 	buildCidDocuments,
 	buildDefaultDraft,
 	buildFormData,
-	buildRegisterBackedDocuments,
 	buildProjectMetadataDocuments,
+	buildRegisterBackedDocuments,
 	buildStandardDocuments,
 	type Contact,
-	createProjectSenderId,
 	createId,
+	createProjectSenderId,
 	type DraftState,
 	type FileState,
 	type GenerationState,
 	getProfileById,
-	isProjectSenderId,
 	isContactComplete,
+	isProjectSenderId,
 	loadDraft,
 	OPTION_GROUPS,
 	type OptionKey,
@@ -56,13 +64,6 @@ import {
 	buildTransmittalNativeStandardsReviewSnapshot,
 	type TransmittalNativeStandardsReviewSnapshot,
 } from "./nativeStandards";
-import {
-	DEFAULT_FIRM,
-	DEFAULT_PE,
-	FIRM_NUMBERS,
-	PE_PROFILES,
-	type PeProfile,
-} from "./config";
 import { transmittalService } from "./service";
 
 export function useTransmittalBuilderState(
@@ -145,7 +146,7 @@ export function useTransmittalBuilderState(
 	const selectedProjectOption = useMemo(
 		() =>
 			draft.selectedProjectId
-				? projectOptionsById.get(draft.selectedProjectId) ?? null
+				? (projectOptionsById.get(draft.selectedProjectId) ?? null)
 				: null,
 		[draft.selectedProjectId, projectOptionsById],
 	);
@@ -349,10 +350,14 @@ export function useTransmittalBuilderState(
 			}
 			if (registerResult.data) {
 				nextRegisterSnapshotId = registerResult.data.id;
-				const selectedRowIds = new Set(preferredIssueSet.selectedRegisterRowIds);
+				const selectedRowIds = new Set(
+					preferredIssueSet.selectedRegisterRowIds,
+				);
 				nextRegisterRows =
 					selectedRowIds.size > 0
-						? registerResult.data.rows.filter((row) => selectedRowIds.has(row.id))
+						? registerResult.data.rows.filter((row) =>
+								selectedRowIds.has(row.id),
+							)
 						: [];
 			} else if (registerResult.error) {
 				packageWarnings.push(registerResult.error.message);
@@ -386,9 +391,12 @@ export function useTransmittalBuilderState(
 			}
 
 			try {
-				const metadataResult = await loadProjectDocumentMetadata(selectedProject, {
-					reportFile: files.acadeReport,
-				});
+				const metadataResult = await loadProjectDocumentMetadata(
+					selectedProject,
+					{
+						reportFile: files.acadeReport,
+					},
+				);
 				if (!active) {
 					return;
 				}
@@ -606,10 +614,15 @@ export function useTransmittalBuilderState(
 	]);
 
 	useEffect(() => {
-		if (typeof window === "undefined") return;
+		const storage = getLocalStorageApi();
+		if (!storage) return;
 		if (saveTimer.current) window.clearTimeout(saveTimer.current);
 		saveTimer.current = window.setTimeout(() => {
-			window.localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(draft));
+			try {
+				storage.setItem(AUTOSAVE_KEY, JSON.stringify(draft));
+			} catch {
+				// Ignore autosave failures and keep the builder usable.
+			}
 			setLastSavedAt(new Date());
 		}, 600);
 		return () => {
@@ -911,7 +924,7 @@ export function useTransmittalBuilderState(
 		(projectId: string) => {
 			const selectedProject = projectOptionsById.get(projectId) ?? null;
 			const previousProject = draft.selectedProjectId
-				? projectOptionsById.get(draft.selectedProjectId) ?? null
+				? (projectOptionsById.get(draft.selectedProjectId) ?? null)
 				: null;
 			const nextProjectSender = selectedProject?.projectPeName
 				? {
@@ -935,10 +948,7 @@ export function useTransmittalBuilderState(
 			);
 
 			startTransition(() => {
-				if (
-					!preferredIssueSet ||
-					projectId !== preferredIssueSet.projectId
-				) {
+				if (!preferredIssueSet || projectId !== preferredIssueSet.projectId) {
 					setPackageRegisterRows([]);
 					setPackageRegisterSnapshotId(null);
 				}
@@ -946,7 +956,8 @@ export function useTransmittalBuilderState(
 					const nextProjectName =
 						safeTrim(prev.projectName) || safeTrim(selectedProject?.name);
 					const nextDescription =
-						safeTrim(prev.description) || safeTrim(selectedProject?.description);
+						safeTrim(prev.description) ||
+						safeTrim(selectedProject?.description);
 					const nextDraft: DraftState = {
 						...prev,
 						selectedProjectId: projectId,
@@ -960,11 +971,9 @@ export function useTransmittalBuilderState(
 
 					const shouldAdoptProjectSender =
 						Boolean(nextProjectSender) &&
-						(
-							isProjectSenderId(prev.peName) ||
+						(isProjectSenderId(prev.peName) ||
 							!safeTrim(prev.peName) ||
-							safeTrim(prev.peName) === fallbackProfileId
-						);
+							safeTrim(prev.peName) === fallbackProfileId);
 
 					if (shouldAdoptProjectSender && nextProjectSender) {
 						nextDraft.peName = nextProjectSender.id;
@@ -992,11 +1001,9 @@ export function useTransmittalBuilderState(
 					const nextProjectFirm = safeTrim(selectedProject?.firmNumber);
 					const shouldAdoptProjectFirm =
 						Boolean(nextProjectFirm) &&
-						(
-							!safeTrim(prev.firmNumber) ||
+						(!safeTrim(prev.firmNumber) ||
 							safeTrim(prev.firmNumber) === previousProjectFirm ||
-							safeTrim(prev.firmNumber) === profileDefaults.firm
-						);
+							safeTrim(prev.firmNumber) === profileDefaults.firm);
 
 					if (shouldAdoptProjectFirm && nextProjectFirm) {
 						nextDraft.firmNumber = nextProjectFirm;
@@ -1116,8 +1123,9 @@ export function useTransmittalBuilderState(
 		setProjectMetadataError(null);
 		setProjectMetadataWarnings([]);
 		setProjectMetadataLoadedAt(null);
-		if (typeof window !== "undefined") {
-			window.localStorage.removeItem(AUTOSAVE_KEY);
+		const storage = getLocalStorageApi();
+		if (storage) {
+			storage.removeItem(AUTOSAVE_KEY);
 		}
 	};
 

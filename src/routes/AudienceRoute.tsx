@@ -19,5 +19,5 @@ export default function AudienceRoute({
 		return <>{children}</>;
 	}
 
-	return <Navigate to="/app/dashboard" replace state={{ from: location }} />;
+	return <Navigate to="/app/home" replace state={{ from: location }} />;
 }

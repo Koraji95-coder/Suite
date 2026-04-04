@@ -130,7 +130,9 @@ describe("ProjectTelemetryPanel", () => {
 		const link = screen.getByRole("link", {
 			name: /open watchdog/i,
 		}) as HTMLAnchorElement;
-		expect(link.getAttribute("href")).toBe("/app/watchdog?project=project-1");
+		expect(link.getAttribute("href")).toBe(
+			"/app/developer/control/watchdog?project=project-1",
+		);
 	});
 
 	it("uses a compact session fallback when journals have not synced yet", () => {

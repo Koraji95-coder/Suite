@@ -28,11 +28,11 @@
 - `src/features/transmittal-builder/useTransmittalBuilderState.ts`
 - `src/features/project-workflow/ProjectIssueSetManager.tsx`
 - `src/features/project-delivery/ProjectDeliverableRegisterPanel.tsx`
-- `src/components/apps/dashboard/useDashboardDeliverySummary.ts`
-- `src/components/apps/drawing-list-manager/DrawingListManager.tsx`
-- `src/components/apps/automation-studio/*`
-- `src/components/apps/standards-checker/StandardsChecker.tsx`
-- `src/routes/watchdog/WatchdogRoutePage.tsx`
+- `src/features/project-overview/useDashboardDeliverySummary.ts`
+- `src/features/drawing-list-manager/ui/DrawingListManager.tsx`
+- `src/features/automation-studio/ui/*`
+- `src/features/standards-checker/ui/StandardsChecker.tsx`
+- `src/routes/developer/control/watchdog/WatchdogRoutePage.tsx`
 
 These callers consume workflow ownership; they should not grow their own local issue-set persistence again.
 

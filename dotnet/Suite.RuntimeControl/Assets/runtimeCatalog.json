@@ -2,7 +2,6 @@
   "serviceOrder": [
     "supabase",
     "backend",
-    "gateway",
     "frontend",
     "watchdog-filesystem",
     "watchdog-autocad"
@@ -17,11 +16,6 @@
       "shortLabel": "BE",
       "bootLabel": "Watchdog Backend",
       "description": "API server and runtime jobs"
-    },
-    "gateway": {
-      "shortLabel": "GW",
-      "bootLabel": "API Gateway",
-      "description": "Local transport and auth edge"
     },
     "frontend": {
       "shortLabel": "UI",
@@ -47,7 +41,6 @@
     "watchdog-autocad-startup",
     "watchdog-autocad-plugin",
     "backend",
-    "gateway",
     "frontend"
   ],
   "bootstrapSteps": {
@@ -78,10 +71,6 @@
     "backend": {
       "label": "Watchdog Backend",
       "shortLabel": "BE"
-    },
-    "gateway": {
-      "label": "API Gateway",
-      "shortLabel": "GW"
     },
     "frontend": {
       "label": "Suite Frontend",

@@ -6,8 +6,8 @@ import {
 	Workflow,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
-import { Panel } from "@/components/primitives/Panel";
+import { TrustStateBadge } from "@/components/system/TrustStateBadge";
+import { Panel } from "@/components/system/base/Panel";
 import { ProjectDeliverableRegisterPanel } from "@/features/project-delivery";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectReadinessWorkspace.module.css";

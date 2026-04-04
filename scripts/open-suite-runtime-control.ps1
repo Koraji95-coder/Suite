@@ -21,7 +21,6 @@ $runtimeStatusScriptPath = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-run
 $startupScript = (Resolve-Path (Join-Path $PSScriptRoot "run-suite-runtime-startup.ps1")).Path
 $stopScript = (Resolve-Path (Join-Path $PSScriptRoot "stop-suite-runtime.ps1")).Path
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
-$gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
 $pluginCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-plugin.ps1")).Path
@@ -91,19 +90,6 @@ function Get-BackendStatus {
 
     $details = if ($result.Payload -and $result.Payload.Error) { [string]$result.Payload.Error } else { $result.OutputTail }
     return New-ComponentStatus -Key "backend" -Name "Backend" -State "stopped" -Summary "Backend is not running." -Details $details
-}
-
-function Get-GatewayStatus {
-    $result = Invoke-JsonPowerShellFile -ScriptPath $gatewayCheckScript -Arguments @("-Json")
-    if ($result.Payload -and [bool]$result.Payload.Healthy) {
-        return New-ComponentStatus -Key "gateway" -Name "Gateway" -State "ready" -Ok $true -Summary "Gateway is healthy." -Details "PID $($result.Payload.ProcessId)."
-    }
-    if ($result.Payload -and [bool]$result.Payload.Running) {
-        return New-ComponentStatus -Key "gateway" -Name "Gateway" -State "starting" -Summary "Gateway is warming up." -Details $result.OutputTail
-    }
-
-    $details = if ($result.Payload -and $result.Payload.Error) { [string]$result.Payload.Error } else { $result.OutputTail }
-    return New-ComponentStatus -Key "gateway" -Name "Gateway" -State "stopped" -Summary "Gateway is not running." -Details $details
 }
 
 function Get-FilesystemCollectorStatus {
@@ -266,7 +252,6 @@ function Convert-RuntimeStatusToLegacySnapshot {
 
     $supabaseService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "supabase"
     $backendService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "backend"
-    $gatewayService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "gateway"
     $frontendService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "frontend"
     $filesystemService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "watchdog-filesystem"
     $autocadService = Find-RuntimeStatusService -RuntimeStatus $RuntimeStatus -Id "watchdog-autocad"
@@ -322,7 +307,6 @@ function Convert-RuntimeStatusToLegacySnapshot {
         }
         New-LegacyComponentFromRuntimeService -Key "supabase" -Name "Supabase" -Service $supabaseService -FallbackSummary "Local Supabase is not running."
         New-LegacyComponentFromRuntimeService -Key "backend" -Name "Backend" -Service $backendService -FallbackSummary "Backend is not running."
-        New-LegacyComponentFromRuntimeService -Key "gateway" -Name "Gateway" -Service $gatewayService -FallbackSummary "Gateway is not running."
         New-LegacyComponentFromRuntimeService -Key "watchdogFilesystem" -Name "Watchdog FS" -Service $filesystemService -FallbackSummary "Filesystem collector needs attention."
         New-LegacyComponentFromRuntimeService -Key "watchdogAutoCad" -Name "Watchdog AutoCAD" -Service $autocadService -FallbackSummary "AutoCAD collector needs attention."
         [pscustomobject]@{
@@ -372,13 +356,12 @@ function Get-RuntimeSnapshot {
         Get-DockerStatus
         Get-SupabaseStatus
         Get-BackendStatus
-        Get-GatewayStatus
         Get-FilesystemCollectorStatus
         Get-AutoCadCollectorStatus
         Get-PluginStatus
     )
 
-    $coreKeys = @("docker", "supabase", "backend", "gateway")
+    $coreKeys = @("docker", "supabase", "backend", "frontend")
     $coreComponents = @($components | Where-Object { $coreKeys -contains $_.key })
     $readyCount = @($coreComponents | Where-Object { [bool]$_.ok }).Count
     $summary = if ($readyCount -eq $coreComponents.Count) {
@@ -816,7 +799,6 @@ $componentRows = @(
     @{ key = "docker"; name = "Docker" },
     @{ key = "supabase"; name = "Supabase" },
     @{ key = "backend"; name = "Backend" },
-    @{ key = "gateway"; name = "Gateway" },
     @{ key = "watchdogFilesystem"; name = "Watchdog FS" },
     @{ key = "watchdogAutoCad"; name = "Watchdog AutoCAD" },
     @{ key = "autocadPlugin"; name = "AutoCAD Plugin" }

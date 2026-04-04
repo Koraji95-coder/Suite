@@ -82,12 +82,12 @@ public sealed class BootstrapProgressReducerTests
             done: true,
             ok: false,
             completedStepIds: new[] { "docker-ready", "supabase-start" },
-            failedStepIds: new[] { "frontend", "gateway" },
+            failedStepIds: new[] { "backend", "frontend" },
             percent: 40);
 
         var result = BootstrapProgressReducer.Reduce(state);
 
-        Assert.Equal(new[] { "API Gateway", "Suite Frontend" }, result.FailedStepLabels);
+        Assert.Equal(new[] { "Watchdog Backend", "Suite Frontend" }, result.FailedStepLabels);
         Assert.True(result.ShowCard);
         Assert.Equal("error", result.StatusState);
     }

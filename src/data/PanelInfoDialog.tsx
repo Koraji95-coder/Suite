@@ -1,11 +1,11 @@
-﻿import { Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { useState } from "react";
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/apps/ui/dialog";
+} from "@/components/system/dialog";
 import styles from "./PanelInfoDialog.module.css";
 
 interface InfoSection {

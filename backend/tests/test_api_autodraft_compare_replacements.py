@@ -140,39 +140,6 @@ class TestAutoDraftCompareReplacements(unittest.TestCase):
         self.assertEqual(replacement_obj.get("target_entity_id"), None)
         self.assertEqual(replacement_obj.get("old_text"), None)
 
-    def test_infer_action_replacement_applies_bounded_agent_boost(self) -> None:
-        replacement = _infer_action_replacement(
-            action=self._build_action(),
-            text_entities=[
-                {
-                    "id": "E-TS410",
-                    "text": "TS410",
-                    "bounds": {"x": 936.0, "y": 968.0, "width": 24.0, "height": 14.0},
-                },
-                {
-                    "id": "E-TS402",
-                    "text": "TS402",
-                    "bounds": {"x": 1010.0, "y": 910.0, "width": 24.0, "height": 14.0},
-                },
-            ],
-            weights=self.weights,
-            db_path=self.db_path,
-            agent_hint={
-                "candidate_boosts": {
-                    "E-TS410": 0.5,
-                },
-                "rationale": "Proximity + tag family fit",
-            },
-        )
-        self.assertIsNotNone(replacement)
-        replacement_obj = replacement or {}
-        candidates = replacement_obj.get("candidates") or []
-        self.assertGreaterEqual(len(candidates), 1)
-        first = candidates[0] or {}
-        score_components = first.get("score_components") or {}
-        self.assertIn("agent_boost", score_components)
-        self.assertLessEqual(float(score_components.get("agent_boost") or 0.0), 0.12)
-
     def test_infer_action_replacement_uses_local_model_to_rerank_candidates(self) -> None:
         action = {
             "id": "action-red-1",

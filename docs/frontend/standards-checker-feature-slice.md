@@ -5,7 +5,7 @@ This is the canonical frontend note for the browser-owned standards-checker slic
 ## Source Of Truth
 
 - `src/features/standards-checker`
-- `src/components/apps/standards-checker/*` as UI shells and panels
+- `src/features/standards-checker/ui/*` as UI shells and panels
 
 ## Current Browser Ownership
 

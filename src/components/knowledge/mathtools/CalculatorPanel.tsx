@@ -1,7 +1,7 @@
 import { Save, Zap } from "lucide-react";
 import { useId, useState } from "react";
 import { useAuth } from "@/auth/useAuth";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";

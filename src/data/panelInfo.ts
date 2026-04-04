@@ -25,7 +25,7 @@ export const dashboardInfo = {
 				"Use the project tabs to move between setup, review, issue sets, and supporting files without losing project context",
 			],
 			tips: [
-				"Use `/app/watchdog` for the dedicated collector and drawing telemetry workspace when you need deeper session or workstation detail",
+				"Use `/app/developer/control/watchdog` for the dedicated collector and drawing telemetry workspace when you need deeper session or workstation detail",
 				"Use `/app/projects` when you need the full project readiness, review inbox, and issue set workflow",
 				"Keep the first dashboard view focused on delivery work, then open the deeper tool routes only when a project needs detail",
 			],
@@ -416,7 +416,7 @@ export const equipmentInfo = {
 		{
 			title: "Files to Edit",
 			content: [
-				"Equipment categories: DashboardShell.tsx menuSections",
+				"Equipment categories: current product-family manifests and feature-owned route surfaces",
 				"Equipment panels: Create new components in src/components/",
 				"Equipment data: Uploaded via Equipment upload interface",
 				"Specifications: Stored in files table with category metadata",

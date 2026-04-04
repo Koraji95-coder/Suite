@@ -74,8 +74,6 @@ def _summarize_push_readiness(run: Optional[dict[str, Any]]) -> Optional[str]:
         value = checks.get(key)
         if isinstance(value, dict):
             message = str(value.get("message") or "").strip()
-            if key == "gateway" and message.lower() == "fetch failed":
-                return fallback
             if message:
                 return message
         return fallback
@@ -83,12 +81,10 @@ def _summarize_push_readiness(run: Optional[dict[str, Any]]) -> Optional[str]:
     if run.get("pushReady") is True:
         return push_readiness_summary or "Hosted migration push is ready."
 
-    if not _check_ok("localSupabase") or not _check_ok("gateway"):
+    if not _check_ok("localSupabase"):
         runtime_issues = []
         if not _check_ok("localSupabase"):
             runtime_issues.append(_check_message("localSupabase", "Local Supabase is unavailable."))
-        if not _check_ok("gateway"):
-            runtime_issues.append(_check_message("gateway", "Gateway health endpoint is unavailable."))
         if runtime_issues:
             return (
                 "Hosted push is waiting on the latest local preflight confirmation: "

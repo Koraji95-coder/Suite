@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("supabase", "backend", "gateway", "frontend", "watchdog-filesystem", "watchdog-autocad")]
+    [ValidateSet("supabase", "backend", "frontend", "watchdog-filesystem", "watchdog-autocad")]
     [string]$Service,
     [Parameter(Mandatory = $true)]
     [ValidateSet("start", "stop", "restart", "status", "logs")]
@@ -24,7 +24,6 @@ $runtimeSharedScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suite-runtime
 $statusScript = (Resolve-Path (Join-Path $PSScriptRoot "get-suite-runtime-status.ps1")).Path
 $runtimeCoreComposeScript = Join-Path $PSScriptRoot "runtime-core-compose.ps1"
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
-$gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
 $filesystemInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadInstallScript = (Resolve-Path (Join-Path $PSScriptRoot "install-watchdog-autocad-collector-startup.ps1")).Path
@@ -32,7 +31,6 @@ $autocadSafetyScript = (Resolve-Path (Join-Path $PSScriptRoot "suite-runtime-aut
 $runtimePaths = Get-SuiteRuntimePaths
 $runtimeStatusDir = $runtimePaths.RuntimeStatusDir
 $backendLogPath = $runtimePaths.BackendLogPath
-$gatewayLogPath = $runtimePaths.GatewayLogPath
 $frontendLogPath = $runtimePaths.FrontendLogPath
 $officeBrokerLogPath = $runtimePaths.OfficeBrokerLogPath
 $filesystemCollectorLogDir = $runtimePaths.FilesystemCollectorLogDir
@@ -175,7 +173,6 @@ function Get-RuntimeCoreServiceName {
 
     switch ($ServiceName) {
         "backend" { return "backend" }
-        "gateway" { return "gateway" }
         "frontend" { return "frontend" }
         default { return $null }
     }
@@ -394,37 +391,6 @@ function Stop-ServiceNow {
                 OutputTail = $message
             }
         }
-        "gateway" {
-            if (Test-ServiceUsesRuntimeCoreCompose -ServiceName "gateway") {
-                $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @("gateway")
-                if ($composeStop) {
-                    return [pscustomobject]@{
-                        ExitCode = if ($composeStop.ok) { 0 } else { 1 }
-                        Ok = [bool]$composeStop.ok
-                        OutputText = [string]$composeStop.outputText
-                        OutputTail = [string]$composeStop.outputText
-                    }
-                }
-            }
-
-            $stoppedIds = New-Object System.Collections.Generic.List[int]
-            foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs"))) {
-                $stoppedIds.Add([int]$id)
-            }
-            foreach ($id in (Stop-ProcessesByCommandTokens -Tokens @("suite-agent-gateway.mjs"))) {
-                if (-not $stoppedIds.Contains([int]$id)) {
-                    $stoppedIds.Add([int]$id)
-                }
-            }
-            Stop-PortListeners -Ports @(3000, 3001) | Out-Null
-            $message = Format-StoppedProcessMessage -Name "gateway processes" -StoppedIds $stoppedIds.ToArray()
-            return [pscustomobject]@{
-                ExitCode = 0
-                Ok = $true
-                OutputText = $message
-                OutputTail = $message
-            }
-        }
         "frontend" {
             if (Test-ServiceUsesRuntimeCoreCompose -ServiceName "frontend") {
                 $composeStop = Invoke-RuntimeCoreComposeJson -Action "stop" -Services @("frontend")
@@ -523,9 +489,6 @@ function Start-ServiceNow {
         "backend" {
             return Invoke-JsonPowerShellFile -ScriptPath $backendCheckScript -Arguments @("-StartIfMissing", "-Json")
         }
-        "gateway" {
-            return Invoke-JsonPowerShellFile -ScriptPath $gatewayCheckScript -Arguments @("-StartIfMissing", "-Json")
-        }
         "frontend" {
             return Invoke-JsonPowerShellFile -ScriptPath $frontendCheckScript -Arguments @("-StartIfMissing", "-Json")
         }
@@ -560,13 +523,6 @@ function Get-LogTarget {
                 kind = "path"
                 label = "Backend Log"
                 target = $backendLogPath
-            }
-        }
-        "gateway" {
-            return [pscustomobject]@{
-                kind = "path"
-                label = "Gateway Log"
-                target = $gatewayLogPath
             }
         }
         "watchdog-filesystem" {

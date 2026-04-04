@@ -9,6 +9,6 @@ if (!fs.existsSync(removedPath)) {
 }
 
 console.error(
-	"zeroclaw-main has been removed from the active Suite repo. Do not restore the subtree; keep historical notes in docs/development/zeroclaw-*.md only.",
+	"zeroclaw-main has been removed from the active Suite repo. Do not restore the subtree or reintroduce ZeroClaw runtime/tooling paths into active Suite docs or code.",
 );
 process.exit(1);

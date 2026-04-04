@@ -6,11 +6,11 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
-import { Badge } from "@/components/primitives/Badge";
-import { Button } from "@/components/primitives/Button";
-import { Input } from "@/components/primitives/Input";
-import { Panel } from "@/components/primitives/Panel";
-import { Text } from "@/components/primitives/Text";
+import { Badge } from "@/components/system/base/Badge";
+import { Button } from "@/components/system/base/Button";
+import { Input } from "@/components/system/base/Input";
+import { Panel } from "@/components/system/base/Panel";
+import { Text } from "@/components/system/base/Text";
 import {
 	useProjectRevisionRegisterState,
 } from "./useProjectRevisionRegisterState";

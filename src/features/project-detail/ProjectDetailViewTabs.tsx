@@ -1,44 +1,51 @@
 import {
-	CheckSquare,
+	CalendarDays,
 	ClipboardList,
-	FileCheck2,
 	FileDown,
-	FilePenLine,
-	FolderTree,
+	PackageCheck,
 	ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectDetailViewTabs.module.css";
 import type { ViewMode } from "@/features/project-core";
+import {
+	resolveProjectNotebookSection,
+	type ProjectNotebookSection,
+} from "@/lib/projectWorkflowNavigation";
 
 interface ProjectDetailViewTabsProps {
 	viewMode: ViewMode;
 	onViewModeChange: (mode: ViewMode) => void;
 }
 
-const primaryTabs: { mode: ViewMode; label: string; icon: typeof CheckSquare }[] = [
-	{ mode: "setup", label: "Setup", icon: FolderTree },
-	{ mode: "readiness", label: "Readiness", icon: ClipboardList },
-	{ mode: "review", label: "Review", icon: ShieldAlert },
-	{ mode: "issue-sets", label: "Issue Sets", icon: FileCheck2 },
-	{ mode: "revisions", label: "Revisions", icon: FilePenLine },
-	{ mode: "files", label: "Files & activity", icon: FileDown },
+const primaryTabs: {
+	section: ProjectNotebookSection;
+	label: string;
+	icon: typeof ClipboardList;
+	defaultViewMode: ViewMode;
+}[] = [
+	{ section: "overview", label: "Overview", icon: ClipboardList, defaultViewMode: "setup" },
+	{ section: "calendar", label: "Calendar", icon: CalendarDays, defaultViewMode: "calendar" },
+	{ section: "files", label: "Files", icon: FileDown, defaultViewMode: "files" },
+	{ section: "release", label: "Release", icon: PackageCheck, defaultViewMode: "issue-sets" },
+	{ section: "review", label: "Review", icon: ShieldAlert, defaultViewMode: "review" },
 ];
 
 function renderTab(
-	mode: ViewMode,
+	section: ProjectNotebookSection,
 	label: string,
-	Icon: typeof CheckSquare,
-	viewMode: ViewMode,
+	Icon: typeof ClipboardList,
+	activeSection: ProjectNotebookSection,
+	defaultViewMode: ViewMode,
 	onViewModeChange: (mode: ViewMode) => void,
 ) {
 	return (
 		<button
-			key={mode}
+			key={section}
 			type="button"
-			onClick={() => onViewModeChange(mode)}
-			aria-pressed={viewMode === mode}
-			className={cn(styles.tab, viewMode === mode && styles.tabActive)}
+			onClick={() => onViewModeChange(defaultViewMode)}
+			aria-pressed={activeSection === section}
+			className={cn(styles.tab, activeSection === section && styles.tabActive)}
 		>
 			<Icon className={styles.icon} />
 			<span>{label}</span>
@@ -50,13 +57,22 @@ export function ProjectDetailViewTabs({
 	viewMode,
 	onViewModeChange,
 }: ProjectDetailViewTabsProps) {
+	const activeSection = resolveProjectNotebookSection(viewMode);
+
 	return (
 		<div className={styles.root}>
 			<div className={styles.group}>
-				<div className={styles.groupLabel}>Project workflow</div>
+				<div className={styles.groupLabel}>Notebook sections</div>
 				<div className={styles.tabRow}>
-					{primaryTabs.map(({ mode, label, icon }) =>
-						renderTab(mode, label, icon, viewMode, onViewModeChange),
+					{primaryTabs.map(({ section, label, icon, defaultViewMode }) =>
+						renderTab(
+							section,
+							label,
+							icon,
+							activeSection,
+							defaultViewMode,
+							onViewModeChange,
+						),
 					)}
 				</div>
 			</div>

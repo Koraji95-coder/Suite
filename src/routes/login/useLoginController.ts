@@ -4,7 +4,6 @@ import {
 } from "@simplewebauthn/browser";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { buildAgentPairingSearchFromLocation } from "../../auth/agentPairingParams";
 import { resolveAuthRedirect } from "../../auth/authRedirect";
 import { useNotification } from "../../auth/NotificationContext";
 import {
@@ -19,7 +18,7 @@ import {
 } from "../../auth/passkeyCapabilityApi";
 import { markPasskeySignInPending } from "../../auth/passkeySessionState";
 import { useAuth } from "../../auth/useAuth";
-import { loadDashboardOverviewFromBackend } from "../../components/apps/dashboard/dashboardOverviewService";
+import { loadDashboardOverviewFromBackend } from "../../features/project-overview/dashboardOverviewService";
 import { logger } from "../../lib/logger";
 import { logAuthMethodTelemetry } from "../../services/securityEventService";
 
@@ -31,7 +30,7 @@ type LocationState = { from?: string };
 
 function isDashboardDestination(path: string): boolean {
 	const normalized = path.split("?")[0].replace(/\/+$/, "");
-	return normalized === "/app/home" || normalized === "/app/dashboard";
+	return normalized === "/app/home";
 }
 
 type LoginController = {
@@ -63,17 +62,9 @@ export function useLoginController(): LoginController {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const notification = useNotification();
-	const agentPairingSearch = useMemo(
-		() => buildAgentPairingSearchFromLocation(location.search, location.hash),
-		[location.hash, location.search],
-	);
-	const hasAgentPairingParams = agentPairingSearch.length > 0;
 	const from = useMemo(() => {
-		if (hasAgentPairingParams) {
-			return `/agent/pairing-callback${agentPairingSearch}`;
-		}
 		return (location.state as LocationState | null)?.from ?? "/app/home";
-	}, [agentPairingSearch, hasAgentPairingParams, location.state]);
+	}, [location.state]);
 
 	const [email, setEmail] = useState("");
 	const [captchaToken, setCaptchaToken] = useState("");
@@ -182,7 +173,7 @@ export function useLoginController(): LoginController {
 		};
 
 		if (shouldPreloadDashboard) {
-			setRedirectMessage("Preparing dashboard...");
+			setRedirectMessage("Preparing workspace...");
 			setRedirectProgress(DASHBOARD_REDIRECT_MIN_PROGRESS);
 			const startedAt = performance.now();
 			const updateBaselineProgress = () => {
@@ -236,8 +227,8 @@ export function useLoginController(): LoginController {
 				setRedirectProgress((current) => Math.max(current, cappedProgress));
 				setRedirectMessage(
 					backendProgress >= 100
-						? "Finalizing dashboard session..."
-						: progress.message || "Loading dashboard...",
+						? "Finalizing workspace session..."
+						: progress.message || "Loading workspace...",
 				);
 			})
 				.then(async () => {
@@ -248,7 +239,7 @@ export function useLoginController(): LoginController {
 						baselineProgressTimerId = null;
 					}
 					setRedirectProgress(100);
-					setRedirectMessage("Dashboard ready.");
+					setRedirectMessage("Workspace ready.");
 					timeoutId = window.setTimeout(navigateToDestination, 120);
 				})
 				.catch(async (preloadError) => {
@@ -264,7 +255,7 @@ export function useLoginController(): LoginController {
 						baselineProgressTimerId = null;
 					}
 					setRedirectProgress(100);
-					setRedirectMessage("Opening dashboard...");
+					setRedirectMessage("Opening workspace...");
 					timeoutId = window.setTimeout(navigateToDestination, 120);
 				});
 		} else {

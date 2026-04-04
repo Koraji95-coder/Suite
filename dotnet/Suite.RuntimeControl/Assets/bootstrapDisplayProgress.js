@@ -7,7 +7,6 @@
     "watchdog-autocad-startup",
     "watchdog-autocad-plugin",
     "backend",
-    "gateway",
     "frontend",
   ];
 
@@ -18,9 +17,8 @@
     "watchdog-filesystem": 10,
     "watchdog-autocad-startup": 10,
     "watchdog-autocad-plugin": 5,
-    backend: 10,
-    gateway: 10,
-    frontend: 10,
+    backend: 15,
+    frontend: 15,
   };
 
   function clamp(value, minimum, maximum) {

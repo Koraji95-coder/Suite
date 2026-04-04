@@ -9,7 +9,6 @@ param(
     [switch]$SkipSupabase,
     [switch]$SkipWatchdog,
     [switch]$SkipBackend,
-    [switch]$SkipGateway,
     [switch]$SkipFrontend,
     [switch]$Json
 )
@@ -296,21 +295,6 @@ function Get-StepLogLines {
         "backend" {
             if ($payload) {
                 $lines += "Backend running: $($payload.Running)"
-                if ($payload.ProcessId) {
-                    $lines += "Process ID: $($payload.ProcessId)"
-                }
-                if ($payload.CommandLine) {
-                    $lines += "Command: $($payload.CommandLine)"
-                }
-                if ($payload.Error) {
-                    $lines += "Error: $($payload.Error)"
-                }
-            }
-        }
-        "gateway" {
-            if ($payload) {
-                $lines += "Gateway running: $($payload.Running)"
-                $lines += "Gateway healthy: $($payload.Healthy)"
                 if ($payload.ProcessId) {
                     $lines += "Process ID: $($payload.ProcessId)"
                 }
@@ -721,9 +705,6 @@ $runtimeCoreServicesToStart = @()
 if (-not $SkipBackend) {
     $runtimeCoreServicesToStart += "backend"
 }
-if (-not $SkipGateway) {
-    $runtimeCoreServicesToStart += "gateway"
-}
 if (-not $SkipFrontend) {
     $runtimeCoreServicesToStart += "frontend"
 }
@@ -959,65 +940,6 @@ else {
             -StepId "backend" `
             -StepLabel "Watchdog backend is not healthy." `
             -Summary "Backend Docker service is not healthy."
-    }
-}
-
-if ($SkipGateway) {
-    $gatewaySkippedStep = New-StepResult -Name "gateway" -State "skipped" -Ok $true -Summary "Skipped gateway bootstrap."
-    $steps += $gatewaySkippedStep
-    Write-StepLog -Step $gatewaySkippedStep
-}
-else {
-    Set-CurrentBootstrapStepStarted `
-        -StepId "gateway" `
-        -StepLabel "Ensuring local gateway availability." `
-        -Summary "Ensuring local gateway availability."
-    $gatewayStart = Invoke-JsonPowerShellScript -ScriptRelativePath "scripts\check-gateway-startup.ps1" -Arguments @("-StartIfMissing", "-Json")
-    $gatewayReady = $gatewayStart.Result.Ok -and $gatewayStart.Payload -and [bool]$gatewayStart.Payload.Healthy
-    $gatewayStarting = $gatewayStart.Result.Ok -and $gatewayStart.Payload -and (-not [bool]$gatewayStart.Payload.Healthy) -and [bool]$gatewayStart.Payload.Running
-    $gatewayStatusCheck = $null
-    if (-not $gatewayReady -and $gatewayStarting) {
-        Write-BootstrapLog -Tag "INFO" -Message "Gateway did not report healthy immediately; verifying local readiness."
-        $gatewayStatusCheck = Wait-ForJsonServiceReady `
-            -StepId "gateway" `
-            -VerificationLabel "gateway" `
-            -ScriptRelativePath "scripts\check-gateway-startup.ps1" `
-            -IsReady {
-                param($probe)
-                return $probe.Result.Ok -and $probe.Payload -and [bool]$probe.Payload.Healthy
-            }
-        $gatewayReady = [bool]$gatewayStatusCheck.Ready
-    }
-    $gatewayDetailsParts = @($gatewayStart.Result.OutputTail)
-    if ($gatewayStatusCheck -and $gatewayStatusCheck.Probe -and $gatewayStatusCheck.Probe.Result.OutputTail) {
-        $gatewayDetailsParts += $gatewayStatusCheck.Probe.Result.OutputTail
-    }
-    $gatewayDetails = [string]::Join(
-        [Environment]::NewLine,
-        @($gatewayDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    ).Trim()
-    $gatewayState = if ($gatewayReady) { "ready" } else { "failed" }
-    $gatewaySummary = if ($gatewayReady) { "Gateway is healthy." } else { "Gateway is not healthy." }
-    $gatewayStep = New-StepResult `
-        -Name "gateway" `
-        -State $gatewayState `
-        -Ok $gatewayReady `
-        -Summary $gatewaySummary `
-        -Details $gatewayDetails `
-        -Payload $(if ($gatewayStatusCheck -and $gatewayStatusCheck.Probe -and $gatewayStatusCheck.Probe.Payload) { $gatewayStatusCheck.Probe.Payload } else { $gatewayStart.Payload })
-    $steps += $gatewayStep
-    Write-StepLog -Step $gatewayStep -FallbackText $gatewayDetails
-    if ($gatewayReady) {
-        Complete-CurrentBootstrapStep `
-            -StepId "gateway" `
-            -StepLabel "Gateway is ready." `
-            -Summary "Gateway is healthy."
-    }
-    else {
-        Fail-CurrentBootstrapStep `
-            -StepId "gateway" `
-            -StepLabel "Gateway is not healthy." `
-            -Summary "Gateway is not healthy."
     }
 }
 

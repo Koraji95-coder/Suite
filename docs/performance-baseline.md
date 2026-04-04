@@ -13,6 +13,6 @@ Notes:
 ## Browser Timing Workflow
 
 - Bootstrap auth state for protected routes with `npm run auth:playwright:bootstrap`.
-- Run `npm run test:e2e:dashboard:perf` for the current dashboard timing pass.
+- Run `npm run test:e2e:dashboard:perf` for the current Home/front-door timing pass.
 - The Playwright run prints and attaches `dashboard-performance.json`.
-- Dashboard stage timings are recorded in `window.__suiteDashboardPerf` by `src/components/apps/dashboard/dashboardPerf.ts`.
+- Home/front-door stage timings are recorded in `window.__suiteDashboardPerf` by `src/features/project-overview/dashboardPerf.ts`.

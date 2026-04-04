@@ -1,6 +1,6 @@
 import { GitBranch } from "lucide-react";
 import { useId, useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import styles from "./SymmetricalComponents.module.css";
 
 export function SymmetricalComponents() {

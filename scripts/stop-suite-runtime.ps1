@@ -367,15 +367,12 @@ function Stop-ProcessesByCommandTokens {
 }
 
 Stop-RuntimeCoreService -ServiceName "backend" -Label "runtime-core-backend"
-Stop-RuntimeCoreService -ServiceName "gateway" -Label "runtime-core-gateway"
 if ($IncludeFrontend) {
     Stop-RuntimeCoreService -ServiceName "frontend" -Label "runtime-core-frontend"
 }
 
 Stop-ProcessesByCommandTokens -Tokens @("backend/api_server.py") -Label "backend"
-Stop-ProcessesByCommandTokens -Tokens @("run-agent-gateway.mjs") -Label "gateway-launcher"
-Stop-ProcessesByCommandTokens -Tokens @("suite-agent-gateway.mjs") -Label "gateway-native-launcher"
-Stop-PortListeners -Ports @(5000, 3000, 3001) -Label "ports"
+Stop-PortListeners -Ports @(5000, 5173) -Label "ports"
 Stop-ProcessesByCommandTokens -Tokens @("watchdog-filesystem-collector-daemon.ps1") -Label "watchdog-filesystem-daemon"
 Stop-ProcessesByCommandTokens -Tokens @("run-watchdog-filesystem-collector.py") -Label "watchdog-filesystem-worker"
 

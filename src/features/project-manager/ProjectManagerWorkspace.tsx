@@ -1,5 +1,5 @@
 import { FolderKanban } from "lucide-react";
-import { Suspense, lazy } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import type { StatusFilter, ViewMode } from "@/features/project-core";
 import { ProjectDetail } from "@/features/project-detail";
 import { WATCHDOG_FOLDER_PICKER_UNAVAILABLE_MESSAGE } from "@/services/watchdogService";
@@ -27,6 +27,9 @@ export interface ProjectManagerWorkspaceProps {
 	onCalendarDateChange?: (date: string | null) => void;
 	calendarMonth?: Date;
 	onCalendarMonthChange?: (month: Date) => void;
+	onSelectedProjectIdChange?: (projectId: string | null) => void;
+	onViewModeChange?: (viewMode: ViewMode) => void;
+	onActiveIssueSetIdChange?: (issueSetId: string | null) => void;
 }
 
 export function ProjectManagerWorkspace({
@@ -37,6 +40,9 @@ export function ProjectManagerWorkspace({
 	onCalendarDateChange,
 	calendarMonth: externalMonth,
 	onCalendarMonthChange,
+	onSelectedProjectIdChange,
+	onViewModeChange,
+	onActiveIssueSetIdChange,
 }: ProjectManagerWorkspaceProps = {}) {
 	const {
 		projects,
@@ -125,6 +131,18 @@ export function ProjectManagerWorkspace({
 		onCalendarMonthChange,
 	});
 
+	useEffect(() => {
+		onSelectedProjectIdChange?.(selectedProject?.id ?? null);
+	}, [onSelectedProjectIdChange, selectedProject?.id]);
+
+	useEffect(() => {
+		onViewModeChange?.(viewMode);
+	}, [onViewModeChange, viewMode]);
+
+	useEffect(() => {
+		onActiveIssueSetIdChange?.(activeIssueSetId);
+	}, [activeIssueSetId, onActiveIssueSetIdChange]);
+
 	return (
 		<div className={styles.root}>
 			<ProjectManagerHeader
@@ -201,8 +219,8 @@ export function ProjectManagerWorkspace({
 							<p className={styles.listPaneEyebrow}>Projects</p>
 							<h3 className={styles.listPaneTitle}>Project list</h3>
 							<p className={styles.listPaneCopy}>
-								Open a project to manage setup, readiness, review, issue
-								sets, and files.
+								Open a project notebook to manage overview, calendar, files,
+								release, and review work.
 							</p>
 						</div>
 					</div>
@@ -270,11 +288,11 @@ export function ProjectManagerWorkspace({
 						<div className={styles.emptyDetail}>
 							<FolderKanban className={styles.emptyIcon} />
 							<p className={styles.emptyTitle}>
-								Select a project to view details
+								Select a project to open the notebook
 							</p>
 							<p className={styles.emptyCopy}>
-								Pick a project to open setup, review, issue sets, and project
-								activity.
+								Pick a project to open overview, review, release, files, and
+								calendar context.
 							</p>
 						</div>
 					)}

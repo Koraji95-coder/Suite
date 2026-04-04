@@ -7,18 +7,21 @@ import {
 	isFrontendPasskeyEnabled,
 	type PasskeyCapability,
 } from "@/auth/passkeyCapabilityApi";
-import { agentService } from "@/services/agentService";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import {
 	logAuthMethodTelemetry,
 	logSecurityEvent,
 } from "@/services/securityEventService";
 import { supabase } from "@/supabase/client";
+
 const PASSKEY_CAPABILITY_CACHE_KEY = "suite:passkey:capability";
 const PASSKEY_CAPABILITY_CACHE_TTL_MS = 5 * 60_000;
 
 function readCachedPasskeyCapability(): PasskeyCapability | null {
+	const storage = getLocalStorageApi();
+	if (!storage) return null;
 	try {
-		const raw = localStorage.getItem(PASSKEY_CAPABILITY_CACHE_KEY);
+		const raw = storage.getItem(PASSKEY_CAPABILITY_CACHE_KEY);
 		if (!raw) return null;
 		const parsed = JSON.parse(raw) as {
 			value?: PasskeyCapability;
@@ -37,8 +40,10 @@ function readCachedPasskeyCapability(): PasskeyCapability | null {
 }
 
 function writeCachedPasskeyCapability(value: PasskeyCapability) {
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(
+		storage.setItem(
 			PASSKEY_CAPABILITY_CACHE_KEY,
 			JSON.stringify({
 				value,
@@ -363,7 +368,6 @@ export function useAccountSessionActions() {
 		setIsSigningOutAll(true);
 		setAccountActionMessage("");
 		try {
-			await agentService.unpair();
 			const { error } = await supabase.auth.signOut({ scope: "global" });
 			if (error) throw error;
 			await logSecurityEvent(

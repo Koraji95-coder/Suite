@@ -21,13 +21,13 @@
 
 ## Current Callers
 
-- `src/components/apps/transmittal-builder/TransmittalBuilderApp.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderMainForm.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderRightRail.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderProjectAndSenderSection.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderTypeAndFilesSection.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderContactsSection.tsx`
-- `src/components/apps/transmittal-builder/TransmittalBuilderOptionsSection.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderApp.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderMainForm.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderRightRail.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderProjectAndSenderSection.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderTypeAndFilesSection.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderContactsSection.tsx`
+- `src/features/transmittal-builder/ui/TransmittalBuilderOptionsSection.tsx`
 - `src/services/projectTransmittalReceiptService.ts`
 - `src/features/project-delivery/evidenceService.ts`
 
@@ -49,5 +49,5 @@ Those dependencies remain outside the slice. The feature owns the transmittal-bu
 ## Transitional Notes
 
 - The old component-local `useTransmittalBuilderState.ts`, `transmittalBuilderModels.ts`, `transmittalConfig.ts`, and `transmittalService.ts` paths have been removed from active code.
-- The `src/components/apps/transmittal-builder/*` tree is now UI-first and should continue shrinking toward shell/presentation ownership only.
+- The `src/features/transmittal-builder/ui/*` tree is now UI-first and should continue shrinking toward shell/presentation ownership only.
 - The package band and right rail now surface the hosted latest native standards review instead of treating standards as implied issue-set state.

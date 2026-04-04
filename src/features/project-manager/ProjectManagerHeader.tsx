@@ -1,8 +1,8 @@
 import { Plus, Search, Target } from "lucide-react";
-import { PageContextBand } from "@/components/apps/ui/PageContextBand";
+import { PageContextBand } from "@/components/system/PageContextBand";
+import type { StatusFilter } from "@/features/project-core";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectManagerHeader.module.css";
-import type { StatusFilter } from "@/features/project-core";
 
 interface ProjectManagerHeaderProps {
 	statusFilter: StatusFilter;
@@ -37,8 +37,8 @@ export function ProjectManagerHeader({
 			summary={
 				<div>
 					<p className={styles.subtitle}>
-						Manage setup, review, issue sets, and package readiness in one
-						place.
+						Keep notes, meetings, files, stage status, review, and release
+						context tied to each project.
 					</p>
 					<p className={styles.summary}>
 						{activeProjects} active - {archivedProjects} archived
@@ -80,14 +80,18 @@ export function ProjectManagerHeader({
 
 				<div className={styles.meta}>
 					<div className={styles.searchWrap}>
+						<label htmlFor="project-manager-search" className={styles.srOnly}>
+							Search projects
+						</label>
 						<Search className={styles.searchIcon} />
 						<input
+							id="project-manager-search"
 							type="text"
 							value={projectSearch}
 							onChange={(event) => onProjectSearchChange(event.target.value)}
-							placeholder="Search projects..."
+							placeholder="Search projects, notes, or release context"
 							className={styles.searchInput}
-							name="projectmanagerheader_input_113"
+							name="projectSearch"
 						/>
 					</div>
 					<div className={styles.statsGrid}>

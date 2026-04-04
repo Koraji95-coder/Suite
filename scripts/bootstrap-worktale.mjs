@@ -10,8 +10,8 @@ import {
 	isPostPushHookHealthy,
 	isPostPushHookInstalled,
 	probeWorktaleCli,
-	runWorktale,
 	runCommand,
+	runWorktale,
 } from "./lib/worktale-support.mjs";
 
 function readState(repoRoot) {
@@ -42,7 +42,11 @@ function logStep(message) {
 
 function printFailure(result, fallbackMessage) {
 	const message =
-		result.stderr || result.stdout || result.error || fallbackMessage || "Command failed.";
+		result.stderr ||
+		result.stdout ||
+		result.error ||
+		fallbackMessage ||
+		"Command failed.";
 	console.error(`worktale: ${message}`);
 	process.exit(1);
 }
@@ -50,7 +54,9 @@ function printFailure(result, fallbackMessage) {
 function ensureReady(repoRoot) {
 	let state = readState(repoRoot);
 	if (!state.cliInstalled) {
-		console.error("worktale: CLI is not installed or is not available on PATH.");
+		console.error(
+			"worktale: CLI is not installed or is not available on PATH.",
+		);
 		process.exit(1);
 	}
 	if (!state.repoExists || !state.gitRepository) {

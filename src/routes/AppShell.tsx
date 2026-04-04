@@ -1,40 +1,45 @@
 // src/routes/AppShell.tsx
 import {
-	AppWindow,
-	BookOpen,
 	Bug,
-	CalendarDays,
 	ChevronRight,
-	ClipboardList,
 	Clock3,
-	FolderOpen,
+	FolderKanban,
+	House,
 	KeyRound,
-	LayoutDashboard,
 	LogOut,
 	Menu,
-	Radar,
+	PencilRuler,
 	RefreshCw,
 	Settings,
+	ShieldCheck,
+	TerminalSquare,
 	X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
+import { SuiteLogo } from "../components/brand/SuiteLogo";
+import { Badge } from "../components/system/base/Badge";
+// Primitives
+import { Button } from "../components/system/base/Button";
+import { Container } from "../components/system/base/Container";
+import { Input } from "../components/system/base/Input";
+import { Panel } from "../components/system/base/Panel";
+import { Stack } from "../components/system/base/Stack";
+import { Text } from "../components/system/base/Text";
+import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 import {
 	PageHeaderProvider,
 	usePageHeader,
-} from "../components/apps/ui/PageHeaderContext";
-import { SuiteLogo } from "../components/brand/SuiteLogo";
-import { Badge } from "../components/primitives/Badge";
-// Primitives
-import { Button } from "../components/primitives/Button";
-import { Container } from "../components/primitives/Container";
-import { Input } from "../components/primitives/Input";
-import { Panel } from "../components/primitives/Panel";
-import { Stack } from "../components/primitives/Stack";
-import { Text } from "../components/primitives/Text";
-import AdminCrownPixel from "../components/roles/AdminCrownPixel";
+} from "../components/system/PageHeaderContext";
 import { useSuiteRuntimeDoctor } from "../hooks/useSuiteRuntimeDoctor";
 import { useWatchdogProjectSync } from "../hooks/useWatchdogProjectSync";
 import {
@@ -47,44 +52,52 @@ import {
 	canAccessAudience,
 	isDevAudience,
 } from "../lib/audience";
-import type { SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
 import { getAppRole } from "../lib/roles";
+import type { SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
-import { resolveShellMeta } from "./appShellMeta";
+import { resolveShellMeta, type ShellFamilyId } from "./appShellMeta";
 
 type ShellNavItem = {
 	to: string;
+	family: ShellFamilyId;
 	label: string;
-	icon: typeof LayoutDashboard;
+	helper: string;
+	icon: typeof House;
 	audience: AppAudience;
 };
 
 const primaryNavItems: ShellNavItem[] = [
 	{
-		to: "/app/dashboard",
-		label: "Dashboard",
-		icon: LayoutDashboard,
+		to: "/app/home",
+		family: "home",
+		label: "Home",
+		helper: "Calm suite board",
+		icon: House,
 		audience: "customer",
 	},
-	{ to: "/app/watchdog", label: "Watchdog", icon: Radar, audience: "customer" },
 	{
 		to: "/app/projects",
+		family: "projects",
 		label: "Projects",
-		icon: FolderOpen,
+		helper: "Notebook and release context",
+		icon: FolderKanban,
 		audience: "customer",
 	},
 	{
-		to: "/app/calendar",
-		label: "Calendar",
-		icon: CalendarDays,
+		to: "/app/draft",
+		family: "draft",
+		label: "Draft",
+		helper: "Released drafting surfaces",
+		icon: PencilRuler,
 		audience: "customer",
 	},
-	{ to: "/app/apps", label: "Apps", icon: AppWindow, audience: "customer" },
 	{
-		to: "/app/knowledge",
-		label: "Knowledge",
-		icon: BookOpen,
+		to: "/app/review",
+		family: "review",
+		label: "Review",
+		helper: "Standards and readiness",
+		icon: ShieldCheck,
 		audience: "customer",
 	},
 ];
@@ -92,8 +105,10 @@ const primaryNavItems: ShellNavItem[] = [
 const developerNavItems: ShellNavItem[] = [
 	{
 		to: "/app/developer",
+		family: "developer",
 		label: "Developer",
-		icon: ClipboardList,
+		helper: "Control, architecture, and labs",
+		icon: TerminalSquare,
 		audience: "dev",
 	},
 ];
@@ -115,7 +130,7 @@ function FirstLoginNamePrompt() {
 	);
 	if (!shouldShow) return null;
 
-	const submit = async (event: React.FormEvent) => {
+	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		const trimmed = value.trim();
 		if (!trimmed || saving) return;
@@ -179,7 +194,7 @@ function FirstLoginNamePrompt() {
 								disabled={saving || value.trim().length < 2}
 								loading={saving}
 							>
-								{saving ? "Saving…" : "Continue"}
+								{saving ? "Saving..." : "Continue"}
 							</Button>
 						</div>
 					</Stack>
@@ -192,7 +207,15 @@ function FirstLoginNamePrompt() {
 const navItemClass = (isActive: boolean) =>
 	cn(styles.navItem, isActive && styles.navItemActive);
 
-function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarNav({
+	activeFamily,
+	pathname,
+	onNavigate,
+}: {
+	activeFamily: ShellFamilyId;
+	pathname: string;
+	onNavigate?: () => void;
+}) {
 	const { user } = useAuth();
 	const canAccessCommandCenter = isDevAudience(user);
 	const navRef = useRef<HTMLElement | null>(null);
@@ -220,31 +243,59 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 		}
 	}, []);
 
+	const introTitle =
+		activeFamily === "developer" ? "Developer branch" : "Customer shell";
+	const introCopy =
+		activeFamily === "developer"
+			? "Control, architecture, and labs stay here until they are ready to graduate."
+			: "Projects, Draft, and Review stay product-led so the main shell stays calm and predictable.";
+	const settingsActive = pathname.startsWith("/app/settings");
+
 	return (
 		<nav ref={navRef} className={styles.sidebarNav}>
+			<div className={styles.navIntroCard}>
+				<div className={styles.navIntroTitle}>{introTitle}</div>
+				<div className={styles.navIntroCopy}>{introCopy}</div>
+			</div>
+
 			<div className={styles.navGroup}>
-				<div className={styles.navGroupLabel}>Workspace</div>
+				<div className={styles.navGroupLabel}>Families</div>
 				{safeNavItems.map((item) => {
 					const Icon = item.icon;
+					const isActive = item.family === activeFamily;
 					return (
 						<NavLink
 							key={item.to}
 							to={item.to}
-							className={({ isActive }) => navItemClass(isActive)}
+							aria-current={isActive ? "page" : undefined}
+							className={navItemClass(isActive)}
 							onClick={onNavigate}
 						>
 							<Icon size={16} />
-							<span>{item.label}</span>
+							<span className={styles.navItemCopy}>
+								<span>{item.label}</span>
+								<span className={styles.navItemHelper}>{item.helper}</span>
+							</span>
 						</NavLink>
 					);
 				})}
+			</div>
+
+			<div className={styles.navGroup}>
+				<div className={styles.navGroupLabel}>Utilities</div>
 				<NavLink
 					to="/app/settings"
-					className={({ isActive }) => navItemClass(isActive)}
+					aria-current={settingsActive ? "page" : undefined}
+					className={navItemClass(settingsActive)}
 					onClick={onNavigate}
 				>
 					<Settings size={16} />
-					<span>Settings</span>
+					<span className={styles.navItemCopy}>
+						<span>Settings</span>
+						<span className={styles.navItemHelper}>
+							Account and workspace preferences
+						</span>
+					</span>
 				</NavLink>
 			</div>
 
@@ -253,15 +304,20 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 					<div className={styles.navGroupLabel}>Developer</div>
 					{safeDeveloperNavItems.map((item) => {
 						const Icon = item.icon;
+						const isActive = item.family === activeFamily;
 						return (
 							<NavLink
 								key={item.to}
 								to={item.to}
-								className={({ isActive }) => navItemClass(isActive)}
+								aria-current={isActive ? "page" : undefined}
+								className={navItemClass(isActive)}
 								onClick={onNavigate}
 							>
 								<Icon size={16} />
-								<span>{item.label}</span>
+								<span className={styles.navItemCopy}>
+									<span>{item.label}</span>
+									<span className={styles.navItemHelper}>{item.helper}</span>
+								</span>
 							</NavLink>
 						);
 					})}
@@ -274,9 +330,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 function SidebarBrand() {
 	return (
 		<NavLink
-			to="/app/dashboard"
+			to="/app/home"
 			className={styles.brandLink}
-			aria-label="Go to dashboard"
+			aria-label="Go to Home"
 		>
 			<SuiteLogo variant="compact" size="md" />
 		</NavLink>
@@ -375,14 +431,20 @@ function SidebarSessionCluster({ compact = false }: { compact?: boolean }) {
 	);
 }
 
-function DesktopSidebar() {
+function DesktopSidebar({
+	activeFamily,
+	pathname,
+}: {
+	activeFamily: ShellFamilyId;
+	pathname: string;
+}) {
 	return (
 		<aside className={styles.desktopSidebar} aria-label="Workspace navigation">
 			<div className={styles.desktopSidebarBrand}>
 				<SidebarBrand />
 			</div>
 			<div className={styles.desktopSidebarContent}>
-				<SidebarNav />
+				<SidebarNav activeFamily={activeFamily} pathname={pathname} />
 			</div>
 			<div className={styles.desktopSidebarFooter}>
 				<SidebarSessionCluster />
@@ -392,9 +454,13 @@ function DesktopSidebar() {
 }
 
 function MobileDrawer({
+	activeFamily,
+	pathname,
 	open,
 	onClose,
 }: {
+	activeFamily: ShellFamilyId;
+	pathname: string;
 	open: boolean;
 	onClose: () => void;
 }) {
@@ -426,7 +492,11 @@ function MobileDrawer({
 					</button>
 				</div>
 				<div className={styles.mobileDrawerContent}>
-					<SidebarNav onNavigate={onClose} />
+					<SidebarNav
+						activeFamily={activeFamily}
+						pathname={pathname}
+						onNavigate={onClose}
+					/>
 				</div>
 				<div className={styles.mobileDrawerFooter}>
 					<SidebarSessionCluster compact />
@@ -689,11 +759,17 @@ function ShellWorkspace() {
 				? "warnings present"
 				: "all checks clear";
 	const resolvedHeaderIcon = header.icon ?? <ShellMetaIcon size={14} />;
+	const showAreaLabel = shellMeta.areaLabel !== shellMeta.familyLabel;
 
 	return (
 		<div className={styles.appRoot}>
 			<FirstLoginNamePrompt />
-			<MobileDrawer open={mobileMenuOpen} onClose={closeMobileMenu} />
+			<MobileDrawer
+				activeFamily={shellMeta.family}
+				pathname={pathname}
+				open={mobileMenuOpen}
+				onClose={closeMobileMenu}
+			/>
 			<AppDiagnosticsDrawer
 				open={diagnosticsOpen}
 				onClose={() => setDiagnosticsOpen(false)}
@@ -704,7 +780,7 @@ function ShellWorkspace() {
 			/>
 
 			<div className={styles.shellBody}>
-				<DesktopSidebar />
+				<DesktopSidebar activeFamily={shellMeta.family} pathname={pathname} />
 				<main ref={scrollRef} className={styles.main}>
 					<div className={styles.commandFrame}>
 						<div className={styles.workspaceSurface}>
@@ -723,7 +799,7 @@ function ShellWorkspace() {
 											<span className={styles.workspaceHeaderEyebrowIcon}>
 												{resolvedHeaderIcon}
 											</span>
-											<span>{APP_NAME} Workspace</span>
+											<span>{APP_NAME} operator board</span>
 										</div>
 										<Text
 											as="h1"
@@ -751,7 +827,7 @@ function ShellWorkspace() {
 										size="sm"
 										className={styles.workspaceRailChip}
 									>
-										Suite workspace
+										Suite board
 									</Badge>
 									<div className={styles.workspaceHeaderRailPair}>
 										<Badge
@@ -760,7 +836,7 @@ function ShellWorkspace() {
 											size="sm"
 											className={styles.workspaceRailChip}
 										>
-											Area
+											Family
 										</Badge>
 										<Badge
 											color="primary"
@@ -768,9 +844,29 @@ function ShellWorkspace() {
 											size="sm"
 											className={styles.workspaceRailValue}
 										>
-											{shellMeta.areaLabel}
+											{shellMeta.familyLabel}
 										</Badge>
 									</div>
+									{showAreaLabel ? (
+										<div className={styles.workspaceHeaderRailPair}>
+											<Badge
+												color="default"
+												variant="soft"
+												size="sm"
+												className={styles.workspaceRailChip}
+											>
+												Area
+											</Badge>
+											<Badge
+												color="default"
+												variant="outline"
+												size="sm"
+												className={styles.workspaceRailValue}
+											>
+												{shellMeta.areaLabel}
+											</Badge>
+										</div>
+									) : null}
 									<button
 										type="button"
 										className={cn(

@@ -9,6 +9,7 @@ This section is the canonical home for workstation-local companion behavior, bri
 
 ## Canonical Docs
 
+- [Local Vs Container Ownership](./local-vs-container-ownership.md)
 - [Windows Workstation Bring-Up](./workstation-bringup.md)
 - [Workstation Transfer Runbook](./workstation-transfer-runbook.md)
 - [MCP Workstation Matrix](./mcp-workstation-matrix.md)
@@ -18,6 +19,9 @@ This section is the canonical home for workstation-local companion behavior, bri
 ## Current Ownership Notes
 
 - Runtime Control is the workstation-local companion layer, not just a bootstrap shell.
+- Docker owns the reproducible runtime-core lane for frontend, backend, Redis, and the local Supabase slice. It does not replace machine-local ownership.
+- Runtime Control owns machine-local control, workstation identity, startup tasks, Docker observability, support bundles, and local action handoff.
+- Workstation switching is Git + bootstrap + workstation sync + mirror/restore. Docker improves parity and observability, but it is not the full portability story.
 - Project setup local actions now terminate at Runtime Control localhost endpoints under `/api/workstation/project-setup/*`.
 - Native project standards review now terminates at `/api/workstation/project-standards/run-review`.
 - Folder picking is companion-owned. The old backend `/api/watchdog/pick-root` route is retired.

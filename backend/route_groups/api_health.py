@@ -36,26 +36,6 @@ def _limiter_health_payload() -> Dict[str, Any]:
     }
 
 
-def _agent_session_store_payload() -> Dict[str, Any]:
-    runtime = current_app.config.get("AGENT_SESSION_STORE_STATUS")
-    if not isinstance(runtime, dict):
-        return {
-            "mode": "memory",
-            "reason": "uninitialized",
-        }
-    payload = {
-        "mode": str(runtime.get("mode") or "memory"),
-        "reason": str(runtime.get("reason") or ""),
-    }
-    redis_url = str(runtime.get("redis_url") or "").strip()
-    if redis_url:
-        payload["redis_url"] = redis_url
-    key_prefix = str(runtime.get("key_prefix") or "").strip()
-    if key_prefix:
-        payload["key_prefix"] = key_prefix
-    return payload
-
-
 def _doctor_state_from_checks(checks: list[Dict[str, Any]]) -> str:
     actionable_checks = [
         check
@@ -96,7 +76,6 @@ def _doctor_counts(checks: list[Dict[str, Any]]) -> Dict[str, int]:
 
 def _suite_health_checks() -> tuple[list[Dict[str, Any]], list[str]]:
     limiter = _limiter_health_payload()
-    agent_session_store = _agent_session_store_payload()
 
     recommendations: list[str] = []
     checks: list[Dict[str, Any]] = [
@@ -134,35 +113,6 @@ def _suite_health_checks() -> tuple[list[Dict[str, Any]], list[str]]:
     if limiter_degraded:
         recommendations.append(
             "Restore shared limiter storage or accept degraded local-memory limiter behavior for this workstation."
-        )
-
-    session_mode = str(agent_session_store.get("mode") or "memory")
-    session_reason = str(agent_session_store.get("reason") or "").strip()
-    session_is_ready = session_mode == "redis" and session_reason == "redis_connected"
-    session_is_background = session_mode == "memory"
-    session_detail = f"Agent session store is using {session_mode} mode."
-    if session_reason:
-        session_detail = f"{session_detail} Reason: {session_reason}."
-    checks.append(
-        {
-            "key": "agent-session-store",
-            "label": "Agent session store",
-            "subsystem": "backend",
-            "severity": (
-                "ready"
-                if session_is_ready
-                else "background"
-                if session_is_background
-                else "needs-attention"
-            ),
-            "detail": session_detail,
-            "actionable": (not session_is_ready) and (not session_is_background),
-            "meta": agent_session_store,
-        }
-    )
-    if (not session_is_ready) and (not session_is_background):
-        recommendations.append(
-            "Restore the configured agent session store so paired-session persistence stays available."
         )
 
     return checks, recommendations
@@ -394,7 +344,6 @@ def create_health_blueprint(*, limiter: Limiter | None = None) -> Blueprint:
                 "timestamp": time.time(),
                 "checkedAt": checked_at,
                 "limiter": _limiter_health_payload(),
-                "agent_session_store": _agent_session_store_payload(),
                 "service": {
                     "id": "backend",
                     "label": "Watchdog Backend",

@@ -24,6 +24,6 @@ This workspace uses component-owned CSS Modules with a shared global token layer
 
 ## Current migrated slices
 
-- `src/components/apps/standards-checker/*`
+- `src/features/standards-checker/ui/*`
 - `src/features/project-manager/ProjectManagerHeader.tsx`
-- `src/components/primitives/Container.tsx`
+- `src/components/system/base/Container.tsx`

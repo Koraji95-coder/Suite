@@ -160,10 +160,6 @@ additional_redirect_urls = [
   "http://localhost:5173",
   "http://127.0.0.1:5173/login",
   "http://localhost:5173/login",
-  "http://127.0.0.1:5173/agent/pairing-callback",
-  "http://localhost:5173/agent/pairing-callback",
-  "http://127.0.0.1:5173/app/agent/pairing-callback",
-  "http://localhost:5173/app/agent/pairing-callback",
   "http://127.0.0.1:5173/app/settings",
   "http://localhost:5173/app/settings",
 ]

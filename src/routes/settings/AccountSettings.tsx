@@ -1,9 +1,9 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
-import { PageContextBand } from "@/components/apps/ui/PageContextBand";
-import { TrustStateBadge } from "@/components/apps/ui/TrustStateBadge";
-import { Stack } from "@/components/primitives/Stack";
-import { Text } from "@/components/primitives/Text";
+import { PageContextBand } from "@/components/system/PageContextBand";
+import { TrustStateBadge } from "@/components/system/TrustStateBadge";
+import { Stack } from "@/components/system/base/Stack";
+import { Text } from "@/components/system/base/Text";
 import styles from "./AccountSettings.module.css";
 import {
 	AccountProfileSection,

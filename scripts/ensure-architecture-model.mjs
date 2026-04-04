@@ -12,7 +12,8 @@ const verifyOnly = process.argv.includes("--verify");
 
 const INPUT_ROOTS = [
 	"src/routes",
-	"src/components/apps",
+	"src/features",
+	"src/components",
 	"src/auth",
 	"src/services",
 	"backend",

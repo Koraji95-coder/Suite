@@ -47,9 +47,8 @@ internal static class BootstrapProgressReducer
         ("watchdog-filesystem", "Filesystem Collector", 10),
         ("watchdog-autocad-startup", "AutoCAD Collector", 10),
         ("watchdog-autocad-plugin", "AutoCAD Plugins", 5),
-        ("backend", "Watchdog Backend", 10),
-        ("gateway", "API Gateway", 10),
-        ("frontend", "Suite Frontend", 10),
+        ("backend", "Watchdog Backend", 15),
+        ("frontend", "Suite Frontend", 15),
     };
 
     private static readonly IReadOnlyDictionary<string, (string Label, int Weight)> MilestoneMap =

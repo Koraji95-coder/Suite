@@ -1,6 +1,15 @@
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
-import type { WorkLedgerFilters, WorkLedgerInput, WorkLedgerRow } from "./types";
-import { normalizeLifecycleState, normalizeSearch, sanitizeArray } from "./helpers";
+import {
+	normalizeLifecycleState,
+	normalizeSearch,
+	sanitizeArray,
+} from "./helpers";
+import type {
+	WorkLedgerFilters,
+	WorkLedgerInput,
+	WorkLedgerRow,
+} from "./types";
 
 const LOCAL_STORAGE_KEY = "suite:work-ledger:local";
 
@@ -10,22 +19,26 @@ const createId = () =>
 		: `work-ledger-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export function readLocalEntries(): WorkLedgerRow[] {
-	if (typeof localStorage === "undefined") return [];
+	const storage = getLocalStorageApi();
+	if (!storage) return [];
 	try {
-		const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+		const raw = storage.getItem(LOCAL_STORAGE_KEY);
 		if (!raw) return [];
 		const parsed = JSON.parse(raw) as unknown;
 		if (!Array.isArray(parsed)) return [];
-		return parsed.filter((entry) => entry && typeof entry === "object") as WorkLedgerRow[];
+		return parsed.filter(
+			(entry) => entry && typeof entry === "object",
+		) as WorkLedgerRow[];
 	} catch {
 		return [];
 	}
 }
 
 export function writeLocalEntries(entries: WorkLedgerRow[]) {
-	if (typeof localStorage === "undefined") return;
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
+		storage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(entries));
 	} catch (error) {
 		logger.warn("WorkLedgerService", "Unable to persist local work ledger", {
 			error,
@@ -33,7 +46,10 @@ export function writeLocalEntries(entries: WorkLedgerRow[]) {
 	}
 }
 
-export function buildLocalEntry(input: WorkLedgerInput, userId: string | null): WorkLedgerRow {
+export function buildLocalEntry(
+	input: WorkLedgerInput,
+	userId: string | null,
+): WorkLedgerRow {
 	const timestamp = new Date().toISOString();
 	return {
 		id: createId(),
@@ -56,7 +72,10 @@ export function buildLocalEntry(input: WorkLedgerInput, userId: string | null): 
 	};
 }
 
-export function filterEntries(entries: WorkLedgerRow[], filters?: WorkLedgerFilters) {
+export function filterEntries(
+	entries: WorkLedgerRow[],
+	filters?: WorkLedgerFilters,
+) {
 	const search = normalizeSearch(filters?.search);
 	const pathQuery = normalizeSearch(filters?.pathQuery);
 
@@ -85,7 +104,8 @@ export function filterEntries(entries: WorkLedgerRow[], filters?: WorkLedgerFilt
 				? true
 				: entry.architecture_paths.some((pathValue) =>
 						pathValue.toLowerCase().includes(pathQuery),
-					) || entry.hotspot_ids.some((hotspotId) =>
+					) ||
+					entry.hotspot_ids.some((hotspotId) =>
 						hotspotId.toLowerCase().includes(pathQuery),
 					),
 		)

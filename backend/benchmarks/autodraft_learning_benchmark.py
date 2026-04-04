@@ -105,8 +105,6 @@ def _feedback_items_from_bundle(bundle: Dict[str, Any]) -> List[Dict[str, Any]]:
             "note",
             "candidates",
             "selected_candidate",
-            "agent_suggestion",
-            "accepted_agent_suggestion",
         ):
             if key not in merged and key in item:
                 merged[key] = item.get(key)

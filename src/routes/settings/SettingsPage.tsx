@@ -1,5 +1,5 @@
-import { PageFrame } from "@/components/apps/ui/PageFrame";
-import { useRegisterPageHeader } from "@/components/apps/ui/PageHeaderContext";
+import { PageFrame } from "@/components/system/PageFrame";
+import { useRegisterPageHeader } from "@/components/system/PageHeaderContext";
 import AccountSettings from "./AccountSettings";
 import styles from "./SettingsPage.module.css";
 

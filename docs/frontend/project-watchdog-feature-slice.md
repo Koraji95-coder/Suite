@@ -25,8 +25,8 @@
 - `src/features/project-review/ProjectReviewInboxWorkspace.tsx`
 - `src/features/project-workflow/ProjectIssueSetManager.tsx`
 - `src/features/project-watchdog/ProjectTelemetryPanel.tsx`
-- `src/components/apps/automation-studio/CadUtilitiesPanel.tsx`
-- `src/components/apps/automation-studio/TerminalAuthoringPanel.tsx`
+- `src/features/automation-studio/ui/CadUtilitiesPanel.tsx`
+- `src/features/automation-studio/ui/TerminalAuthoringPanel.tsx`
 
 These app components are consumers of the feature slice. They should not become the long-term owners of telemetry loading or tracked-drawing aggregation again.
 

@@ -7,7 +7,7 @@ import {
 	DEFAULT_DISCIPLINES,
 	DEFAULT_SHEET_TYPES,
 	parseFileName,
-} from "@/components/apps/drawing-list-manager/drawingListManagerModels";
+} from "@/features/drawing-list-manager/ui/drawingListManagerModels";
 import {
 	createProjectScopedFetchCache,
 	getCurrentSupabaseUserId,

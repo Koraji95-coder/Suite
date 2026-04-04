@@ -12,7 +12,7 @@ The original project/frontend separation lane is effectively complete.
 
 What is already done:
 
-- project UI ownership was moved out of `src/components/apps/projects` into feature-owned slices under `src/features/*`
+- project UI ownership was moved out of the old shared project app tree into feature-owned slices under `src/features/*`
 - project setup/title-block browser flow was cut over to:
   - hosted core: `/api/project-setup/*`
   - Runtime Control: `/api/workstation/project-setup/*`
@@ -118,7 +118,7 @@ Goal:
 Rules:
 
 - keep global CSS + CSS Modules
-- keep primitives and tokens central
+- keep the shared system layer and tokens central
 - do not let each route invent its own layout language
 
 Target work:

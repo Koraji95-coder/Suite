@@ -50,7 +50,8 @@
 	flex: 0 0 16rem;
 	min-width: 16rem;
 	flex-direction: column;
-	border: 1px solid color-mix(in srgb, var(--brand-border-strong) 72%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-strong) 72%, transparent);
 	border-radius: 1.18rem;
 	background:
 		radial-gradient(
@@ -73,7 +74,8 @@
 .desktopSidebarBrand {
 	flex: 0 0 auto;
 	padding: 1.05rem 0.92rem 0.9rem;
-	border-bottom: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
 }
 
 .desktopSidebarContent {
@@ -86,7 +88,8 @@
 .desktopSidebarFooter {
 	flex: 0 0 auto;
 	padding: 0.78rem;
-	border-top: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border-top: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
 	background:
 		linear-gradient(
 			180deg,
@@ -99,6 +102,36 @@
 .sidebarNav {
 	display: grid;
 	gap: 0.7rem;
+}
+
+.navIntroCard {
+	display: grid;
+	gap: 0.35rem;
+	padding: 0.78rem 0.85rem 0.84rem;
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 84%, transparent);
+	border-radius: 0.95rem;
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--accent) 10%, transparent),
+			transparent 62%
+		),
+		color-mix(in srgb, var(--surface) 62%, transparent);
+}
+
+.navIntroTitle {
+	font-size: 0.72rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--brand-gold) 62%, var(--text-muted));
+}
+
+.navIntroCopy {
+	font-size: 0.78rem;
+	line-height: 1.55;
+	color: var(--text-muted);
 }
 
 .navGroup {
@@ -117,7 +150,7 @@
 
 .navItem {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	gap: 0.65rem;
 	border-radius: 0.82rem;
 	padding: 0.62rem 0.78rem;
@@ -129,7 +162,8 @@
 		color 120ms ease,
 		border-color 120ms ease,
 		transform 120ms ease;
-	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 48%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 48%, transparent);
 	background: color-mix(in srgb, var(--surface) 46%, transparent);
 }
 
@@ -138,6 +172,19 @@
 	background: color-mix(in srgb, var(--surface-2) 76%, transparent);
 	border-color: color-mix(in srgb, var(--brand-border-strong) 52%, transparent);
 	transform: translateY(-1px);
+}
+
+.navItemCopy {
+	display: grid;
+	gap: 0.12rem;
+	min-width: 0;
+}
+
+.navItemHelper {
+	font-size: 0.68rem;
+	font-weight: 500;
+	line-height: 1.45;
+	color: color-mix(in srgb, var(--text-muted) 86%, transparent);
 }
 
 .navItemActive {
@@ -280,7 +327,8 @@
 	gap: 1.15rem;
 	min-height: 6.8rem;
 	padding: 1rem 1.08rem 1rem;
-	border-bottom: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border-bottom: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
 	border-top-left-radius: calc(1.25rem - 1px);
 	border-top-right-radius: calc(1.25rem - 1px);
 	background: var(--suite-header-surface);
@@ -344,11 +392,26 @@
 }
 
 .workspaceHeaderMeta {
-	display: grid;
-	grid-template-columns: max-content minmax(0, 12rem) 11rem;
+	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 0.58rem;
+	max-width: min(34rem, 100%);
+	min-width: 0;
 	flex-shrink: 0;
+}
+
+.workspaceHeaderMeta > * {
+	flex: 0 0 auto;
+}
+
+.workspaceHeaderMeta > .workspaceHeaderRailPair {
+	min-width: fit-content;
+}
+
+.workspaceHeaderMeta > .diagnosticsToggle {
+	margin-left: auto;
 }
 
 .workspaceHeaderRailPair {
@@ -378,7 +441,8 @@
 	gap: 0.55rem;
 	min-width: 11.45rem;
 	height: 2rem;
-	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
 	border-radius: 999px;
 	background:
 		linear-gradient(
@@ -605,7 +669,8 @@
 	grid-template-rows: auto 1fr;
 	min-height: 100%;
 	overflow: clip;
-	border: 1px solid color-mix(in srgb, var(--brand-border-strong) 70%, transparent);
+	border: 1px solid
+		color-mix(in srgb, var(--brand-border-strong) 70%, transparent);
 	border-radius: 1.25rem;
 	background: var(--suite-panel-surface-strong);
 	box-shadow:
@@ -732,8 +797,10 @@
 	}
 
 	.workspaceHeaderMeta {
+		display: grid;
 		grid-template-columns: 1fr;
 		justify-items: stretch;
+		max-width: none;
 	}
 
 	.workspaceHeaderRailPair {

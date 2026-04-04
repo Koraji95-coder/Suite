@@ -67,20 +67,6 @@ end $$;
 do $$
 begin
 	if not exists (
-		select 1 from pg_type where typname = 'memory_type'
-	) then
-		create type public.memory_type as enum (
-			'preference',
-			'knowledge',
-			'pattern',
-			'relationship'
-		);
-	end if;
-end $$;
-
-do $$
-begin
-	if not exists (
 		select 1 from pg_type where typname = 'workflow_type'
 	) then
 		create type public.workflow_type as enum (
@@ -368,28 +354,6 @@ create table if not exists public.whiteboards (
 	updated_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.ai_conversations (
-	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references auth.users (id) on delete cascade,
-	panel_context text null,
-	title text null,
-	messages jsonb not null default '[]'::jsonb,
-	context_data jsonb not null default '{}'::jsonb,
-	created_at timestamptz not null default timezone('utc', now()),
-	updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.ai_memory (
-	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references auth.users (id) on delete cascade,
-	memory_type public.memory_type not null,
-	content jsonb not null,
-	connections jsonb not null default '{}'::jsonb,
-	strength integer not null default 1,
-	created_at timestamptz not null default timezone('utc', now()),
-	last_accessed timestamptz not null default timezone('utc', now())
-);
-
 create table if not exists public.block_library (
 	id uuid primary key default gen_random_uuid(),
 	user_id uuid not null references auth.users (id) on delete cascade,
@@ -538,8 +502,6 @@ create index if not exists idx_formulas_user_id on public.formulas (user_id);
 create index if not exists idx_saved_calculations_user_id on public.saved_calculations (user_id);
 create index if not exists idx_saved_circuits_user_id on public.saved_circuits (user_id);
 create index if not exists idx_whiteboards_user_id on public.whiteboards (user_id);
-create index if not exists idx_ai_conversations_user_id on public.ai_conversations (user_id);
-create index if not exists idx_ai_memory_user_id on public.ai_memory (user_id);
 create index if not exists idx_block_library_user_id on public.block_library (user_id);
 create index if not exists idx_automation_workflows_user_id on public.automation_workflows (user_id);
 create index if not exists idx_drawing_annotations_user_id on public.drawing_annotations (user_id);
@@ -577,11 +539,6 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_whiteboards_updated_at on public.whiteboards;
 create trigger set_whiteboards_updated_at
 before update on public.whiteboards
-for each row execute function public.set_updated_at();
-
-drop trigger if exists set_ai_conversations_updated_at on public.ai_conversations;
-create trigger set_ai_conversations_updated_at
-before update on public.ai_conversations
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_user_settings_updated_at on public.user_settings;

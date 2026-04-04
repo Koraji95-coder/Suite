@@ -3,7 +3,7 @@ import type {
 	ProjectReviewInboxItem,
 	ProjectReviewInboxQuickAction,
 } from "./useProjectReviewInboxData";
-import { Badge } from "@/components/primitives/Badge";
+import { Badge } from "@/components/system/base/Badge";
 import styles from "./ProjectReviewInboxList.module.css";
 import type { ViewMode } from "@/features/project-core";
 

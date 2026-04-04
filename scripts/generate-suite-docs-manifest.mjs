@@ -10,7 +10,8 @@ const outputFile = path.join(
 	repoRoot,
 	"src",
 	"routes",
-	"knowledge",
+	"developer",
+	"control",
 	"modules",
 	"generated",
 	"developerDocsManifest.generated.json",
@@ -26,12 +27,6 @@ const SECTION_META = {
 		title: "Frontend",
 		description:
 			"Browser-owned architecture, feature slices, and UI/runtime flow notes.",
-	},
-	agent: {
-		id: "agent-lab",
-		title: "Agent Lab",
-		description:
-			"Pairing, orchestration, and profile-routing docs for experimental agent workflows.",
 	},
 	autodraft: {
 		id: "automation-lab",
@@ -205,17 +200,11 @@ function inferTags(relativePath, sectionId) {
 	if (normalized.includes("watchdog")) {
 		tags.add("watchdog");
 	}
-	if (normalized.includes("gateway")) {
-		tags.add("gateway");
-	}
 	if (normalized.includes("supabase")) {
 		tags.add("supabase");
 	}
 	if (normalized.includes("auth")) {
 		tags.add("auth");
-	}
-	if (normalized.includes("agent")) {
-		tags.add("agents");
 	}
 	if (normalized.includes("autodraft") || normalized.includes("autowire")) {
 		tags.add("automation");

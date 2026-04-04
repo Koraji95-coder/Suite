@@ -114,36 +114,6 @@ function runCli(args) {
 	};
 }
 
-async function checkGatewayHealth() {
-	const host = readSetting(mergedEnv, "AGENT_GATEWAY_HOST", "127.0.0.1");
-	const configuredPort = readSetting(mergedEnv, "AGENT_GATEWAY_PORT", "3001");
-	const port = Number.parseInt(configuredPort, 10);
-	const probeHost =
-		host === "0.0.0.0" || host === "::" || host === "*" ? "127.0.0.1" : host;
-	const url = `http://${probeHost}:${Number.isFinite(port) ? port : 3001}/health`;
-
-	try {
-		const response = await fetch(url, {
-			method: "GET",
-			signal: AbortSignal.timeout(3000),
-		});
-		return {
-			level: response.ok ? "ok" : "warning",
-			ok: response.ok,
-			message: response.ok
-				? "Gateway health endpoint is available."
-				: `Gateway health returned HTTP ${response.status}.`,
-		};
-	} catch (error) {
-		return {
-			level: "warning",
-			ok: false,
-			message:
-				error instanceof Error ? error.message : "Gateway health check failed.",
-		};
-	}
-}
-
 function checkLocalSupabase() {
 	const result = runCli(["status", "-o", "env"]);
 	return {
@@ -320,7 +290,6 @@ function showFailureNotification(title, message) {
 async function runPreflightWorkflow() {
 	const activeMode = resolveMode();
 	const localSupabase = checkLocalSupabase();
-	const gateway = await checkGatewayHealth();
 	const cliAuth = checkCliAuth();
 	const linkedProject = cliAuth.ok ? verifyLinkedProject() : null;
 	const dryRunCheck = cliAuth.ok && linkedProject?.ok ? runDryRunCheck() : null;
@@ -333,7 +302,6 @@ async function runPreflightWorkflow() {
 			`Local auth email mode: ${resolveLocalEmailMode()}.`,
 		),
 		localSupabase,
-		gateway,
 		cliAuth,
 		projectRef: buildCheck(
 			remoteProjectRef ? "ok" : "warning",
@@ -369,10 +337,8 @@ async function runPreflightWorkflow() {
 	};
 
 	const ok = Boolean(cliAuth.ok && linkedProject?.ok && dryRunCheck?.ok);
-	const pushReady = Boolean(
-		ok && (activeMode !== "local" || (localSupabase.ok && gateway.ok)),
-	);
-	const localRuntimeReady = Boolean(localSupabase.ok && gateway.ok);
+	const pushReady = Boolean(ok && (activeMode !== "local" || localSupabase.ok));
+	const localRuntimeReady = Boolean(localSupabase.ok);
 	const summary = ok
 		? dryRunCheck?.message || "Hosted Supabase preflight is ready."
 		: dryRunCheck?.message ||
@@ -382,7 +348,7 @@ async function runPreflightWorkflow() {
 	const pushReadinessSummary = pushReady
 		? "Hosted migration push is ready."
 		: activeMode === "local" && !localRuntimeReady
-			? "Hosted push is blocked until local Supabase and the gateway are healthy."
+			? "Hosted push is blocked until local Supabase is healthy."
 			: !cliAuth.ok
 				? cliAuth.message || "Hosted push is blocked until CLI auth is ready."
 				: !linkedProject?.ok

@@ -21,13 +21,13 @@ That means the first commercial package should be built around:
 - Watchdog project and drawing telemetry
 
 AutoDraft can be the premium automation layer later.
-Agents can be the premium orchestration layer even later.
+Local model-assisted review can be reconsidered only after the core product is stable.
 
 ## Before The First Paid Pilot
 
 ### 1. Make setup feel like a product
 
-- One guided install/bootstrap path for runtime, backend, gateway, frontend, collectors, and AutoCAD plugin.
+- One guided install/bootstrap path for runtime, backend, frontend, collectors, and AutoCAD plugin.
 - Visible version/build info for every moving piece.
 - One clear health screen that matches reality.
 - One support bundle export for logs, runtime state, and diagnostics.
@@ -114,7 +114,7 @@ Watchdog especially needs clear answers here.
 - Production Control
 - Production Control + Watchdog
 - Production Control + Watchdog + AutoDraft
-- Agents only after the rest is stable
+- more advanced automation only after the rest is stable
 
 ### 2. Add billing and entitlement operations
 
@@ -135,7 +135,7 @@ Watchdog especially needs clear answers here.
 ## What Not To Sell First
 
 - not "all-in-one engineering workspace"
-- not generic AI agents
+- not generic AI feature sprawl
 - not general construction PM
 - not autonomous CAD edits without review
 
@@ -155,13 +155,13 @@ Watchdog especially needs clear answers here.
 - clearer throughput and quality metrics
 - very strong review and approval UX
 
-## What Agents Need Before They Can Carry Revenue
+## What Higher-Autonomy Automation Needs Before It Can Carry Revenue
 
 - explicit tool boundaries
 - stronger review inbox and approval flow
 - output attachment to real projects/drawings
 - better run recovery and audit trail
-- less "interesting demo" energy and more "reliable operator assistant" energy
+- less "interesting demo" energy and more "reliable operator workflow" energy
 
 ## Short Version
 

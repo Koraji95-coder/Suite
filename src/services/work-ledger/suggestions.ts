@@ -6,7 +6,6 @@ import type {
 
 const EMPTY_SOURCES = {
 	git: 0,
-	agent: 0,
 	watchdog: 0,
 };
 

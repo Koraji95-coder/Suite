@@ -1,6 +1,6 @@
 import { FileCheck2, FolderTree, FolderUp, Radar } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Panel } from "@/components/primitives/Panel";
+import { Panel } from "@/components/system/base/Panel";
 import { buildProjectScopedAppHref } from "@/lib/projectWorkflowNavigation";
 import { buildWatchdogHref } from "@/lib/watchdogNavigation";
 import { ProjectSetupReadinessPanel } from "./ProjectSetupReadinessPanel";
@@ -61,7 +61,7 @@ export function ProjectSetupWorkspace({
 }: ProjectSetupWorkspaceProps) {
 	const setupAction = resolveSetupAction(project, telemetry);
 	const drawingListHref = buildProjectScopedAppHref(
-		"/app/apps/drawing-list-manager",
+		"/app/draft/drawing-list-manager",
 		project.id,
 	);
 	const watchdogHref = buildWatchdogHref(project.id);

@@ -1,5 +1,5 @@
 import { MapPin, Plus } from "lucide-react";
-import type { GridDesign } from "@/components/apps/ground-grid-generator/types";
+import type { GridDesign } from "@/features/ground-grid-generation/ui/types";
 import { cn } from "@/lib/utils";
 import styles from "./ProjectDetailGroundGridsView.module.css";
 

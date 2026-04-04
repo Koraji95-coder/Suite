@@ -8,7 +8,6 @@ from backend.route_groups.api_runtime_config import (
     derive_default_passkey_rp_id,
     normalize_auth_passkey_provider,
     normalize_autodraft_execute_provider,
-    resolve_agent_webhook_secret,
     resolve_api_key,
     resolve_autodraft_dotnet_api_url,
     resolve_auth_email_require_turnstile,
@@ -93,31 +92,6 @@ class TestApiRuntimeConfig(unittest.TestCase):
             "anon",
         )
         self.assertEqual(len(logger.warnings), 1)
-
-    def test_resolve_agent_webhook_secret(self) -> None:
-        logger = _LoggerStub()
-        self.assertEqual(
-            resolve_agent_webhook_secret(
-                os_module=_OSStub({"AGENT_WEBHOOK_SECRET": "prod-secret"}),
-                logger=logger,
-            ),
-            "prod-secret",
-        )
-        self.assertEqual(
-            resolve_agent_webhook_secret(
-                os_module=_OSStub({"VITE_AGENT_WEBHOOK_SECRET": "dev-secret"}),
-                logger=logger,
-            ),
-            "dev-secret",
-        )
-        self.assertEqual(
-            resolve_agent_webhook_secret(
-                os_module=_OSStub({}),
-                logger=logger,
-            ),
-            "",
-        )
-        self.assertGreaterEqual(len(logger.warnings), 1)
 
     def test_normalize_auth_passkey_provider(self) -> None:
         logger = _LoggerStub()

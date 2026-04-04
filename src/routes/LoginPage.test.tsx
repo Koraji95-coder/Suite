@@ -64,10 +64,6 @@ vi.mock("../auth/passkeySessionState", () => ({
 	markPasskeySignInPending: mockMarkPasskeySignInPending,
 }));
 
-vi.mock("../auth/agentPairingParams", () => ({
-	buildAgentPairingSearchFromLocation: vi.fn(() => ""),
-}));
-
 vi.mock("../auth/authRedirect", () => ({
 	resolveAuthRedirect: vi.fn(() => "/login"),
 }));
@@ -76,7 +72,7 @@ vi.mock("../services/securityEventService", () => ({
 	logAuthMethodTelemetry: vi.fn(async () => undefined),
 }));
 
-vi.mock("../components/apps/dashboard/dashboardOverviewService", () => ({
+vi.mock("../features/project-overview/dashboardOverviewService", () => ({
 	loadDashboardOverviewFromBackend: mockLoadDashboardOverviewFromBackend,
 }));
 
@@ -94,14 +90,6 @@ vi.mock("../auth/CaptchaChallenge", () => ({
 	default: ({ token }: { token: string }) => (
 		<div data-testid="captcha-challenge">{token}</div>
 	),
-}));
-
-vi.mock("../components/agent/AgentOrbitLoader", () => ({
-	AgentOrbitLoader: () => <div data-testid="agent-orbit-loader" />,
-}));
-
-vi.mock("../components/agent/AgentPixelMark", () => ({
-	AgentPixelMark: () => <div data-testid="agent-pixel-mark" />,
 }));
 
 vi.mock("@simplewebauthn/browser", () => ({
@@ -209,8 +197,8 @@ describe("LoginPage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Opening your dashboard")).toBeTruthy();
-		expect(screen.getByText("Preparing dashboard...")).toBeTruthy();
+		expect(screen.getByText("Opening your workspace")).toBeTruthy();
+		expect(screen.getByText("Preparing workspace...")).toBeTruthy();
 	});
 
 	it("shows only the inline login error when passkey verification fails", async () => {

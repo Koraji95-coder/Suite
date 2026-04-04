@@ -47,7 +47,7 @@ Those services remain in `src/services/*` for now. The feature slice is responsi
 
 ## Transitional Notes
 
-- `src/components/apps/projects/projectReviewDescriptors.ts` and `src/components/apps/projects/useProjectReviewInboxData.ts` have been removed from active code.
+- The old shared project app tree descriptor and inbox-data helpers have been removed from active code.
 - Review/readiness now ingest the hosted latest native standards review in addition to drawing-backed standards evidence.
 - `ProjectReadinessWorkspace.tsx`, `ProjectReviewInboxWorkspace.tsx`, and `ProjectReviewInboxList.tsx` now live under `src/features/project-review` instead of the `projects` app tree.
 - `src/features/project-review` now uses shared project models from `src/features/project-core` instead of importing them from the project app surface.

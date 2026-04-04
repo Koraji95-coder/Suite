@@ -17,13 +17,5 @@ export function resolveViteProxyTargets(env: ProxyEnv) {
 			[env.BACKEND_PROXY_TARGET, env.VITE_BACKEND_URL, env.BACKEND_URL],
 			"http://127.0.0.1:5000",
 		),
-		gatewayProxyTarget: pickFirstNonEmpty(
-			[
-				env.AGENT_GATEWAY_PROXY_TARGET,
-				env.VITE_AGENT_GATEWAY_URL,
-				env.AGENT_GATEWAY_URL,
-			],
-			"http://127.0.0.1:3000",
-		),
 	};
 }

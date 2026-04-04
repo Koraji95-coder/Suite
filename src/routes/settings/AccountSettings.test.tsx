@@ -58,7 +58,7 @@ describe("AccountSettings", () => {
 		vi.clearAllMocks();
 	});
 
-	it("renders customer-safe trust controls without agent pairing", () => {
+	it("renders customer-safe trust controls without legacy pairing controls", () => {
 		render(
 			<MemoryRouter>
 				<AccountSettings />
@@ -72,7 +72,6 @@ describe("AccountSettings", () => {
 		expect(
 			screen.queryByRole("button", { name: /Pair this device/i }),
 		).toBeNull();
-		expect(screen.queryByText("Agent access")).toBeNull();
 		expect(screen.queryByText("Verification path")).toBeNull();
 	});
 

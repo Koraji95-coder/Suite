@@ -79,7 +79,7 @@ class TestApiRedisJsonStore(unittest.TestCase):
         redis_stub = _RedisStub()
         store = RedisJsonTtlStore(
             redis_client=redis_stub,
-            key_prefix="suite:agent:session:",
+            key_prefix="suite:test:session:",
             now_fn=lambda: redis_stub.now,
         )
 
@@ -100,7 +100,7 @@ class TestApiRedisJsonStore(unittest.TestCase):
         redis_stub = _RedisStub()
         store = RedisJsonTtlStore(
             redis_client=redis_stub,
-            key_prefix="suite:agent:session:",
+            key_prefix="suite:test:session:",
             now_fn=lambda: redis_stub.now,
         )
 
@@ -116,7 +116,7 @@ class TestApiRedisJsonStore(unittest.TestCase):
         redis_stub = _RedisStub()
         store = RedisJsonTtlStore(
             redis_client=redis_stub,
-            key_prefix="suite:agent:session:",
+            key_prefix="suite:test:session:",
             now_fn=lambda: redis_stub.now,
         )
 

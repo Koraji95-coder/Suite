@@ -1,6 +1,6 @@
 import { TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import styles from "./PlotGenerator.module.css";
 
 type PlotType =

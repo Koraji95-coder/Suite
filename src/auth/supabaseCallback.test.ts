@@ -25,11 +25,8 @@ describe("supabaseCallback", () => {
 	it("accepts only known callback paths", () => {
 		expect(isAllowedSupabaseCallbackPath("/login")).toBe(true);
 		expect(isAllowedSupabaseCallbackPath("/signup")).toBe(true);
-		expect(isAllowedSupabaseCallbackPath("/agent/pairing-callback")).toBe(true);
-		expect(isAllowedSupabaseCallbackPath("/app/agent/pairing-callback")).toBe(
-			true,
-		);
-		expect(isAllowedSupabaseCallbackPath("/app/agent")).toBe(false);
+		expect(isAllowedSupabaseCallbackPath("/app/home")).toBe(false);
+		expect(isAllowedSupabaseCallbackPath("/app/legacy-route")).toBe(false);
 	});
 
 	it("requires canonical Supabase session params", () => {
@@ -51,30 +48,30 @@ describe("supabaseCallback", () => {
 
 	it("removes Supabase auth params from search and keeps app params", () => {
 		const stripped = stripSupabaseAuthParamsFromSearch(
-			"?agent_action=pair&access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer&agent_challenge=xyz",
+			"?flow=signup&access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer&context=verify",
 		);
-		expect(stripped).toBe("?agent_action=pair&agent_challenge=xyz");
+		expect(stripped).toBe("?flow=signup&context=verify");
 	});
 
-	it("removes Supabase auth params from hash route payload and keeps pairing params", () => {
+	it("removes Supabase auth params from hash route payload and keeps app params", () => {
 		const stripped = stripSupabaseAuthParamsFromHash(
-			"#/login?access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer&agent_action=pair&agent_challenge=xyz",
+			"#/login?access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer&flow=signup&context=verify",
 		);
-		expect(stripped).toBe("#/login?agent_action=pair&agent_challenge=xyz");
+		expect(stripped).toBe("#/login?flow=signup&context=verify");
 	});
 
 	it("sanitizes current URL in place", () => {
 		window.history.replaceState(
 			{},
 			"",
-			"/agent/pairing-callback?agent_action=pair&access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer#agent_challenge=xyz&access_token=abc",
+			"/login?flow=signup&access_token=abc&refresh_token=def&expires_in=3600&token_type=bearer#context=verify&access_token=abc",
 		);
 
 		const changed = sanitizeSupabaseCallbackUrlInPlace();
 
 		expect(changed).toBe(true);
-		expect(window.location.pathname).toBe("/agent/pairing-callback");
-		expect(window.location.search).toBe("?agent_action=pair");
-		expect(window.location.hash).toBe("#agent_challenge=xyz");
+		expect(window.location.pathname).toBe("/login");
+		expect(window.location.search).toBe("?flow=signup");
+		expect(window.location.hash).toBe("#context=verify");
 	});
 });

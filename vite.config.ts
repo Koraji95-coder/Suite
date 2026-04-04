@@ -6,7 +6,7 @@ import { resolveViteProxyTargets } from "./vite.proxy-targets";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), "");
-	const { backendUrl, gatewayProxyTarget } = resolveViteProxyTargets(env);
+	const { backendUrl } = resolveViteProxyTargets(env);
 
 	return {
 		plugins: [react()],
@@ -24,12 +24,6 @@ export default defineConfig(({ mode }) => {
 				"/api": {
 					target: backendUrl,
 					changeOrigin: true,
-				},
-				"/gateway": {
-					target: gatewayProxyTarget,
-					changeOrigin: true,
-					ws: true,
-					rewrite: (path) => path.replace(/^\/gateway/, ""),
 				},
 			},
 		},

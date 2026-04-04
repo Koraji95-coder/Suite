@@ -4,7 +4,7 @@ This is the canonical runtime note for the Drawing Cleanup workflow that now liv
 
 ## Ownership
 
-- Browser surface: `/app/apps/batch-find-replace`
+- Browser surface: `/app/developer/labs/batch-find-replace`
 - Backend routes:
   - `POST /api/batch-find-replace/cad/cleanup-preview`
   - `POST /api/batch-find-replace/cad/cleanup-apply`

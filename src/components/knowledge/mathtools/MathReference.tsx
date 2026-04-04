@@ -1,6 +1,6 @@
 import { BookOpen, Calculator, TrendingUp } from "lucide-react";
 import { useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import { cn } from "@/lib/utils";
 import styles from "./MathReference.module.css";
 

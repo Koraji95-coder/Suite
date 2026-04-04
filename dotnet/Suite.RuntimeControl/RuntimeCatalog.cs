@@ -239,7 +239,6 @@ internal sealed class RuntimeCatalog
             [
                 "supabase",
                 "backend",
-                "gateway",
                 "frontend",
                 "watchdog-filesystem",
                 "watchdog-autocad",
@@ -248,7 +247,6 @@ internal sealed class RuntimeCatalog
             {
                 ["supabase"] = new() { ShortLabel = "SB", BootLabel = "Supabase", Description = "PostgreSQL, Auth, Storage, and local APIs" },
                 ["backend"] = new() { ShortLabel = "BE", BootLabel = "Watchdog Backend", Description = "API server and runtime jobs" },
-                ["gateway"] = new() { ShortLabel = "GW", BootLabel = "API Gateway", Description = "Local transport and auth edge" },
                 ["frontend"] = new() { ShortLabel = "UI", BootLabel = "Suite Frontend", Description = "Vite shell and local app routes" },
                 ["watchdog-filesystem"] = new() { ShortLabel = "FS", BootLabel = "Filesystem Collector", Description = "Filesystem watcher and activity intake" },
                 ["watchdog-autocad"] = new() { ShortLabel = "AC", BootLabel = "AutoCAD Collector", Description = "Drawing tracker and AutoCAD plugin readiness" },
@@ -262,7 +260,6 @@ internal sealed class RuntimeCatalog
                 "watchdog-autocad-startup",
                 "watchdog-autocad-plugin",
                 "backend",
-                "gateway",
                 "frontend",
             ],
             BootstrapSteps = new Dictionary<string, RuntimeCatalogBootstrapStepMeta>(StringComparer.OrdinalIgnoreCase)
@@ -274,7 +271,6 @@ internal sealed class RuntimeCatalog
                 ["watchdog-autocad-startup"] = new() { Label = "AutoCAD Collector", ShortLabel = "AC" },
                 ["watchdog-autocad-plugin"] = new() { Label = "AutoCAD Plugins", ShortLabel = "AP" },
                 ["backend"] = new() { Label = "Watchdog Backend", ShortLabel = "BE" },
-                ["gateway"] = new() { Label = "API Gateway", ShortLabel = "GW" },
                 ["frontend"] = new() { Label = "Suite Frontend", ShortLabel = "UI" },
             },
             WorkshopRouteShortcuts = new Dictionary<string, RuntimeCatalogRouteShortcut>(StringComparer.OrdinalIgnoreCase)

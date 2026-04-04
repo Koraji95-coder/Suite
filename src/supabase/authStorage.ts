@@ -1,7 +1,8 @@
+import { getLocalStorageApi } from "@/lib/browserStorage";
+
 const SUPABASE_AUTH_STORAGE_PREFIX = "suite-auth";
 
-export const SUPABASE_LEGACY_AUTH_STORAGE_KEY =
-	SUPABASE_AUTH_STORAGE_PREFIX;
+export const SUPABASE_LEGACY_AUTH_STORAGE_KEY = SUPABASE_AUTH_STORAGE_PREFIX;
 
 function normalizeSupabaseStorageScope(supabaseUrl: string): string {
 	const rawValue = String(supabaseUrl || "").trim();
@@ -11,8 +12,7 @@ function normalizeSupabaseStorageScope(supabaseUrl: string): string {
 
 	try {
 		const parsed = new URL(rawValue);
-		const normalizedPath =
-			parsed.pathname.replace(/\/+$/, "") || "/";
+		const normalizedPath = parsed.pathname.replace(/\/+$/, "") || "/";
 		return `${parsed.origin}${normalizedPath}`;
 	} catch {
 		return rawValue;
@@ -34,16 +34,15 @@ export function buildSupabaseAuthStorageKey(supabaseUrl: string): string {
 }
 
 export function cleanupLegacySupabaseAuthStorage(storageKey: string): void {
-	if (typeof window === "undefined") {
-		return;
-	}
-
 	if (storageKey === SUPABASE_LEGACY_AUTH_STORAGE_KEY) {
 		return;
 	}
 
+	const storage = getLocalStorageApi();
+	if (!storage) return;
+
 	try {
-		window.localStorage.removeItem(SUPABASE_LEGACY_AUTH_STORAGE_KEY);
+		storage.removeItem(SUPABASE_LEGACY_AUTH_STORAGE_KEY);
 	} catch {
 		// Ignore localStorage failures and keep auth initialization non-fatal.
 	}

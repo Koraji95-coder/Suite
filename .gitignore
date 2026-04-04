@@ -31,6 +31,9 @@ __pycache__/
 **/bin/
 **/obj/
 
+# Runtime Control local publish artifacts
+dotnet/Suite.RuntimeControl/artifacts/
+
 # Rust/local build artifacts
 
 # Local browser automation/session artifacts

@@ -4,7 +4,7 @@ import {
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/apps/ui/dialog";
+} from "@/components/system/dialog";
 import styles from "./ProjectManagerFormModal.module.css";
 import { type Priority, TaskFormData } from "@/features/project-core";
 

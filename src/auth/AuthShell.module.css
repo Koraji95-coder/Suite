@@ -215,29 +215,6 @@
 	color: var(--text);
 }
 
-.agentBadgeRow {
-	margin-top: 0.45rem;
-}
-
-.agentBadge {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.38rem;
-	padding: 0.26rem 0.5rem;
-	border: 1px solid var(--brand-border-soft);
-	border-radius: 999px;
-	background:
-		linear-gradient(
-			140deg,
-			var(--brand-chip-cool-bg),
-			color-mix(in srgb, var(--brand-surface-neutral) 86%, transparent)
-		);
-}
-
-.agentName {
-	text-transform: capitalize;
-}
-
 .rightPanel {
 	position: relative;
 	overflow: hidden;

@@ -59,7 +59,7 @@ node scripts/bootstrap-playwright-auth-state.mjs \
 ```bash
 npx --yes --package @playwright/cli playwright-cli open http://localhost:5173/
 npx --yes --package @playwright/cli playwright-cli state-load output/playwright/auth-state.json
-npx --yes --package @playwright/cli playwright-cli goto http://localhost:5173/app/apps/autodraft-studio
+npx --yes --package @playwright/cli playwright-cli goto http://localhost:5173/app/developer/labs/autodraft-studio
 ```
 
 ## Use With Repo Tests

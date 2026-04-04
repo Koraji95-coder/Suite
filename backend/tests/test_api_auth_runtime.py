@@ -25,14 +25,6 @@ class _LoggerStub:
         return None
 
 
-class _NowStub:
-    def __init__(self, value: float = 1000.0) -> None:
-        self.value = value
-
-    def __call__(self) -> float:
-        return self.value
-
-
 def _jsonify(payload):
     return payload
 
@@ -41,8 +33,6 @@ def _build_runtime(
     *,
     request_obj: _RequestStub,
     g_obj: SimpleNamespace,
-    session_store: dict,
-    now_fn,
     verify_fn=None,
 ):
     return create_auth_runtime(
@@ -50,12 +40,6 @@ def _build_runtime(
         jsonify_fn=_jsonify,
         g_obj=g_obj,
         is_valid_email_fn=lambda email: "@" in email,
-        purge_expired_agent_sessions_fn=lambda: None,
-        token_urlsafe_fn=lambda _n: "session-1",
-        now_fn=now_fn,
-        agent_session_ttl_seconds=3600,
-        agent_sessions_store=session_store,
-        agent_session_cookie="suite_agent_session",
         supabase_jwt_secret="",
         supabase_url="",
         supabase_api_key="",
@@ -75,8 +59,6 @@ class TestApiAuthRuntime(unittest.TestCase):
         runtime = _build_runtime(
             request_obj=request_obj,
             g_obj=g_obj,
-            session_store={},
-            now_fn=_NowStub(),
             verify_fn=lambda _token: None,
         )
 
@@ -93,8 +75,6 @@ class TestApiAuthRuntime(unittest.TestCase):
         runtime = _build_runtime(
             request_obj=request_obj,
             g_obj=SimpleNamespace(),
-            session_store={},
-            now_fn=_NowStub(),
             verify_fn=lambda _token: None,
         )
 
@@ -107,8 +87,6 @@ class TestApiAuthRuntime(unittest.TestCase):
         runtime = _build_runtime(
             request_obj=request_obj,
             g_obj=g_obj,
-            session_store={},
-            now_fn=_NowStub(),
             verify_fn=lambda token: {"id": "user-1"} if token == "good" else None,
         )
 
@@ -121,9 +99,9 @@ class TestApiAuthRuntime(unittest.TestCase):
 
     def test_require_supabase_user_timeout_envelope(self) -> None:
         request_obj = _RequestStub()
-        request_obj.path = "/api/agent/session"
+        request_obj.path = "/api/auth/email-link"
         request_obj.headers["Authorization"] = "Bearer timeout"
-        g_obj = SimpleNamespace(agent_request_id="req-runtime-timeout")
+        g_obj = SimpleNamespace(request_id="req-runtime-timeout")
 
         def verify(_token: str):
             raise SupabaseAuthProviderTimeoutError()
@@ -131,8 +109,6 @@ class TestApiAuthRuntime(unittest.TestCase):
         runtime = _build_runtime(
             request_obj=request_obj,
             g_obj=g_obj,
-            session_store={},
-            now_fn=_NowStub(),
             verify_fn=verify,
         )
 
@@ -145,55 +121,6 @@ class TestApiAuthRuntime(unittest.TestCase):
         self.assertEqual(payload.get("code"), "AUTH_PROVIDER_TIMEOUT")
         self.assertEqual(payload.get("requestId"), "req-runtime-timeout")
         self.assertEqual((payload.get("meta") or {}).get("retryable"), True)
-
-    def test_agent_session_lifecycle_and_decorator(self) -> None:
-        request_obj = _RequestStub()
-        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
-        session_store = {}
-        now_stub = _NowStub()
-        runtime = _build_runtime(
-            request_obj=request_obj,
-            g_obj=g_obj,
-            session_store=session_store,
-            now_fn=now_stub,
-            verify_fn=lambda _token: None,
-        )
-
-        session_id, expires_at = runtime.create_agent_session("token-1", "user-1")
-        self.assertEqual(session_id, "session-1")
-        self.assertEqual(expires_at, 4600)
-        request_obj.cookies["suite_agent_session"] = session_id
-
-        def endpoint():
-            return {"ok": True}, 200
-
-        wrapped = runtime.require_agent_session(endpoint)
-        self.assertEqual(wrapped(), ({"ok": True}, 200))
-        self.assertEqual(g_obj.agent_session["token"], "token-1")
-
-        runtime.clear_agent_session_for_request()
-        self.assertIsNone(runtime.get_agent_session())
-
-    def test_require_agent_session_rejects_mismatch(self) -> None:
-        request_obj = _RequestStub()
-        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
-        session_store = {
-            "session-1": {"token": "token-1", "user_id": "user-2", "expires_at": 9999}
-        }
-        request_obj.cookies["suite_agent_session"] = "session-1"
-        runtime = _build_runtime(
-            request_obj=request_obj,
-            g_obj=g_obj,
-            session_store=session_store,
-            now_fn=_NowStub(),
-            verify_fn=lambda _token: None,
-        )
-
-        def endpoint():
-            return {"ok": True}, 200
-
-        wrapped = runtime.require_agent_session(endpoint)
-        self.assertEqual(wrapped(), ({"error": "Agent session required"}, 401))
 
 
 if __name__ == "__main__":

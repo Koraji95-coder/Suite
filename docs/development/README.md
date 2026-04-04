@@ -17,7 +17,6 @@ This section is for operational and support docs. It is not the canonical home f
 - [Supabase Local/Hosted Workflow](./supabase-local-hosted-workflow.md)
 - [Command Center](./command-center.md)
 - [Repo Hygiene Playbook](./repo-hygiene-playbook.md)
-- [Realtime Agent / AutoWire / AutoDraft State](./realtime-agent-autowire-autodraft-state.md)
 
 ## Do Not Use This Section For
 

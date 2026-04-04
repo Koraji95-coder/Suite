@@ -4,7 +4,6 @@ export type ArchitectureDomainId =
 	| "frontend"
 	| "backend"
 	| "data"
-	| "agent"
 	| "docs";
 
 export interface ArchitectureDomain {
@@ -50,7 +49,7 @@ export const ARCHITECTURE_DOMAINS: ArchitectureDomain[] = [
 		label: "Frontend App",
 		group: "frontend",
 		summary:
-			"React + Vite UI shell, route pages, app modules, and browser-side orchestration.",
+			"React + Vite UI shell, feature-owned routes, shared system UI, and browser-side orchestration.",
 		repoRoots: ["src/routes", "src/components", "src/auth", "src/services"],
 	},
 	{
@@ -68,19 +67,6 @@ export const ARCHITECTURE_DOMAINS: ArchitectureDomain[] = [
 		summary:
 			"Supabase schema, RLS policies, and frontend data access utilities.",
 		repoRoots: ["src/supabase", "supabase", "backend/supabase"],
-	},
-	{
-		id: "agent",
-		label: "Agent Platform",
-		group: "agent",
-		summary:
-			"Suite agent UI, broker endpoints, and the Suite-native gateway boundary for brokered/direct workflows.",
-		repoRoots: [
-			"src/routes/agent",
-			"src/services/agentService.ts",
-			"scripts/suite-agent-gateway.mjs",
-			"scripts/run-agent-gateway.mjs",
-		],
 	},
 	{
 		id: "docs",
@@ -120,21 +106,21 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		label: "Feature Routes",
 		path: "src/routes",
 		summary:
-			"Page-level route modules for dashboard, projects, apps, settings.",
+			"Page-level route modules for the Home, Projects, Draft, Review, Developer, and Settings families.",
 	},
 	{
 		id: "feature-components",
 		domainId: "frontend",
-		label: "Feature Components",
-		path: "src/components/apps",
+		label: "Feature Slices",
+		path: "src/features",
 		summary:
-			"Domain apps (ground grid, transmittal, drawing list, graph, standards, calendar).",
+			"Feature-owned product workflows, labs, and route backing surfaces.",
 	},
 	{
 		id: "ui-primitives",
 		domainId: "frontend",
 		label: "UI Primitives",
-		path: "src/components/primitives",
+		path: "src/components/system/base",
 		summary:
 			"Shared primitives (Button/Input/Text/Panel/Stack/Container) used across app modules.",
 	},
@@ -142,7 +128,7 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		id: "pageframe-system",
 		domainId: "frontend",
 		label: "PageFrame + Section",
-		path: "src/components/apps/ui/PageFrame.tsx",
+		path: "src/components/system/PageFrame.tsx",
 		summary:
 			"Canonical page-level layout system: PageFrame for route wrapper, Section for in-page blocks.",
 	},
@@ -174,8 +160,8 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		id: "graph-tooling",
 		domainId: "frontend",
 		label: "Graph Tooling",
-		path: "src/components/apps/graph",
-		summary: "Architecture + memory graph visualization and inspectors.",
+		path: "src/features/graph/ui",
+		summary: "Architecture graph visualization and inspectors.",
 	},
 	{
 		id: "api-server",
@@ -183,7 +169,7 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		label: "Flask API Server",
 		path: "backend/api_server.py",
 		summary:
-			"Main API surface for auth, passkeys, AutoCAD integration, agent broker, and utilities.",
+			"Main API surface for auth, passkeys, AutoCAD integration, and utilities.",
 	},
 	{
 		id: "transmittal-engine",
@@ -248,38 +234,6 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 			"Bootstrap SQL and policy setup scripts used with backend workflows.",
 	},
 	{
-		id: "agent-ui",
-		domainId: "agent",
-		label: "Agent UI + Transport",
-		path: "src/routes/agent + src/services/agentService.ts",
-		summary:
-			"Agent route plus client-side pairing/session transport (direct and brokered modes).",
-	},
-	{
-		id: "broker-api",
-		domainId: "agent",
-		label: "Broker Endpoints",
-		path: "backend/api_server.py (/api/agent/*)",
-		summary:
-			"Pairing challenge-confirm, session health/config, and webhook ingress.",
-	},
-	{
-		id: "suite-native-gateway",
-		domainId: "agent",
-		label: "Suite-Native Gateway",
-		path: "scripts/suite-agent-gateway.mjs",
-		summary:
-			"Native gateway API surface for pairing, webhook, health, model proxying, and external passkey callback bridging.",
-	},
-	{
-		id: "gateway-launch-boundary",
-		domainId: "agent",
-		label: "Gateway Launch Boundary",
-		path: "scripts/run-agent-gateway.mjs",
-		summary:
-			"Runtime launcher that defaults to the Suite-native gateway and treats any legacy gateway process as stale drift to stop.",
-	},
-	{
 		id: "docs-hub",
 		domainId: "docs",
 		label: "Docs Hub",
@@ -292,7 +246,7 @@ const CURATED_ARCHITECTURE_MODULES: ArchitectureModule[] = [
 		label: "Environment Contracts",
 		path: ".env.example + docs/security/environment-and-secrets.md",
 		summary:
-			"Required env variables and secret boundaries for frontend/backend/agent flows.",
+			"Required env variables and secret boundaries for frontend/backend flows.",
 	},
 	{
 		id: "tooling-guardrails",
@@ -432,30 +386,6 @@ export const ARCHITECTURE_DEPENDENCIES: ArchitectureDependency[] = [
 		weight: 0.65,
 	},
 	{
-		sourceId: "agent-ui",
-		targetId: "frontend-services",
-		kind: "calls",
-		weight: 0.9,
-	},
-	{
-		sourceId: "frontend-services",
-		targetId: "broker-api",
-		kind: "calls",
-		weight: 0.8,
-	},
-	{
-		sourceId: "broker-api",
-		targetId: "suite-native-gateway",
-		kind: "bridges",
-		weight: 0.86,
-	},
-	{
-		sourceId: "suite-native-gateway",
-		targetId: "gateway-launch-boundary",
-		kind: "powers",
-		weight: 0.9,
-	},
-	{
 		sourceId: "docs-hub",
 		targetId: "env-contracts",
 		kind: "documents",
@@ -484,20 +414,10 @@ export const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
 		id: "cad-automation",
 		title: "CAD Tool Request Path",
 		steps: [
-			"src/components/apps/*",
+			"src/features/*",
 			"src/services/*",
 			"backend/api_server.py (/api/execute, /api/layers, /api/status)",
 			"AutoCAD COM host + CAD scripts",
-		],
-	},
-	{
-		id: "agent-pairing",
-		title: "Agent Pairing + Webhook Path",
-		steps: [
-			"src/routes/agent + src/services/agentService.ts",
-			"backend/api_server.py (/api/agent/*)",
-			"scripts/suite-agent-gateway.mjs",
-			"native gateway routes + stale legacy-process detection only",
 		],
 	},
 	{
@@ -515,8 +435,8 @@ export const ARCHITECTURE_FLOWS: ArchitectureFlow[] = [
 		title: "UI Modernization Path",
 		steps: [
 			"src/styles/tokens.css + src/styles/globals.css",
-			"src/components/primitives/*",
-			"src/components/apps/ui/PageFrame.tsx + Section",
+			"src/components/system/base/*",
+			"src/components/system/PageFrame.tsx + Section",
 			"feature apps migrated from utility classes to CSS Modules",
 		],
 	},
@@ -539,19 +459,7 @@ export const ARCHITECTURE_FIX_CANDIDATES: ArchitectureFixCandidate[] = [
 			"Large hotspot files make refactors riskier and testing harder. Continue module extraction by feature and API domain.",
 		paths: [
 			"backend/api_server.py",
-			"src/services/agentService.ts",
 			"src/routes/LoginPage.tsx",
-		],
-	},
-	{
-		id: "case-normalization",
-		priority: "medium",
-		title: "Directory naming style mismatch in batch find/replace module",
-		detail:
-			"Mixed naming style (`Batch_find_and_replace`) differs from route slug conventions and can cause friction in imports and search.",
-		paths: [
-			"src/components/apps/Batch_find_and_replace",
-			"src/routes/apps/batch-find-replace/BatchFindReplaceRoutePage.tsx",
 		],
 	},
 	{
@@ -565,12 +473,12 @@ export const ARCHITECTURE_FIX_CANDIDATES: ArchitectureFixCandidate[] = [
 	{
 		id: "ui-migration-tail",
 		priority: "high",
-		title: "Shared primitives are mid-migration away from utility classes",
+		title: "Shared system UI still needs ongoing convergence",
 		detail:
-			"Core app modules are now largely CSS-module based, but shared primitives and remaining route shells still need full convergence to the tokenized style system.",
+			"Core app modules are now largely feature-owned and CSS-module based, but the shared system layer and remaining route shells still need ongoing convergence around the tokenized style system.",
 		paths: [
-			"src/components/primitives",
-			"src/components/apps/ui/PageFrame.tsx",
+			"src/components/system",
+			"src/components/system/PageFrame.tsx",
 			"src/routes",
 			"src/theme.css",
 		],

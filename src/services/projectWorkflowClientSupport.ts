@@ -1,6 +1,8 @@
+import {
+	getLocalStorageApi as getBrowserLocalStorageApi,
+	type BrowserStorageApi as LocalStorageApi,
+} from "@/lib/browserStorage";
 import { supabase } from "@/supabase/client";
-
-export type LocalStorageApi = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 interface ProjectScopedCacheEntry<T> {
 	expiresAt: number;
@@ -14,23 +16,13 @@ let cachedCurrentSupabaseUserIdExpiresAt = 0;
 let currentSupabaseUserIdSubscriptionInitialized = false;
 
 function normalizeProjectCacheKey(projectId: string) {
-	return String(projectId ?? "").trim().toLowerCase();
+	return String(projectId ?? "")
+		.trim()
+		.toLowerCase();
 }
 
 export function getLocalStorageApi(): LocalStorageApi | null {
-	if (typeof globalThis === "undefined" || !("localStorage" in globalThis)) {
-		return null;
-	}
-	const candidate = globalThis.localStorage;
-	if (
-		!candidate ||
-		typeof candidate.getItem !== "function" ||
-		typeof candidate.setItem !== "function" ||
-		typeof candidate.removeItem !== "function"
-	) {
-		return null;
-	}
-	return candidate;
+	return getBrowserLocalStorageApi();
 }
 
 export async function getCurrentSupabaseUserId(): Promise<string | null> {
@@ -79,7 +71,8 @@ export async function getCurrentSupabaseUserId(): Promise<string | null> {
 			throw userError;
 		}
 		cachedCurrentSupabaseUserId = user?.id ?? null;
-		cachedCurrentSupabaseUserIdExpiresAt = Date.now() + AUTH_USER_ID_CACHE_TTL_MS;
+		cachedCurrentSupabaseUserIdExpiresAt =
+			Date.now() + AUTH_USER_ID_CACHE_TTL_MS;
 		return cachedCurrentSupabaseUserId;
 	}
 
@@ -112,7 +105,7 @@ export function createProjectScopedFetchCache<T>(ttlMs = 2_000) {
 		read,
 		readInFlight(projectId: string) {
 			const key = normalizeProjectCacheKey(projectId);
-			return key ? inFlight.get(key) ?? null : null;
+			return key ? (inFlight.get(key) ?? null) : null;
 		},
 		write(projectId: string, value: T) {
 			const key = normalizeProjectCacheKey(projectId);

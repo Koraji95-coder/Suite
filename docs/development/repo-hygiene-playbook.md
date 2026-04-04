@@ -25,6 +25,7 @@ Tracked generated artifacts include:
 - `backend/Transmittal-Builder/core/__pycache__/...`
 - `dotnet/named-pipe-bridge/bin/...`
 - `dotnet/named-pipe-bridge/obj/...`
+- `dotnet/Suite.RuntimeControl/artifacts/publish/...`
 
 These should be ignored and untracked.
 
@@ -62,6 +63,9 @@ __pycache__/
 # .NET build artifacts
 **/bin/
 **/obj/
+
+# Runtime Control local publish artifacts
+dotnet/Suite.RuntimeControl/artifacts/
 ```
 
 ### 5. Untrack generated files (keep local files on disk)
@@ -70,6 +74,7 @@ __pycache__/
 git rm -r --cached backend/Transmittal-Builder/core/__pycache__
 git rm -r --cached dotnet/named-pipe-bridge/bin
 git rm -r --cached dotnet/named-pipe-bridge/obj
+git rm -r --cached dotnet/Suite.RuntimeControl/artifacts/publish
 ```
 
 If a path is already untracked, git may print an error for that path; that is fine.
@@ -78,7 +83,7 @@ If a path is already untracked, git may print an error for that path; that is fi
 
 ```bash
 git add .gitignore
-git add -u backend/Transmittal-Builder/core/__pycache__ dotnet/named-pipe-bridge/bin dotnet/named-pipe-bridge/obj
+git add -u backend/Transmittal-Builder/core/__pycache__ dotnet/named-pipe-bridge/bin dotnet/named-pipe-bridge/obj dotnet/Suite.RuntimeControl/artifacts/publish
 ```
 
 ### 7. Verify staged changes
@@ -120,12 +125,13 @@ git restore --source=HEAD -- <path>
 ## Ongoing Hygiene Checklist
 
 - Keep generated artifacts ignored (`bin`, `obj`, `__pycache__`, `*.pyc`).
+- Keep Runtime Control publish output under `dotnet/Suite.RuntimeControl/artifacts/` local-only and untracked.
 - Do not commit `.env` or secrets.
 - Before PR/commit, run:
 
 ```bash
 git status --short
-git ls-files | grep -E '__pycache__|\.pyc$|/obj/|/bin/' || true
+git ls-files | grep -E '__pycache__|\.pyc$|/obj/|/bin/|Suite\.RuntimeControl/artifacts/publish/' || true
 ```
 
 - If generated files appear again in `git status`, repeat the untrack step with `--cached`.

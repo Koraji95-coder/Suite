@@ -26,7 +26,7 @@ Date: 2026-03-06
 
 ## Run Notes (2026-03-06)
 - AutoDraft Studio UI acceptance completed via authenticated Playwright session:
-  - Route access verified at `/app/apps/autodraft-studio`.
+  - Route access verified at `/app/developer/labs/autodraft-studio`.
   - Rule Library tab verified with swapped mappings and icons:
     - `🟢 DELETE` with action `Remove all geometry inside the cloud boundary`
     - `🔴 ADD` with action `Add geometry drawn inside red cloud to model`
@@ -56,8 +56,8 @@ Date: 2026-03-06
 - `dotnet test dotnet/autodraft-api-contract.Tests/AutoDraft.ApiContract.Tests.csproj -v minimal`
 
 ## Key Files
-- `src/components/apps/autodraft-studio/autodraftData.ts`
-- `src/components/apps/autodraft-studio/AutoDraftStudioApp.tsx`
+- `src/features/autodraft-studio/ui/autodraftData.ts`
+- `src/features/autodraft-studio/ui/AutoDraftStudioApp.tsx`
 - `backend/route_groups/api_autodraft.py`
 - `backend/tests/test_api_route_groups.py`
 - `backend/tests/test_api_autodraft_seed_parity.py`

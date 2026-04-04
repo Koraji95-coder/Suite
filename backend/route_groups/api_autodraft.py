@@ -183,12 +183,6 @@ _COMPARE_CALIBRATION_MODES = {
     _COMPARE_CALIBRATION_MODE_AUTO,
     _COMPARE_CALIBRATION_MODE_MANUAL,
 }
-_COMPARE_AGENT_REVIEW_MODE_OFF = "off"
-_COMPARE_AGENT_REVIEW_MODE_PRE = "pre"
-_COMPARE_AGENT_REVIEW_MODES = {
-    _COMPARE_AGENT_REVIEW_MODE_OFF,
-    _COMPARE_AGENT_REVIEW_MODE_PRE,
-}
 
 _AUTO_CALIBRATION_READY_MIN_CONFIDENCE = 0.56
 _AUTO_CALIBRATION_READY_MIN_MATCH_RATIO = 0.45
@@ -224,21 +218,8 @@ _REPLACEMENT_TUNING_DEFAULT = {
 _REPLACEMENT_MODEL_MIN_CONFIDENCE = 0.58
 _REPLACEMENT_MODEL_MAX_BOOST = 0.14
 _REPLACEMENT_MODEL_MAX_PENALTY = 0.12
-_SHADOW_ADVISOR_PROFILE = "draftsmith"
-_SHADOW_ADVISOR_MAX_CASES = 20
-_SHADOW_ADVISOR_TOKEN_CACHE_LOCK = threading.Lock()
-_SHADOW_ADVISOR_TOKEN_CACHE: Dict[str, Any] = {
-    "token": None,
-    "expires_at": 0.0,
-    "source": "none",
-}
 _COMPARE_FEEDBACK_DB_LOCK = threading.Lock()
 _LOCAL_LEARNING_RUNTIME = get_local_learning_runtime()
-_AGENT_PRE_REVIEW_MAX_BOOST = 0.12
-_AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION = 5
-_AGENT_PRE_REVIEW_DEFAULT_PROFILE = "draftsmith"
-_AGENT_PRE_REVIEW_DEFAULT_TIMEOUT_MS = 30000
-_AGENT_PRE_REVIEW_DEFAULT_MAX_CASES = 20
 _SEE_DWG_REFERENCE_PATTERN = re.compile(r"\bsee\s+dwg\b", re.IGNORECASE)
 _TITLE_BLOCK_TEXT_PATTERN = re.compile(
     r"\b(revision|rev(?:ision)?|drawing\s+no|dwg\s+no|sheet\s+no|title|scale|date|checked|approved)\b",
@@ -3269,7 +3250,6 @@ def _extract_pdf_compare_markups(
         "recognition": _compare_recognition_summary(
             markups,
             feature_source=prepare_feature_source,
-            agent_hints_applied=False,
         ),
     }
     return payload, None, 200
@@ -4024,7 +4004,6 @@ def _compare_recognition_summary(
     markups: List[Dict[str, Any]],
     *,
     feature_source: str,
-    agent_hints_applied: bool,
 ) -> Dict[str, Any]:
     recognitions = [
         markup.get("recognition")
@@ -4051,8 +4030,6 @@ def _compare_recognition_summary(
         }
     )
     summary_reason_codes = ["markup_compare_ready"]
-    if agent_hints_applied:
-        summary_reason_codes.append("agent_hints_applied")
     if "local_model" in recognition_sources:
         summary_reason_codes.append("local_models_available")
     return {
@@ -4082,7 +4059,6 @@ def _compare_recognition_summary(
             if isinstance(recognition, dict)
         ),
         "override_reason": None,
-        "agent_hints_applied": bool(agent_hints_applied),
     }
 
 
@@ -4098,13 +4074,6 @@ def _normalize_calibration_mode(value: Any) -> str:
     if mode in _COMPARE_CALIBRATION_MODES:
         return mode
     return _COMPARE_CALIBRATION_MODE_AUTO
-
-
-def _normalize_agent_review_mode(value: Any) -> str:
-    mode = _normalize_text(value)
-    if mode in _COMPARE_AGENT_REVIEW_MODES:
-        return mode
-    return _COMPARE_AGENT_REVIEW_MODE_PRE
 
 
 def _normalize_boolean(value: Any, *, default: bool = False) -> bool:
@@ -4613,8 +4582,6 @@ def _ensure_compare_feedback_schema(connection: sqlite3.Connection) -> None:
             note TEXT,
             candidates_json TEXT,
             selected_candidate_json TEXT,
-            agent_suggestion_json TEXT,
-            accepted_agent_suggestion INTEGER NOT NULL DEFAULT 0,
             payload_json TEXT
         )
         """
@@ -4643,12 +4610,6 @@ def _ensure_compare_feedback_schema(connection: sqlite3.Connection) -> None:
         str(row[1] or "").strip().lower()
         for row in connection.execute("PRAGMA table_info(feedback_events)").fetchall()
     }
-    if "agent_suggestion_json" not in existing_columns:
-        connection.execute("ALTER TABLE feedback_events ADD COLUMN agent_suggestion_json TEXT")
-    if "accepted_agent_suggestion" not in existing_columns:
-        connection.execute(
-            "ALTER TABLE feedback_events ADD COLUMN accepted_agent_suggestion INTEGER NOT NULL DEFAULT 0"
-        )
     if "feedback_type" not in existing_columns:
         connection.execute(
             "ALTER TABLE feedback_events ADD COLUMN feedback_type TEXT NOT NULL DEFAULT 'replacement_review'"
@@ -5102,7 +5063,6 @@ def _infer_action_replacement(
     weights: Dict[str, float],
     db_path: str,
     tuning: Optional[Dict[str, float]] = None,
-    agent_hint: Optional[Dict[str, Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
     if not isinstance(markup, dict):
@@ -5127,13 +5087,6 @@ def _infer_action_replacement(
     )
     new_text_norm = _normalize_learning_text(new_text)
     pair_hits = _load_replacement_pair_hits(db_path=db_path, new_text_norm=new_text_norm)
-    hint_obj = agent_hint if isinstance(agent_hint, dict) else {}
-    hint_boosts = (
-        hint_obj.get("candidate_boosts")
-        if isinstance(hint_obj.get("candidate_boosts"), dict)
-        else {}
-    )
-    hint_rationale = str(hint_obj.get("rationale") or "").strip()
 
     candidates: List[Dict[str, Any]] = []
     for entity in text_entities:
@@ -5177,13 +5130,7 @@ def _infer_action_replacement(
             - same_text_penalty
         )
         base_score = _clamp_value(base_score, minimum=0.0, maximum=1.0)
-        raw_agent_boost = _safe_float(hint_boosts.get(candidate_entity_id))
-        agent_boost = _clamp_value(
-            raw_agent_boost or 0.0,
-            minimum=0.0,
-            maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
-        )
-        score = _clamp_value(base_score + agent_boost, minimum=0.0, maximum=1.0)
+        score = _clamp_value(base_score, minimum=0.0, maximum=1.0)
         score_components = {
             "pointer": round(pointer_component, 4),
             "overlap": round(overlap_component, 4),
@@ -5191,7 +5138,6 @@ def _infer_action_replacement(
             "pair_boost": round(pair_boost, 4),
             "same_text_penalty": round(same_text_penalty, 4),
             "base_score": round(base_score, 4),
-            "agent_boost": round(agent_boost, 4),
             "pre_model_score": round(score, 4),
             "final_score": round(score, 4),
         }
@@ -5205,8 +5151,6 @@ def _infer_action_replacement(
             "pair_hit_count": pair_hit_count,
             "score_components": score_components,
         }
-        if hint_rationale:
-            candidate_obj["agent_rationale"] = hint_rationale
         candidates.append(candidate_obj)
 
     candidates.sort(
@@ -5731,758 +5675,6 @@ def _normalize_shadow_reviews(value: Any) -> List[Dict[str, Any]]:
     return reviews
 
 
-def _resolve_shadow_service_token_ttl_seconds() -> int:
-    raw_value = str(
-        os.environ.get("AUTODRAFT_COMPARE_SHADOW_SERVICE_TOKEN_TTL_SECONDS", "") or ""
-    ).strip()
-    try:
-        parsed = int(raw_value)
-    except Exception:
-        parsed = 7 * 24 * 60 * 60
-    return max(120, min(30 * 24 * 60 * 60, parsed))
-
-
-def _resolve_shadow_service_token_cache_key() -> str:
-    return (
-        str(
-            os.environ.get("AUTODRAFT_COMPARE_SHADOW_SERVICE_TOKEN_REDIS_KEY", "")
-            or ""
-        ).strip()
-        or "suite:autodraft:shadow:token"
-    )
-
-
-def _resolve_shadow_token_redis_url() -> str:
-    explicit = str(
-        os.environ.get("AUTODRAFT_COMPARE_SHADOW_TOKEN_REDIS_URL", "") or ""
-    ).strip()
-    if explicit:
-        return explicit
-    fallback_keys = (
-        "AGENT_SESSION_REDIS_URL",
-        "REDIS_URL",
-        "API_LIMITER_STORAGE_URI",
-    )
-    for key in fallback_keys:
-        candidate = str(os.environ.get(key, "") or "").strip()
-        if candidate.lower().startswith(("redis://", "rediss://")):
-            return candidate
-    return ""
-
-
-def _load_shadow_service_token_from_redis(
-    *,
-    redis_url: str,
-    key: str,
-) -> Optional[Dict[str, Any]]:
-    if redis is None or not redis_url:
-        return None
-    try:
-        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
-        raw_value = client.get(key)
-        if raw_value is None:
-            return None
-        parsed = _safe_json_loads(
-            raw_value.decode("utf-8", errors="replace")
-            if isinstance(raw_value, bytes)
-            else str(raw_value)
-        )
-        if not isinstance(parsed, dict):
-            return None
-        token = str(parsed.get("token") or "").strip()
-        expires_at = _safe_float(parsed.get("expires_at"))
-        if not token or expires_at is None or expires_at <= (time.time() + 20):
-            return None
-        return {
-            "token": token,
-            "expires_at": float(expires_at),
-            "source": "redis_cache",
-        }
-    except Exception:
-        return None
-
-
-def _save_shadow_service_token_to_redis(
-    *,
-    redis_url: str,
-    key: str,
-    token: str,
-    expires_at: float,
-) -> None:
-    if redis is None or not redis_url:
-        return
-    ttl_seconds = max(1, int(expires_at - time.time()))
-    if ttl_seconds <= 0:
-        return
-    try:
-        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
-        client.set(
-            key,
-            json.dumps(
-                {"token": token, "expires_at": float(expires_at)},
-                ensure_ascii=True,
-            ),
-            ex=ttl_seconds,
-        )
-    except Exception:
-        return
-
-
-def _clear_shadow_service_token_from_redis(*, redis_url: str, key: str) -> None:
-    if redis is None or not redis_url:
-        return
-    try:
-        client = redis.Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
-        client.delete(key)
-    except Exception:
-        return
-
-
-def _request_shadow_pairing_code(
-    *,
-    gateway_url: str,
-    webhook_secret: str,
-    timeout_seconds: int,
-) -> Tuple[Optional[str], Optional[str]]:
-    headers: Dict[str, str] = {}
-    if webhook_secret:
-        headers["X-Webhook-Secret"] = webhook_secret
-    try:
-        response = requests.post(
-            f"{gateway_url}/pairing-code",
-            headers=headers if headers else None,
-            timeout=timeout_seconds,
-        )
-    except Exception as exc:
-        return None, str(exc)
-    if not response.ok:
-        return None, _read_json_error(response)
-    payload = _safe_json_loads(response.text)
-    if not isinstance(payload, dict):
-        return None, "Pairing code response was not valid JSON."
-    pairing_code = str(payload.get("pairing_code") or "").strip()
-    if not re.fullmatch(r"\d{6}", pairing_code):
-        return None, "Pairing code response did not include a valid one-time code."
-    return pairing_code, None
-
-
-def _pair_shadow_service_token(
-    *,
-    gateway_url: str,
-    pairing_code: str,
-    timeout_seconds: int,
-) -> Tuple[Optional[str], Optional[str]]:
-    try:
-        response = requests.post(
-            f"{gateway_url}/pair",
-            headers={"X-Pairing-Code": pairing_code},
-            timeout=timeout_seconds,
-        )
-    except Exception as exc:
-        return None, str(exc)
-    if not response.ok:
-        return None, _read_json_error(response)
-    payload = _safe_json_loads(response.text)
-    if not isinstance(payload, dict):
-        return None, "Shadow pair response was not valid JSON."
-    token = str(payload.get("token") or "").strip()
-    if not token:
-        return None, "Shadow pair response did not include bearer token."
-    return token, None
-
-
-def _clear_shadow_service_token_cache() -> None:
-    redis_url = _resolve_shadow_token_redis_url()
-    redis_key = _resolve_shadow_service_token_cache_key()
-    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
-        _SHADOW_ADVISOR_TOKEN_CACHE["token"] = None
-        _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = 0.0
-        _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "cleared"
-    _clear_shadow_service_token_from_redis(redis_url=redis_url, key=redis_key)
-
-
-def _get_shadow_service_token(
-    *,
-    gateway_url: str,
-    webhook_secret: str,
-    timeout_seconds: int,
-) -> Tuple[Optional[str], str, Optional[str]]:
-    now = time.time()
-    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
-        token = str(_SHADOW_ADVISOR_TOKEN_CACHE.get("token") or "").strip()
-        expires_at = _safe_float(_SHADOW_ADVISOR_TOKEN_CACHE.get("expires_at")) or 0.0
-        source = str(_SHADOW_ADVISOR_TOKEN_CACHE.get("source") or "memory")
-        if token and expires_at > (now + 20):
-            return token, source or "memory_cache", None
-
-    redis_url = _resolve_shadow_token_redis_url()
-    redis_key = _resolve_shadow_service_token_cache_key()
-    cached = _load_shadow_service_token_from_redis(redis_url=redis_url, key=redis_key)
-    if isinstance(cached, dict):
-        cached_token = str(cached.get("token") or "").strip()
-        cached_expires = _safe_float(cached.get("expires_at")) or 0.0
-        if cached_token and cached_expires > (now + 20):
-            with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
-                _SHADOW_ADVISOR_TOKEN_CACHE["token"] = cached_token
-                _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = cached_expires
-                _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "redis_cache"
-            return cached_token, "redis_cache", None
-
-    pairing_code, pairing_error = _request_shadow_pairing_code(
-        gateway_url=gateway_url,
-        webhook_secret=webhook_secret,
-        timeout_seconds=timeout_seconds,
-    )
-    if not pairing_code:
-        return None, "none", pairing_error or "Unable to request pairing code."
-
-    token, pair_error = _pair_shadow_service_token(
-        gateway_url=gateway_url,
-        pairing_code=pairing_code,
-        timeout_seconds=timeout_seconds,
-    )
-    if not token:
-        return None, "none", pair_error or "Unable to pair shadow advisor token."
-
-    ttl_seconds = _resolve_shadow_service_token_ttl_seconds()
-    expires_at = now + float(ttl_seconds)
-    with _SHADOW_ADVISOR_TOKEN_CACHE_LOCK:
-        _SHADOW_ADVISOR_TOKEN_CACHE["token"] = token
-        _SHADOW_ADVISOR_TOKEN_CACHE["expires_at"] = expires_at
-        _SHADOW_ADVISOR_TOKEN_CACHE["source"] = "fresh_pair"
-
-    _save_shadow_service_token_to_redis(
-        redis_url=redis_url,
-        key=redis_key,
-        token=token,
-        expires_at=expires_at,
-    )
-    return token, "fresh_pair", None
-
-
-def _resolve_agent_pre_review_profile() -> str:
-    configured = str(
-        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_PROFILE", "") or ""
-    ).strip()
-    return configured or _AGENT_PRE_REVIEW_DEFAULT_PROFILE
-
-
-def _resolve_agent_pre_review_timeout_seconds() -> int:
-    raw_value = str(
-        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_TIMEOUT_MS", "")
-        or ""
-    ).strip()
-    fallback_ms = _AGENT_PRE_REVIEW_DEFAULT_TIMEOUT_MS
-    try:
-        parsed_ms = int(raw_value) if raw_value else fallback_ms
-    except Exception:
-        parsed_ms = fallback_ms
-    return max(1, min(60, parsed_ms // 1000 or 1))
-
-
-def _resolve_agent_pre_review_max_cases() -> int:
-    raw_value = str(
-        os.environ.get("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_MAX_CASES", "")
-        or ""
-    ).strip()
-    try:
-        parsed = int(raw_value) if raw_value else _AGENT_PRE_REVIEW_DEFAULT_MAX_CASES
-    except Exception:
-        parsed = _AGENT_PRE_REVIEW_DEFAULT_MAX_CASES
-    return max(1, min(100, parsed))
-
-
-def _resolve_profile_primary_model(profile_id: str) -> str:
-    normalized_profile = _normalize_text(profile_id)
-    if not normalized_profile:
-        return ""
-    env_key = f"AGENT_MODEL_{normalized_profile.upper()}_PRIMARY"
-    configured = str(os.environ.get(env_key, "") or "").strip()
-    if configured:
-        return configured
-    defaults = {
-        "koro": "qwen3:14b",
-        "devstral": "devstral-small-2:latest",
-        "sentinel": "gemma3:12b",
-        "forge": "qwen2.5-coder:14b",
-        "draftsmith": "joshuaokolo/C3Dv0:latest",
-        "gridsage": "ALIENTELLIGENCE/electricalengineerv2:latest",
-    }
-    return defaults.get(normalized_profile, "")
-
-
-def _extract_gateway_model_ids(payload: Any) -> Set[str]:
-    ids: Set[str] = set()
-    if isinstance(payload, dict):
-        data_list = payload.get("data") if isinstance(payload.get("data"), list) else []
-        model_list = (
-            payload.get("models") if isinstance(payload.get("models"), list) else []
-        )
-        for entry in [*data_list, *model_list]:
-            if not isinstance(entry, dict):
-                continue
-            for key in ("id", "model", "name"):
-                value = str(entry.get(key) or "").strip()
-                if value:
-                    ids.add(value)
-    elif isinstance(payload, list):
-        for entry in payload:
-            if isinstance(entry, str) and entry.strip():
-                ids.add(entry.strip())
-            elif isinstance(entry, dict):
-                for key in ("id", "model", "name"):
-                    value = str(entry.get(key) or "").strip()
-                    if value:
-                        ids.add(value)
-    return ids
-
-
-def _preflight_agent_pre_review_model(
-    *,
-    gateway_url: str,
-    headers: Dict[str, str],
-    profile_id: str,
-    timeout_seconds: int,
-) -> Dict[str, Any]:
-    expected_model = _resolve_profile_primary_model(profile_id)
-    preflight: Dict[str, Any] = {
-        "checked": False,
-        "available": False,
-        "expected_model": expected_model or None,
-        "reason": "not_checked",
-    }
-    if not expected_model:
-        preflight["checked"] = True
-        preflight["available"] = False
-        preflight["reason"] = f"No configured primary model for profile `{profile_id}`."
-        return preflight
-    try:
-        response = requests.get(
-            f"{gateway_url}/v1/models",
-            headers=headers if headers else None,
-            timeout=max(1, min(timeout_seconds, 10)),
-        )
-    except Exception as exc:
-        preflight["checked"] = True
-        preflight["available"] = False
-        preflight["reason"] = f"Model preflight failed: {exc}"
-        return preflight
-
-    preflight["checked"] = True
-    if not response.ok:
-        preflight["available"] = False
-        preflight["reason"] = _read_json_error(response)
-        return preflight
-    payload = _safe_json_loads(response.text)
-    model_ids = _extract_gateway_model_ids(payload)
-    if expected_model in model_ids:
-        preflight["available"] = True
-        preflight["reason"] = "model_available"
-    else:
-        preflight["available"] = False
-        preflight["reason"] = (
-            f"Expected model `{expected_model}` was not listed by gateway `/v1/models`."
-        )
-    return preflight
-
-
-def _normalize_agent_pre_review_hints(raw_value: Any) -> Dict[str, Dict[str, Any]]:
-    if not isinstance(raw_value, list):
-        return {}
-    hints: Dict[str, Dict[str, Any]] = {}
-    for raw_hint in raw_value:
-        if not isinstance(raw_hint, dict):
-            continue
-        action_id = str(raw_hint.get("action_id") or "").strip()
-        if not action_id:
-            continue
-        boosts: Dict[str, float] = {}
-        raw_boosts = raw_hint.get("candidate_boosts")
-        if isinstance(raw_boosts, dict):
-            for entity_id_raw, boost_raw in raw_boosts.items():
-                entity_id = str(entity_id_raw or "").strip()
-                boost = _safe_float(boost_raw)
-                if not entity_id or boost is None or boost <= 0:
-                    continue
-                boosts[entity_id] = _clamp_value(
-                    boost,
-                    minimum=0.0,
-                    maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
-                )
-        elif isinstance(raw_boosts, list):
-            for entry in raw_boosts:
-                if not isinstance(entry, dict):
-                    continue
-                entity_id = str(entry.get("entity_id") or "").strip()
-                boost = _safe_float(entry.get("boost"))
-                if not entity_id or boost is None or boost <= 0:
-                    continue
-                boosts[entity_id] = _clamp_value(
-                    boost,
-                    minimum=0.0,
-                    maximum=_AGENT_PRE_REVIEW_MAX_BOOST,
-                )
-        if len(boosts) > _AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION:
-            sorted_boosts = sorted(
-                boosts.items(),
-                key=lambda item: (-float(item[1]), str(item[0])),
-            )
-            boosts = dict(sorted_boosts[:_AGENT_PRE_REVIEW_MAX_CANDIDATE_BOOSTS_PER_ACTION])
-
-        intent_hint = str(raw_hint.get("intent_hint") or "").strip().upper() or None
-        if intent_hint and intent_hint not in {"ADD", "DELETE", "NOTE", "UNCLASSIFIED"}:
-            intent_hint = None
-        roi_hint = _normalize_bounds(raw_hint.get("roi_hint"))
-        rationale = str(raw_hint.get("rationale") or "").strip()
-        hints[action_id] = {
-            "candidate_boosts": boosts,
-            "intent_hint": intent_hint,
-            "roi_hint": _copy_bounds(roi_hint) if roi_hint else None,
-            "rationale": rationale or None,
-        }
-    return hints
-
-
-def _run_agent_pre_review(
-    *,
-    request_id: str,
-    review_cases: List[Dict[str, Any]],
-    review_mode: str,
-    logger: Any,
-) -> Tuple[Dict[str, Any], Dict[str, Dict[str, Any]]]:
-    profile_id = _resolve_agent_pre_review_profile()
-    enabled_env = _env_flag("AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED", default=True)
-    enabled = enabled_env and review_mode == _COMPARE_AGENT_REVIEW_MODE_PRE
-    result: Dict[str, Any] = {
-        "enabled": enabled,
-        "attempted": False,
-        "available": False,
-        "used": False,
-        "profile": profile_id,
-        "latency_ms": None,
-        "hints_count": 0,
-        "error": None,
-        "auth": {
-            "mode": "service_token",
-            "token_source": "none",
-            "refresh_attempted": False,
-        },
-        "preflight": {
-            "checked": False,
-            "available": False,
-            "expected_model": _resolve_profile_primary_model(profile_id) or None,
-            "reason": "not_checked",
-        },
-    }
-    if not enabled:
-        result["error"] = (
-            "Agent pre-review disabled by request."
-            if review_mode == _COMPARE_AGENT_REVIEW_MODE_OFF
-            else "Agent pre-review disabled by AUTODRAFT_COMPARE_AGENT_PRE_REVIEW_ENABLED."
-        )
-        return result, {}
-    if not review_cases:
-        result["available"] = True
-        return result, {}
-
-    gateway_url = str(os.environ.get("AGENT_GATEWAY_URL", "") or "").strip().rstrip("/")
-    if not gateway_url:
-        result["error"] = "AGENT_GATEWAY_URL is not configured."
-        return result, {}
-
-    timeout_seconds = _resolve_agent_pre_review_timeout_seconds()
-    max_cases = _resolve_agent_pre_review_max_cases()
-    result["attempted"] = True
-    headers = {"Content-Type": "application/json"}
-    webhook_secret = str(os.environ.get("AGENT_WEBHOOK_SECRET", "") or "").strip()
-    if webhook_secret:
-        headers["X-Webhook-Secret"] = webhook_secret
-
-    token, token_source, token_error = _get_shadow_service_token(
-        gateway_url=gateway_url,
-        webhook_secret=webhook_secret,
-        timeout_seconds=timeout_seconds,
-    )
-    result["auth"] = {
-        "mode": "service_token",
-        "token_source": token_source,
-        "refresh_attempted": False,
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    elif token_error:
-        result["error"] = f"Agent pre-review token unavailable: {token_error}"
-        return result, {}
-
-    preflight = _preflight_agent_pre_review_model(
-        gateway_url=gateway_url,
-        headers=headers,
-        profile_id=profile_id,
-        timeout_seconds=timeout_seconds,
-    )
-    result["preflight"] = preflight
-    if preflight.get("checked") and not bool(preflight.get("available")):
-        result["error"] = str(preflight.get("reason") or "Agent model preflight failed.")
-        return result, {}
-
-    started_at = time.perf_counter()
-    prompt_payload = {
-        "task": "autodraft_compare_pre_review",
-        "request_id": request_id,
-        "instructions": (
-            "Return strict JSON only. You are advisory only and must not override deterministic rules. "
-            "Suggest bounded candidate boosts for likely replacement targets. "
-            "Do not suggest replacing red SEE DWG reference notes."
-        ),
-        "cases": review_cases[:max_cases],
-        "response_schema": {
-            "hints": [
-                {
-                    "action_id": "string",
-                    "candidate_boosts": [
-                        {
-                            "entity_id": "string",
-                            "boost": "number 0..0.12",
-                        }
-                    ],
-                    "intent_hint": "ADD|DELETE|NOTE|UNCLASSIFIED|null",
-                    "roi_hint": {
-                        "x": "number",
-                        "y": "number",
-                        "width": "number",
-                        "height": "number",
-                    },
-                    "rationale": "string",
-                }
-            ]
-        },
-    }
-    try:
-        response = requests.post(
-            f"{gateway_url}/webhook",
-            headers=headers,
-            json={
-                "profile_id": profile_id,
-                "message": json.dumps(prompt_payload, ensure_ascii=True),
-            },
-            timeout=timeout_seconds,
-        )
-    except Exception as exc:
-        result["error"] = str(exc)
-        result["latency_ms"] = round((time.perf_counter() - started_at) * 1000.0, 2)
-        return result, {}
-    result["latency_ms"] = round((time.perf_counter() - started_at) * 1000.0, 2)
-
-    if response.status_code in {401, 403}:
-        _clear_shadow_service_token_cache()
-        refreshed_token, refreshed_source, refreshed_error = _get_shadow_service_token(
-            gateway_url=gateway_url,
-            webhook_secret=webhook_secret,
-            timeout_seconds=timeout_seconds,
-        )
-        result["auth"] = {
-            "mode": "service_token",
-            "token_source": refreshed_source,
-            "refresh_attempted": True,
-        }
-        if not refreshed_token:
-            result["error"] = (
-                "Agent pre-review auth refresh failed: "
-                f"{refreshed_error or _read_json_error(response)}"
-            )
-            return result, {}
-        retry_headers = dict(headers)
-        retry_headers["Authorization"] = f"Bearer {refreshed_token}"
-        try:
-            response = requests.post(
-                f"{gateway_url}/webhook",
-                headers=retry_headers,
-                json={
-                    "profile_id": profile_id,
-                    "message": json.dumps(prompt_payload, ensure_ascii=True),
-                },
-                timeout=timeout_seconds,
-            )
-        except Exception as exc:
-            result["error"] = str(exc)
-            return result, {}
-
-    if not response.ok:
-        result["error"] = _read_json_error(response)
-        return result, {}
-
-    payload = _safe_json_loads(response.text)
-    if not isinstance(payload, dict):
-        result["error"] = "Agent pre-review response was not JSON."
-        return result, {}
-    raw_hints: Any = payload.get("hints")
-    if not isinstance(raw_hints, list):
-        shadow_text = _extract_shadow_text(payload)
-        extracted = _extract_json_object_from_text(shadow_text) if shadow_text else None
-        if isinstance(extracted, dict):
-            raw_hints = extracted.get("hints")
-    hints_map = _normalize_agent_pre_review_hints(raw_hints)
-    result["available"] = True
-    result["used"] = bool(hints_map)
-    result["hints_count"] = len(hints_map)
-    if not hints_map:
-        result["error"] = "Agent pre-review returned no structured hints."
-        if logger is not None and hasattr(logger, "info"):
-            logger.info(
-                "AutoDraft compare pre-review returned empty hints request_id=%s",
-                request_id,
-            )
-    return result, hints_map
-
-
-def _run_shadow_advisor(
-    *,
-    request_id: str,
-    review_cases: List[Dict[str, Any]],
-    logger: Any,
-) -> Dict[str, Any]:
-    enabled = _env_flag("AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED", default=True)
-    result: Dict[str, Any] = {
-        "enabled": enabled,
-        "available": False,
-        "profile": _SHADOW_ADVISOR_PROFILE,
-        "reviews": [],
-        "error": None,
-        "auth": {
-            "mode": "service_token",
-            "token_source": "none",
-            "refresh_attempted": False,
-        },
-    }
-    if not enabled:
-        result["error"] = "Shadow advisor disabled by AUTODRAFT_COMPARE_SHADOW_ADVISOR_ENABLED."
-        return result
-    if not review_cases:
-        result["available"] = True
-        return result
-
-    gateway_url = str(os.environ.get("AGENT_GATEWAY_URL", "") or "").strip().rstrip("/")
-    if not gateway_url:
-        result["error"] = "AGENT_GATEWAY_URL is not configured."
-        return result
-
-    timeout_ms_raw = str(os.environ.get("AUTODRAFT_COMPARE_SHADOW_TIMEOUT_MS", "8000") or "").strip()
-    try:
-        timeout_seconds = max(1, min(30, int(timeout_ms_raw) // 1000 or 8))
-    except Exception:
-        timeout_seconds = 8
-
-    prompt_payload = {
-        "task": "autodraft_compare_shadow_review",
-        "request_id": request_id,
-        "instructions": (
-            "For each case, return one best suggestion in strict JSON. "
-            "Do not include prose outside JSON."
-        ),
-        "cases": review_cases[:_SHADOW_ADVISOR_MAX_CASES],
-        "response_schema": {
-            "reviews": [
-                {
-                    "action_id": "string",
-                    "suggested_old_text": "string|null",
-                    "suggested_entity_id": "string|null",
-                    "confidence": "number 0..1",
-                    "rationale": "string",
-                }
-            ]
-        },
-    }
-    headers = {"Content-Type": "application/json"}
-    webhook_secret = str(os.environ.get("AGENT_WEBHOOK_SECRET", "") or "").strip()
-    if webhook_secret:
-        headers["X-Webhook-Secret"] = webhook_secret
-    gateway_token, token_source, token_error = _get_shadow_service_token(
-        gateway_url=gateway_url,
-        webhook_secret=webhook_secret,
-        timeout_seconds=timeout_seconds,
-    )
-    result["auth"] = {
-        "mode": "service_token",
-        "token_source": token_source,
-        "refresh_attempted": False,
-    }
-    if gateway_token:
-        headers["Authorization"] = f"Bearer {gateway_token}"
-    elif token_error:
-        result["error"] = f"Shadow advisor token unavailable: {token_error}"
-        return result
-
-    try:
-        response = requests.post(
-            f"{gateway_url}/webhook",
-            headers=headers,
-            json={
-                "profile_id": _SHADOW_ADVISOR_PROFILE,
-                "message": json.dumps(prompt_payload, ensure_ascii=True),
-            },
-            timeout=timeout_seconds,
-        )
-    except Exception as exc:
-        result["error"] = str(exc)
-        return result
-
-    if response.status_code in {401, 403}:
-        _clear_shadow_service_token_cache()
-        refreshed_token, refreshed_source, refreshed_error = _get_shadow_service_token(
-            gateway_url=gateway_url,
-            webhook_secret=webhook_secret,
-            timeout_seconds=timeout_seconds,
-        )
-        result["auth"] = {
-            "mode": "service_token",
-            "token_source": refreshed_source,
-            "refresh_attempted": True,
-        }
-        if not refreshed_token:
-            result["error"] = (
-                f"Shadow advisor auth refresh failed: {refreshed_error or _read_json_error(response)}"
-            )
-            return result
-        retry_headers = dict(headers)
-        retry_headers["Authorization"] = f"Bearer {refreshed_token}"
-        try:
-            response = requests.post(
-                f"{gateway_url}/webhook",
-                headers=retry_headers,
-                json={
-                    "profile_id": _SHADOW_ADVISOR_PROFILE,
-                    "message": json.dumps(prompt_payload, ensure_ascii=True),
-                },
-                timeout=timeout_seconds,
-            )
-        except Exception as exc:
-            result["error"] = str(exc)
-            return result
-
-    if not response.ok:
-        result["error"] = _read_json_error(response)
-        return result
-
-    payload = _safe_json_loads(response.text)
-    if not isinstance(payload, dict):
-        result["error"] = "Shadow advisor response was not JSON."
-        return result
-
-    reviews_raw: Any = payload.get("reviews")
-    if not isinstance(reviews_raw, list):
-        shadow_text = _extract_shadow_text(payload)
-        extracted = _extract_json_object_from_text(shadow_text) if shadow_text else None
-        if isinstance(extracted, dict):
-            reviews_raw = extracted.get("reviews")
-
-    reviews = _normalize_shadow_reviews(reviews_raw)
-    result["available"] = True
-    result["reviews"] = reviews
-    if not reviews:
-        result["error"] = "Shadow advisor returned no structured review suggestions."
-    return result
-
-
 def _build_replacement_review_message(replacement: Dict[str, Any]) -> str:
     new_text = str(replacement.get("new_text") or "").strip()
     old_text = str(replacement.get("old_text") or "").strip()
@@ -6496,101 +5688,19 @@ def _build_replacement_review_message(replacement: Dict[str, Any]) -> str:
     return f"Could not confidently determine the existing CAD text replaced by '{new_text}'."
 
 
-def _build_agent_pre_review_cases(
-    *,
-    actions: List[Dict[str, Any]],
-    baseline_replacements: Dict[str, Dict[str, Any]],
-    max_cases: int,
-) -> List[Dict[str, Any]]:
-    cases: List[Dict[str, Any]] = []
-    for action in actions:
-        if not isinstance(action, dict):
-            continue
-        action_id = str(action.get("id") or "").strip()
-        if not action_id:
-            continue
-        replacement = baseline_replacements.get(action_id)
-        if not isinstance(replacement, dict):
-            continue
-        markup = action.get("markup") if isinstance(action.get("markup"), dict) else {}
-        markup_bounds = _normalize_bounds(markup.get("bounds"))
-        candidates = replacement.get("candidates") if isinstance(replacement.get("candidates"), list) else []
-        cases.append(
-            {
-                "action_id": action_id,
-                "new_text": str(replacement.get("new_text") or ""),
-                "status": str(replacement.get("status") or ""),
-                "confidence": float(_safe_float(replacement.get("confidence")) or 0.0),
-                "markup": {
-                    "id": str(markup.get("id") or "").strip() or None,
-                    "type": str(markup.get("type") or "").strip() or "unknown",
-                    "color": str(markup.get("color") or "").strip() or "unknown",
-                    "text": str(markup.get("text") or "").strip(),
-                    "bounds": _copy_bounds(markup_bounds) if markup_bounds else None,
-                },
-                "candidates": candidates[:_REPLACEMENT_MAX_CANDIDATES],
-            }
-        )
-        if len(cases) >= max_cases:
-            break
-    return cases
-
-
 def _enrich_compare_result_with_replacements(
     *,
     compare_result: Dict[str, Any],
     cad_context: Dict[str, Any],
     request_id: str,
     tuning: Optional[Dict[str, float]] = None,
-    review_mode: str = _COMPARE_AGENT_REVIEW_MODE_PRE,
-    logger: Any = None,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+ ) -> List[Dict[str, Any]]:
     plan_obj = compare_result.get("plan")
     if not isinstance(plan_obj, dict):
-        return [], {
-            "enabled": False,
-            "attempted": False,
-            "available": False,
-            "used": False,
-            "profile": _resolve_agent_pre_review_profile(),
-            "latency_ms": None,
-            "hints_count": 0,
-            "error": "Plan payload unavailable for pre-review.",
-            "auth": {
-                "mode": "service_token",
-                "token_source": "none",
-                "refresh_attempted": False,
-            },
-            "preflight": {
-                "checked": False,
-                "available": False,
-                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
-                "reason": "not_checked",
-            },
-        }
+        return []
     actions = plan_obj.get("actions")
     if not isinstance(actions, list):
-        return [], {
-            "enabled": False,
-            "attempted": False,
-            "available": False,
-            "used": False,
-            "profile": _resolve_agent_pre_review_profile(),
-            "latency_ms": None,
-            "hints_count": 0,
-            "error": "Action payload unavailable for pre-review.",
-            "auth": {
-                "mode": "service_token",
-                "token_source": "none",
-                "refresh_attempted": False,
-            },
-            "preflight": {
-                "checked": False,
-                "available": False,
-                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
-                "reason": "not_checked",
-            },
-        }
+        return []
 
     backcheck_obj = (
         compare_result.get("backcheck")
@@ -6627,22 +5737,9 @@ def _enrich_compare_result_with_replacements(
             weights=weights,
             db_path=db_path,
             tuning=tuning,
-            agent_hint=None,
         )
         if isinstance(baseline, dict):
             baseline_replacements[action_id] = baseline
-
-    pre_review_cases = _build_agent_pre_review_cases(
-        actions=replacement_actions,
-        baseline_replacements=baseline_replacements,
-        max_cases=_resolve_agent_pre_review_max_cases(),
-    )
-    pre_review_result, hint_map = _run_agent_pre_review(
-        request_id=request_id,
-        review_cases=pre_review_cases,
-        review_mode=review_mode,
-        logger=logger,
-    )
 
     review_queue: List[Dict[str, Any]] = []
     warned_count = 0
@@ -6650,14 +5747,12 @@ def _enrich_compare_result_with_replacements(
         action_id = str(action.get("id") or "").strip()
         if not action_id:
             continue
-        action_hint = hint_map.get(action_id)
         replacement = _infer_action_replacement(
             action=action,
             text_entities=text_entities,
             weights=weights,
             db_path=db_path,
             tuning=tuning,
-            agent_hint=action_hint,
         )
         if not replacement:
             continue
@@ -6700,8 +5795,6 @@ def _enrich_compare_result_with_replacements(
                 "candidates": replacement.get("candidates")
                 if isinstance(replacement.get("candidates"), list)
                 else [],
-                "agent_hint": action_hint if isinstance(action_hint, dict) else None,
-                "shadow": None,
             }
         )
 
@@ -6717,7 +5810,7 @@ def _enrich_compare_result_with_replacements(
     compare_result["backcheck"] = backcheck_obj
     _recompute_compare_summary(compare_result)
     compare_result["review_queue"] = review_queue
-    return review_queue, pre_review_result
+    return review_queue
 
 
 def _normalize_feedback_items(raw_payload: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -6760,15 +5853,6 @@ def _normalize_feedback_items(raw_payload: Dict[str, Any]) -> List[Dict[str, Any
             if isinstance(entry.get("selected_candidate"), dict)
             else {}
         )
-        agent_suggestion = (
-            entry.get("agent_suggestion")
-            if isinstance(entry.get("agent_suggestion"), dict)
-            else {}
-        )
-        accepted_agent_suggestion = _normalize_boolean(
-            entry.get("accepted_agent_suggestion"),
-            default=False,
-        )
         item = {
             "feedback_type": feedback_type if has_markup_learning_fields else "replacement_review",
             "request_id": str(entry.get("request_id") or raw_payload.get("requestId") or "").strip(),
@@ -6781,8 +5865,6 @@ def _normalize_feedback_items(raw_payload: Dict[str, Any]) -> List[Dict[str, Any
             "note": str(entry.get("note") or "").strip(),
             "candidates": candidates,
             "selected_candidate": selected_candidate,
-            "agent_suggestion": agent_suggestion,
-            "accepted_agent_suggestion": accepted_agent_suggestion,
             "markup_id": str(entry.get("markup_id") or "").strip(),
             "payload": dict(entry),
         }
@@ -6979,10 +6061,8 @@ def _persist_feedback_items(
                         note,
                         candidates_json,
                         selected_candidate_json,
-                        agent_suggestion_json,
-                        accepted_agent_suggestion,
                         payload_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         now_iso,
@@ -6997,8 +6077,6 @@ def _persist_feedback_items(
                         item.get("note") or None,
                         _safe_json_dumps(item.get("candidates") or []),
                         _safe_json_dumps(item.get("selected_candidate") or {}),
-                        _safe_json_dumps(item.get("agent_suggestion") or {}),
-                        1 if bool(item.get("accepted_agent_suggestion")) else 0,
                         _safe_json_dumps(item.get("payload") or {}),
                     ),
                 )
@@ -7075,8 +6153,6 @@ def _export_feedback_data(
                     note,
                     candidates_json,
                     selected_candidate_json,
-                    agent_suggestion_json,
-                    accepted_agent_suggestion,
                     payload_json
                 FROM feedback_events
                 ORDER BY id ASC
@@ -7117,13 +6193,6 @@ def _export_feedback_data(
                     str(row["selected_candidate_json"] or "{}")
                 )
                 or {},
-                "agent_suggestion": _safe_json_loads(
-                    str(row["agent_suggestion_json"] or "{}")
-                )
-                or {},
-                "accepted_agent_suggestion": bool(
-                    int(_safe_float(row["accepted_agent_suggestion"]) or 0)
-                ),
                 "payload": _safe_json_loads(str(row["payload_json"] or "{}")) or {},
             }
         )
@@ -7191,8 +6260,6 @@ def _feedback_items_from_exported_events(
             "note",
             "candidates",
             "selected_candidate",
-            "agent_suggestion",
-            "accepted_agent_suggestion",
             "created_utc",
         ):
             if key not in merged and key in event:
@@ -7340,10 +6407,8 @@ def _import_feedback_data(
                         note,
                         candidates_json,
                         selected_candidate_json,
-                        agent_suggestion_json,
-                        accepted_agent_suggestion,
                         payload_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         str(entry.get("created_utc") or now_iso),
@@ -7358,13 +6423,6 @@ def _import_feedback_data(
                         str(entry.get("note") or "").strip() or None,
                         _safe_json_dumps(entry.get("candidates") or []),
                         _safe_json_dumps(entry.get("selected_candidate") or {}),
-                        _safe_json_dumps(entry.get("agent_suggestion") or {}),
-                        1
-                        if _normalize_boolean(
-                            entry.get("accepted_agent_suggestion"),
-                            default=False,
-                        )
-                        else 0,
                         _safe_json_dumps(payload_json or {}),
                     ),
                 )
@@ -8398,7 +7456,6 @@ def create_autodraft_blueprint(
         engine_requested = _normalize_compare_engine(payload.get("engine"))
         tolerance_profile = _normalize_tolerance_profile(payload.get("tolerance_profile"))
         calibration_mode = _normalize_calibration_mode(payload.get("calibration_mode"))
-        agent_review_mode = _normalize_agent_review_mode(payload.get("agent_review_mode"))
         manual_override = _normalize_boolean(payload.get("manual_override"), default=False)
         roi_bounds_pdf = _normalize_compare_roi(payload.get("roi"))
         calibration_seed = (
@@ -8739,7 +7796,6 @@ def create_autodraft_blueprint(
             "tolerance_profile": tolerance_profile,
             "replacement_tuning": replacement_tuning,
             "calibration_mode": calibration_mode,
-            "agent_review_mode": agent_review_mode,
             "roi": _copy_bounds(roi_bounds_pdf) if roi_bounds_pdf else None,
             "auto_calibration": _sanitize_auto_calibration_payload(auto_calibration),
             "requestId": request_id,
@@ -8819,82 +7875,13 @@ def create_autodraft_blueprint(
         )
 
         review_queue: List[Dict[str, Any]] = []
-        agent_pre_review_result: Dict[str, Any] = {
-            "enabled": False,
-            "attempted": False,
-            "available": False,
-            "used": False,
-            "profile": _resolve_agent_pre_review_profile(),
-            "latency_ms": None,
-            "hints_count": 0,
-            "error": "Replacement pre-review was not executed.",
-            "auth": {
-                "mode": "service_token",
-                "token_source": "none",
-                "refresh_attempted": False,
-            },
-            "preflight": {
-                "checked": False,
-                "available": False,
-                "expected_model": _resolve_profile_primary_model(_resolve_agent_pre_review_profile()) or None,
-                "reason": "not_checked",
-            },
-        }
         if isinstance(cad_context_for_compare, dict):
-            review_queue, agent_pre_review_result = _enrich_compare_result_with_replacements(
+            review_queue = _enrich_compare_result_with_replacements(
                 compare_result=compare_result,
                 cad_context=cad_context_for_compare,
                 request_id=request_id,
                 tuning=replacement_tuning,
-                review_mode=agent_review_mode,
-                logger=logger,
             )
-
-        shadow_result: Dict[str, Any] = {
-            "enabled": False,
-            "available": False,
-            "profile": _SHADOW_ADVISOR_PROFILE,
-            "reviews": [],
-            "error": None,
-        }
-        if review_queue:
-            shadow_result = _run_shadow_advisor(
-                request_id=request_id,
-                review_cases=review_queue,
-                logger=logger,
-            )
-            reviews = (
-                shadow_result.get("reviews")
-                if isinstance(shadow_result.get("reviews"), list)
-                else []
-            )
-            reviews_by_action_id = {
-                str(entry.get("action_id") or "").strip(): entry
-                for entry in reviews
-                if isinstance(entry, dict) and str(entry.get("action_id") or "").strip()
-            }
-            for item in review_queue:
-                action_id = str(item.get("action_id") or "").strip()
-                if action_id in reviews_by_action_id:
-                    item["shadow"] = reviews_by_action_id[action_id]
-
-            if shadow_result.get("error"):
-                backcheck_obj = (
-                    compare_result.get("backcheck")
-                    if isinstance(compare_result.get("backcheck"), dict)
-                    else {}
-                )
-                warnings = (
-                    backcheck_obj.get("warnings")
-                    if isinstance(backcheck_obj.get("warnings"), list)
-                    else []
-                )
-                _append_unique_note(
-                    warnings,
-                    f"Shadow advisor unavailable: {shadow_result.get('error')}",
-                )
-                backcheck_obj["warnings"] = warnings
-                compare_result["backcheck"] = backcheck_obj
 
         compare_result["requestId"] = request_id
         compare_result["engine"] = {
@@ -8923,12 +7910,9 @@ def create_autodraft_blueprint(
         compare_result["replacement_tuning"] = replacement_tuning
         compare_result["markup_review_queue"] = markup_review_queue
         compare_result["review_queue"] = review_queue
-        compare_result["agent_pre_review"] = agent_pre_review_result
-        compare_result["shadow_advisor"] = shadow_result
         compare_result["recognition"] = _compare_recognition_summary(
             effective_transformed_markups,
             feature_source="prepared_markups+cad_context",
-            agent_hints_applied=bool(agent_pre_review_result.get("used")),
         )
         return jsonify(compare_result), 200
 

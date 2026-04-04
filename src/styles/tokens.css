@@ -175,54 +175,9 @@
 	--suite-panel-height-loose: clamp(38.75rem, 72dvh, 65rem);
 	--suite-panel-scroll-max: min(70dvh, 57.5rem);
 
-	/* Agent surface system */
-	--agent-surface-base: var(--brand-surface-neutral);
-	--agent-surface-elevated: var(--brand-surface-branded);
-	--agent-surface-muted: color-mix(in srgb, var(--surface-2) 52%, transparent);
-	--agent-surface-border: color-mix(in srgb, var(--border) 78%, transparent);
-	--agent-surface-border-strong: color-mix(
-		in srgb,
-		var(--border-strong) 78%,
-		transparent
-	);
-
-	--agent-accent-warm: color-mix(
-		in srgb,
-		var(--accent) 70%,
-		var(--tertiary) 30%
-	);
-	--agent-accent-warm-soft: color-mix(
-		in srgb,
-		var(--agent-accent-warm) 22%,
-		transparent
-	);
-	--agent-accent-cool: color-mix(in srgb, var(--info) 82%, #7f95d8 18%);
-	--agent-accent-cool-soft: color-mix(in srgb, var(--info) 18%, transparent);
-
-	--agent-ambient-start: color-mix(
-		in srgb,
-		var(--bg) 84%,
-		var(--brand-ambient-cool-strong) 16%
-	);
-	--agent-ambient-mid: color-mix(
-		in srgb,
-		var(--surface) 88%,
-		var(--brand-ambient-warm) 12%
-	);
-	--agent-ambient-end: color-mix(
-		in srgb,
-		var(--bg) 84%,
-		var(--brand-ambient-warm-strong) 16%
-	);
-	--agent-text-strong: color-mix(in srgb, var(--text) 96%, #fff 4%);
-	--agent-text-soft: color-mix(in srgb, var(--text-muted) 84%, transparent);
-
-	--agent-shadow-soft: 0 18px 40px rgb(0 0 0 / 34%);
-	--agent-shadow-strong: 0 28px 70px rgb(0 0 0 / 45%);
-
-	--agent-motion-fast: 140ms;
-	--agent-motion-base: 220ms;
-	--agent-motion-slow: 360ms;
+	/* Shared surface depth */
+	--surface-shadow-soft: 0 18px 40px rgb(0 0 0 / 34%);
+	--surface-shadow-strong: 0 28px 70px rgb(0 0 0 / 45%);
 
 	--nexus-shell-border: color-mix(in srgb, var(--border) 82%, transparent);
 	--nexus-shell-glow: color-mix(in srgb, var(--primary) 22%, transparent);

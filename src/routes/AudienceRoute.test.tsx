@@ -32,10 +32,10 @@ describe("AudienceRoute", () => {
 		authState.allowCommandCenter = false;
 
 		render(
-			<MemoryRouter initialEntries={["/app/changelog"]}>
+			<MemoryRouter initialEntries={["/app/developer/control/changelog"]}>
 				<Routes>
 					<Route
-						path="/app/changelog"
+						path="/app/developer/control/changelog"
 						element={
 							<AudienceRoute audience="dev">
 								<div>Hidden surface</div>
@@ -43,14 +43,14 @@ describe("AudienceRoute", () => {
 						}
 					/>
 					<Route
-						path="/app/dashboard"
-						element={<div>Dashboard fallback</div>}
+						path="/app/home"
+						element={<div>Home fallback</div>}
 					/>
 				</Routes>
 			</MemoryRouter>,
 		);
 
-		expect(screen.getByText("Dashboard fallback")).toBeTruthy();
+		expect(screen.getByText("Home fallback")).toBeTruthy();
 	});
 
 	it("allows dev users through to dev-only routes", () => {
@@ -64,10 +64,10 @@ describe("AudienceRoute", () => {
 		authState.allowCommandCenter = true;
 
 		render(
-			<MemoryRouter initialEntries={["/app/command-center"]}>
+			<MemoryRouter initialEntries={["/app/developer/control/command-center"]}>
 				<Routes>
 					<Route
-						path="/app/command-center"
+						path="/app/developer/control/command-center"
 						element={
 							<AudienceRoute audience="dev">
 								<div>Dev only</div>

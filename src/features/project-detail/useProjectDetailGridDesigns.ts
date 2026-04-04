@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { GridDesign } from "@/components/apps/ground-grid-generator/types";
+import type { GridDesign } from "@/features/ground-grid-generation/ui/types";
 import { logger } from "@/lib/errorLogger";
 import { supabase } from "@/supabase/client";
 import type { Json } from "@/supabase/database";
@@ -58,12 +58,12 @@ export function useProjectDetailGridDesigns(
 			.select()
 			.maybeSingle();
 		if (data) {
-			navigate(`/app/apps/ground-grid?design=${data.id}`);
+			navigate(`/app/developer/labs/ground-grid-generation?design=${data.id}`);
 		}
 	};
 
 	const openGridDesign = (designId: string) => {
-		navigate(`/app/apps/ground-grid?design=${designId}`);
+		navigate(`/app/developer/labs/ground-grid-generation?design=${designId}`);
 	};
 
 	return {

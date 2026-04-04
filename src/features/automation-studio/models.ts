@@ -1,4 +1,4 @@
-import type { AutoDraftPreviewOperation } from "@/components/apps/autodraft-studio/autodraftService";
+import type { AutoDraftPreviewOperation } from "@/features/autodraft-studio/ui/autodraftService";
 import type {
   CadPreviewMatch,
   CadReplaceRule,

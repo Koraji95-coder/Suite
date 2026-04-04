@@ -1,4 +1,5 @@
 import yaml from "js-yaml";
+import { getLocalStorageApi } from "../lib/browserStorage";
 import { logger } from "../lib/logger";
 import { supabase } from "./client";
 
@@ -17,8 +18,6 @@ const BACKUP_TABLES = [
 	"saved_calculations",
 	"saved_circuits",
 	"whiteboards",
-	"ai_conversations",
-	"ai_memory",
 	"block_library",
 	"automation_workflows",
 	"drawing_annotations",
@@ -184,9 +183,11 @@ export function fromYaml(yamlStr: string): BackupData {
  * Save backup YAML to localStorage (auto-sync).
  */
 export function saveToLocalStorage(yamlStr: string): void {
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 	try {
-		localStorage.setItem(BACKUP_STORAGE_KEY, yamlStr);
-		localStorage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
+		storage.setItem(BACKUP_STORAGE_KEY, yamlStr);
+		storage.setItem(BACKUP_TIMESTAMP_KEY, new Date().toISOString());
 	} catch (e) {
 		logger.warn(
 			"Backup: localStorage save failed (quota?)",
@@ -200,14 +201,26 @@ export function saveToLocalStorage(yamlStr: string): void {
  * Get the last backup timestamp from localStorage.
  */
 export function getLastBackupTimestamp(): string | null {
-	return localStorage.getItem(BACKUP_TIMESTAMP_KEY);
+	const storage = getLocalStorageApi();
+	if (!storage) return null;
+	try {
+		return storage.getItem(BACKUP_TIMESTAMP_KEY);
+	} catch {
+		return null;
+	}
 }
 
 /**
  * Get the backup YAML from localStorage.
  */
 export function getFromLocalStorage(): string | null {
-	return localStorage.getItem(BACKUP_STORAGE_KEY);
+	const storage = getLocalStorageApi();
+	if (!storage) return null;
+	try {
+		return storage.getItem(BACKUP_STORAGE_KEY);
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -351,8 +364,6 @@ export async function restoreFromYaml(
 		"activity_log",
 		"calendar_events",
 		"whiteboards",
-		"ai_conversations",
-		"ai_memory",
 		"block_library",
 		"automation_workflows",
 		"drawing_annotations",

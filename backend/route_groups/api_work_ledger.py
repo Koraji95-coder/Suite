@@ -61,7 +61,6 @@ def create_work_ledger_blueprint(
     requests_module: Any = requests,
     subprocess_module: Any = subprocess,
     socket_module: Any = socket,
-    agent_run_orchestrator: Any = None,
     watchdog_service: Any = None,
 ) -> Blueprint:
     """Create /api/work-ledger route group blueprint."""
@@ -90,7 +89,6 @@ def create_work_ledger_blueprint(
         repo_root=resolved_repo_root,
         logger=logger,
         subprocess_module=subprocess_module,
-        agent_run_orchestrator=agent_run_orchestrator,
         watchdog_service=watchdog_service or WatchdogMonitorService(),
     )
 

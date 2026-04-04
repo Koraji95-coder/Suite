@@ -120,9 +120,9 @@ Create two test users: `user_a`, `user_b`.
 1. Log in as `user_a`.
 2. Create project, task, and calendar event from app routes:
    - `/app/projects`
-   - `/app/calendar`
+   - `/app/projects/:projectId/calendar`
 3. Log out, log in as `user_b`.
-4. Verify `user_b` cannot see `user_a` records in dashboard/projects/calendar.
+4. Verify `user_b` cannot see `user_a` records in Home, Projects, or the project notebook calendar.
 
 ### B. Storage isolation
 

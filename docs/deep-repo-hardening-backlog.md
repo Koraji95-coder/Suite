@@ -7,11 +7,11 @@ tracks implementation priorities with explicit acceptance criteria.
 
 ## Critical
 
-- [x] AutoWire route fragmentation (`/app/apps/conduit-route` vs legacy AutoWire naming)
-  - Fix: canonical route moved to `/app/apps/autowire` with compatibility redirect.
+- [x] AutoWire route fragmentation across the retired Apps IA
+  - Fix: canonical route moved to `/app/developer/labs/autowire` under the Developer > Labs branch.
   - Acceptance:
-    - `/app/apps/autowire` loads successfully.
-    - `/app/apps/conduit-route` redirects to `/app/apps/autowire`.
+    - `/app/developer/labs/autowire` loads successfully.
+    - Legacy Apps-era aliases are no longer part of the supported shell contract.
 
 - [x] Missing AutoDraft CAD backcheck path (manual QA bottleneck)
   - Fix: added `POST /api/autodraft/backcheck` (backend + .NET contract stub + UI trigger).
@@ -44,15 +44,6 @@ tracks implementation priorities with explicit acceptance criteria.
       is provided.
     - spoofed client `backcheck_fail_count` no longer bypasses the gate.
 
-- [x] Agent conversation storage limits can exceed browser localStorage quota
-  - Fix:
-    - lowered default transcript caps in `agentTaskManager`.
-    - added byte-budget enforcement with conversation/message trimming before writes.
-    - added quota-retry path with aggressive trim and structured warning telemetry.
-  - Acceptance:
-    - oversized histories are trimmed deterministically before persistence.
-    - quota exceptions no longer hard-fail normal save paths.
-
 ## Medium
 
 - [x] Expand CAD-aware backcheck from request-supplied context to live CAD-read enrichment
@@ -67,13 +58,13 @@ tracks implementation priorities with explicit acceptance criteria.
 
 - [x] Complete legacy AutoWire artifact retirement
   - Fix:
-    - removed legacy duplicate prototype artifacts under `src/components/apps/autowire/*`.
+    - removed legacy duplicate prototype artifacts from the retired Apps-era AutoWire tree.
     - documented archival/removal mapping in
       `docs/archive/legacy/autowire-legacy-artifacts-archive.md`.
   - Acceptance:
-    - no runtime imports reference `src/components/apps/autowire/*`.
+    - no runtime imports reference retired Apps-era AutoWire paths.
     - canonical AutoWire implementation remains under
-      `src/components/apps/conduit-route/*`.
+      `src/features/autowire/ui/*`.
 
 - [x] Promote AutoDraft .NET backcheck from contract stub to CAD-native verifier
   - Fix:

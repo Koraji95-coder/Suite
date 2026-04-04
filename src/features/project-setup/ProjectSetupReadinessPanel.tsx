@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import {
 	TrustStateBadge,
-} from "@/components/apps/ui/TrustStateBadge";
+} from "@/components/system/TrustStateBadge";
 import { cn } from "@/lib/utils";
 import { useProjectSetupReadinessState } from "./useProjectSetupReadinessState";
 import { DEFAULT_PROJECT_SETUP_TITLE_BLOCK_NAME } from "./wizard";

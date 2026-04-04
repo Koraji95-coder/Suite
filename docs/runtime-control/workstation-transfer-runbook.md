@@ -5,7 +5,7 @@ Date: March 30, 2026
 Use this when moving active development between Windows workstations and you want the destination machine to pick up:
 
 - the current `Suite` repo
-- the current `DailyDesk` repo or workspace
+- the current `Office` repo or workspace
 - the correct workstation profile
 - the local Office companion path
 - startup tasks and runtime health
@@ -25,7 +25,7 @@ Each physical machine should keep one permanent id. Do not restore the work PC a
 ## Source Machine Before You Leave
 
 1. Commit and push the `Suite` repo.
-2. Commit and push the `DailyDesk` repo if it is already in Git.
+2. Commit and push the `Office` repo if it is already in Git.
 3. Mirror workstation-local state if needed:
 
 ```powershell
@@ -127,6 +127,32 @@ Expected behavior:
 - Office appears in `Companion Apps`
 - `Apply workstation profile` is available in Support
 - `Open Office` launches the built Office binary for this machine
+
+## What Docker Does And Does Not Move
+
+Docker helps reconstruct the shared runtime-core lane:
+
+- frontend
+- backend
+- Redis
+- local Supabase development services
+
+Docker does not replace machine-local ownership for:
+
+- Runtime Control
+- Office companion
+- watchdog collectors
+- AutoCAD and plugin execution
+- startup tasks
+- workstation identity
+- local learning, SQLite, JSONL, and promoted local model artifacts
+
+The destination workstation still needs:
+
+- Git for code
+- bootstrap for machine setup
+- `workstation:sync` for identity
+- `workstation:restore` for local-only state when needed
 
 ## AutoCAD / Watchdog Expectations
 

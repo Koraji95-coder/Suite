@@ -21,7 +21,6 @@ export type WorkLedgerPublishJobRow =
 export type WorkLedgerSourceKind =
 	| "manual"
 	| "git_checkpoint"
-	| "agent_run"
 	| "watchdog"
 	| "architecture"
 	| "project";
@@ -135,7 +134,6 @@ export interface WorkLedgerDraftSuggestionsResponse {
 	count: number;
 	sources: {
 		git: number;
-		agent: number;
 		watchdog: number;
 	};
 	suggestions: WorkLedgerDraftSuggestion[];

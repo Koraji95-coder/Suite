@@ -10,7 +10,8 @@ const outputPath = path.join(
 );
 const SNAPSHOT_INPUT_ROOTS = [
 	"src/routes",
-	"src/components/apps",
+	"src/features",
+	"src/components",
 	"src/auth",
 	"src/services",
 	"backend",
@@ -29,8 +30,8 @@ const DOMAIN_ROOTS = [
 		domainId: "frontend",
 		roots: [
 			"src/routes",
-			"src/components/apps",
-			"src/components/apps/dxfer",
+			"src/features",
+			"src/components",
 			"src/auth",
 			"src/services",
 		],
@@ -44,16 +45,6 @@ const DOMAIN_ROOTS = [
 	{
 		domainId: "data",
 		roots: ["src/supabase", "supabase", "backend/supabase"],
-		maxChildrenPerRoot: 10,
-	},
-	{
-		domainId: "agent",
-		roots: [
-			"src/routes/agent",
-			"src/services/agentService.ts",
-			"scripts/suite-agent-gateway.mjs",
-			"scripts/run-agent-gateway.mjs",
-		],
 		maxChildrenPerRoot: 10,
 	},
 	{
@@ -116,30 +107,24 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 
 function runBiomeWrite(relativeOutput) {
-	const isWindows = process.platform === "win32";
-	const attempts = [
+	const biomeBin = path.join(
+		repoRoot,
+		"node_modules",
+		"@biomejs",
+		"biome",
+		"bin",
+		"biome",
+	);
+	const result = spawnSync(
+		process.execPath,
+		[biomeBin, "check", "--write", relativeOutput],
 		{
-			command: "npx",
-			args: ["biome", "check", "--write", relativeOutput],
-		},
-		{
-			command: "npm",
-			args: ["exec", "--", "biome", "check", "--write", relativeOutput],
-		},
-	];
-
-	for (const attempt of attempts) {
-		const result = spawnSync(attempt.command, attempt.args, {
 			cwd: repoRoot,
+			shell: false,
 			stdio: "ignore",
-			shell: isWindows,
-		});
-		if (!result.error && result.status === 0) {
-			return true;
-		}
-	}
-
-	return false;
+		},
+	);
+	return !result.error && result.status === 0;
 }
 
 function toPosix(relPath) {
@@ -441,17 +426,20 @@ async function buildHotspots() {
 async function buildBatchFindReplaceDetails() {
 	const moduleDir = path.join(
 		repoRoot,
-		"src/components/apps/Batch_find_and_replace",
+		"src/features/batch-find-replace/ui",
 	);
 	const routeFile = path.join(
 		repoRoot,
-		"src/routes/apps/batch-find-replace/BatchFindReplaceRoutePage.tsx",
+		"src/routes/developer/labs/batch-find-replace/BatchFindReplaceRoutePage.tsx",
 	);
 	const routeGroupFile = path.join(
 		repoRoot,
 		"backend/route_groups/api_batch_find_replace.py",
 	);
-	const registryFile = path.join(repoRoot, "backend/route_groups/api_registry.py");
+	const registryFile = path.join(
+		repoRoot,
+		"backend/route_groups/api_registry.py",
+	);
 	const backendFile = path.join(repoRoot, "backend/api_server.py");
 
 	let moduleFiles = [];
@@ -500,7 +488,7 @@ async function buildBatchFindReplaceDetails() {
 		moduleFiles,
 		backendRouteCount,
 		namingNote:
-			"The module folder uses `Batch_find_and_replace` while route slugs use `batch-find-replace`.",
+			"Feature ownership and route slugs now share the normalized `batch-find-replace` naming.",
 	};
 }
 
@@ -509,7 +497,10 @@ async function buildBackupRouteStatus() {
 		repoRoot,
 		"backend/route_groups/api_backup.py",
 	);
-	const registryFile = path.join(repoRoot, "backend/route_groups/api_registry.py");
+	const registryFile = path.join(
+		repoRoot,
+		"backend/route_groups/api_registry.py",
+	);
 	const backendFile = path.join(repoRoot, "backend/api_server.py");
 
 	const routeGroupText = await readTextSafe(backupRouteGroupFile);
@@ -533,7 +524,8 @@ async function buildBackupRouteStatus() {
 		await readTextSafe(registryFile),
 	);
 	return {
-		routeImplemented: hasBackupPrefix || legacyImplemented || registryImplemented,
+		routeImplemented:
+			hasBackupPrefix || legacyImplemented || registryImplemented,
 	};
 }
 

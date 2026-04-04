@@ -1,6 +1,6 @@
 import { Activity } from "lucide-react";
 import { useId, useState } from "react";
-import { Section } from "@/components/apps/ui/PageFrame";
+import { Section } from "@/components/system/PageFrame";
 import { cn } from "@/lib/utils";
 import styles from "./SinusoidalCalculator.module.css";
 

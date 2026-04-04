@@ -3,7 +3,7 @@ import type { DrawingAnnotation } from "@/features/standards-checker/standardsDr
 import { standardsCheckerBackendService } from "@/features/standards-checker/backendService";
 import type { ProjectStandardsLatestReview } from "@/features/standards-checker/standardsCheckerModels";
 import { hasRecordedProjectStandardsLatestReview } from "@/features/standards-checker/latestReview";
-import { type TrustState } from "@/components/apps/ui/TrustStateBadge";
+import { type TrustState } from "@/components/system/TrustStateBadge";
 import {
 	buildProjectIssueSetAppHref,
 	buildProjectScopedAppHref,
@@ -247,7 +247,7 @@ function getSetupItems(
 			actionType: "link",
 			actionLabel: "Open title block review",
 			actionTarget: buildProjectScopedAppHref(
-				"/app/apps/drawing-list-manager",
+				"/app/draft/drawing-list-manager",
 				project.id,
 			),
 			issueSetId: null,
@@ -309,7 +309,7 @@ function getTitleBlockItems(
 				actionType: "link",
 				actionLabel: "Open title block review",
 				actionTarget: buildProjectIssueSetAppHref(
-					"/app/apps/drawing-list-manager",
+					"/app/draft/drawing-list-manager",
 					projectId,
 					issueSet?.id,
 				),
@@ -399,7 +399,7 @@ function getDeliverableRegisterItems(args: {
 				actionType: "link",
 				actionLabel: "Open title block review",
 				actionTarget: buildProjectIssueSetAppHref(
-					"/app/apps/drawing-list-manager",
+					"/app/draft/drawing-list-manager",
 					args.projectId,
 					args.issueSet?.id,
 				),
@@ -420,7 +420,7 @@ function getDeliverableRegisterItems(args: {
 				actionType: "link",
 				actionLabel: "Open title block review",
 				actionTarget: buildProjectIssueSetAppHref(
-					"/app/apps/drawing-list-manager",
+					"/app/draft/drawing-list-manager",
 					args.projectId,
 					args.issueSet?.id,
 				),
@@ -510,7 +510,7 @@ function getStandardsItems(
 				actionType: "link" as const,
 				actionLabel: "Open Standards Checker",
 				actionTarget: buildProjectIssueSetAppHref(
-					"/app/apps/standards-checker",
+					"/app/review/standards-checker",
 					projectId,
 					issueSet?.id,
 				),
@@ -548,7 +548,7 @@ function getStandardsItems(
 			actionType: "link",
 			actionLabel: "Open Standards Checker",
 			actionTarget: buildProjectIssueSetAppHref(
-				"/app/apps/standards-checker",
+				"/app/review/standards-checker",
 				projectId,
 				issueSet?.id,
 			),
@@ -649,7 +649,7 @@ function getIssueSetItems(args: {
 				actionType: "link",
 				actionLabel: "Open Transmittal Builder",
 				actionTarget: buildProjectIssueSetAppHref(
-					"/app/apps/transmittal-builder",
+					"/app/projects/transmittal-builder",
 					projectId,
 					issueSet.id,
 				),

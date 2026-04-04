@@ -384,7 +384,7 @@ export function useProjectManagerState({
 							return matchedProject;
 						}
 					}
-					return data[0];
+					return null;
 				});
 			}
 		} catch (err) {

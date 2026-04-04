@@ -405,8 +405,7 @@ function Wait-ForCompanionRuntimeGate {
 		if ($statusResult.Ok -and $statusResult.Payload) {
 			$doctorState = [string]$statusResult.Payload.doctor.overallState
 			$backendReady = [bool](@($statusResult.Payload.services | Where-Object { $_.id -eq "backend" -and $_.state -eq "running" }).Count -gt 0)
-			$gatewayReady = [bool](@($statusResult.Payload.services | Where-Object { $_.id -eq "gateway" -and $_.state -eq "running" }).Count -gt 0)
-			if ($backendReady -and $gatewayReady -and $doctorState -ne "unavailable") {
+			if ($backendReady -and $doctorState -ne "unavailable") {
 				return [pscustomobject]@{
 					ok = $true
 					payload = $statusResult.Payload
@@ -762,7 +761,7 @@ if ($overallOk) {
     Launch-ManagedOfficeCompanion
     Show-Notification `
         -Title "Suite runtime ready" `
-        -Message "Supabase, backend, gateway, frontend, and collectors are ready after Windows sign-in." `
+        -Message "Supabase, backend, frontend, and collectors are ready after Windows sign-in." `
         -Level "Info"
 }
 else {

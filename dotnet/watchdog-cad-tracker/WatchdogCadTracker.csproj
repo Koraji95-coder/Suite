@@ -59,10 +59,6 @@
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="..\..\src\components\apps\watchdog\DrawingTracker.cs" Link="DrawingTracker.cs" />
-  </ItemGroup>
-
   <Target Name="ValidateAutoCadManagedReferences" BeforeTargets="ResolveReferences">
     <Error
       Condition="'$(ResolvedAutoCadInstallDir)' == ''"

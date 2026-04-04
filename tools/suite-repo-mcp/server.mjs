@@ -99,7 +99,7 @@ const STATIC_RESOURCES = [
 		uri: AUTODESK_REFERENCE_PACK_RESOURCE_URI,
 		name: "AutoCAD Electrical 2026 Local Reference Pack",
 		description:
-			"Combined local ACADE reference pack that consolidates project-flow and AutoLISP/API docs for agent use.",
+			"Combined local ACADE reference pack that consolidates project-flow and AutoLISP/API docs for local coding and reference use.",
 		mimeType: "text/markdown",
 		filePath: AUTODESK_REFERENCE_PACK_RESOURCE_PATH,
 	},
@@ -1602,70 +1602,6 @@ async function toolAddApiErrorWrapper(args = {}) {
 	);
 }
 
-function parseBackendAgentProfileModelMap(sourceText) {
-	const map = new Map();
-	const entryRegex =
-		/\{\s*"id":\s*"([^"]+)"[\s\S]*?"model_primary":\s*"([^"]+)"[\s\S]*?"model_fallbacks":\s*\[([\s\S]*?)\][\s\S]*?\},?/g;
-	let match;
-	while ((match = entryRegex.exec(sourceText)) !== null) {
-		const id = String(match[1] || "")
-			.trim()
-			.toLowerCase();
-		if (!id) continue;
-		const primary = String(match[2] || "").trim();
-		const fallbackMatches = [...String(match[3] || "").matchAll(/"([^"]+)"/g)];
-		const fallbacks = fallbackMatches
-			.map((item) => String(item[1] || "").trim())
-			.filter(Boolean);
-		map.set(id, { primary, fallbacks });
-	}
-	return map;
-}
-
-function sliceObjectBlock(sourceText, marker) {
-	const start = sourceText.indexOf(`${marker}: {`);
-	if (start < 0) return "";
-	const firstBrace = sourceText.indexOf("{", start);
-	if (firstBrace < 0) return "";
-
-	let depth = 0;
-	for (let index = firstBrace; index < sourceText.length; index += 1) {
-		const ch = sourceText[index];
-		if (ch === "{") depth += 1;
-		if (ch === "}") {
-			depth -= 1;
-			if (depth === 0) {
-				return sourceText.slice(start, index + 1);
-			}
-		}
-	}
-	return "";
-}
-
-function parseFrontendAgentProfileModelMap(sourceText, profileIds) {
-	const map = new Map();
-	for (const profileId of profileIds) {
-		const block = sliceObjectBlock(sourceText, profileId);
-		if (!block) continue;
-
-		const primaryMatch =
-			block.match(/modelPrimary:\s*resolvePrimary\([^,]+,\s*"([^"]+)"\)/) ||
-			block.match(/modelPrimary:\s*"([^"]+)"/);
-		const fallbackMatch = block.match(/modelFallbacks:\s*\[([\s\S]*?)\]/);
-		const fallbackValues = fallbackMatch
-			? [...fallbackMatch[1].matchAll(/"([^"]+)"/g)]
-					.map((item) => String(item[1] || "").trim())
-					.filter(Boolean)
-			: [];
-
-		map.set(profileId, {
-			primary: String(primaryMatch?.[1] || "").trim(),
-			fallbacks: fallbackValues,
-		});
-	}
-	return map;
-}
-
 async function toolCheckWatchdogBackendStartup(args = {}) {
 	if (process.platform !== "win32") {
 		return createTextResult(
@@ -1729,101 +1665,6 @@ async function toolCheckWatchdogBackendStartup(args = {}) {
 				2,
 			),
 	);
-}
-
-async function toolVerifyAgentRoutingGuardrails() {
-	const guardrailsAbs = resolveRepoPath("AGENTS.md");
-	const frontendAbs = resolveRepoPath("src/components/agent/agentProfiles.ts");
-	const backendAbs = resolveRepoPath(
-		"backend/route_groups/api_agent_profiles.py",
-	);
-
-	const guardrailsText = (await fs.readFile(guardrailsAbs, "utf8")).toString();
-	const frontendText = (await fs.readFile(frontendAbs, "utf8")).toString();
-	const backendText = (await fs.readFile(backendAbs, "utf8")).toString();
-
-	const requiredGuardrails = [
-		"Do not add or use Tailwind",
-		"Do not make major auth flow changes",
-		"AutoCAD Reliability Guardrail",
-		"Agent Model Routing Guardrail",
-		"MCP/Handoff Guardrail",
-		"Gateway Build/Runtime Guardrail",
-		"The Suite-native gateway is the default gateway path for Suite workflows.",
-		"Use `npm run gateway:dev` as the canonical command",
-		"Legacy ZeroClaw CLI fallback is retired from active Suite workflows.",
-		"strict single-model per profile",
-	];
-	const missingGuardrails = requiredGuardrails.filter(
-		(item) => !guardrailsText.includes(item),
-	);
-
-	const backendMap = parseBackendAgentProfileModelMap(backendText);
-	const profileIds = [...backendMap.keys()].sort();
-	const frontendMap = parseFrontendAgentProfileModelMap(
-		frontendText,
-		profileIds,
-	);
-
-	const mismatches = [];
-	for (const profileId of profileIds) {
-		const backendModel = backendMap.get(profileId);
-		const frontendModel = frontendMap.get(profileId);
-		if (!backendModel || !frontendModel) {
-			mismatches.push(`missing profile mapping for ${profileId}`);
-			continue;
-		}
-
-		if (backendModel.primary !== frontendModel.primary) {
-			mismatches.push(
-				`${profileId} primary mismatch (backend=${backendModel.primary}, frontend=${frontendModel.primary})`,
-			);
-		}
-		const backendFallback = JSON.stringify(backendModel.fallbacks);
-		const frontendFallback = JSON.stringify(frontendModel.fallbacks);
-		if (backendFallback !== frontendFallback) {
-			mismatches.push(
-				`${profileId} fallback mismatch (backend=${backendFallback}, frontend=${frontendFallback})`,
-			);
-		}
-		if (
-			(backendModel.fallbacks || []).length > 0 ||
-			(frontendModel.fallbacks || []).length > 0
-		) {
-			mismatches.push(
-				`${profileId} fallback list must be empty in strict-routing mode`,
-			);
-		}
-	}
-
-	if (!backendMap.has("gridsage")) {
-		mismatches.push("gridsage profile missing from backend profile catalog");
-	}
-
-	const ok = missingGuardrails.length === 0 && mismatches.length === 0;
-	const lines = [];
-	lines.push(`Guardrail file: ${repoRelative(guardrailsAbs)}`);
-	lines.push(`Frontend profile file: ${repoRelative(frontendAbs)}`);
-	lines.push(`Backend profile file: ${repoRelative(backendAbs)}`);
-	lines.push(`Profile count checked: ${profileIds.length}`);
-	lines.push(`Result: ${ok ? "PASS" : "FAIL"}`);
-
-	if (missingGuardrails.length > 0) {
-		lines.push("");
-		lines.push("Missing guardrail markers:");
-		for (const item of missingGuardrails) lines.push(`- ${item}`);
-	}
-	if (mismatches.length > 0) {
-		lines.push("");
-		lines.push("Mapping mismatches:");
-		for (const item of mismatches) lines.push(`- ${item}`);
-	}
-	if (ok) {
-		lines.push("");
-		lines.push("All guardrails and profile-model mappings are aligned.");
-	}
-
-	return createTextResult(lines.join("\n"), !ok);
 }
 
 async function toolGetWorkstationContext() {
@@ -2680,33 +2521,18 @@ Notes: ${notes}
    - stable error envelope with success/code/message/requestId/meta
    - structured logger.exception with stage context
    - no silent broad exception swallow patterns
-4. Preserve agent profile routing contract:
-   - profile-driven primary model routing only
-   - keep frontend/backend mappings consistent
-   - do not re-enable cross-profile fallback retries
-5. Preserve orchestration contract:
-   - keep /api/agent/runs* run-ledger flow additive
-   - do not alter single-chat or pairing behavior as part of orchestration changes
-6. Gateway build/runtime policy (locked default):
-   - use \`npm run gateway:dev\` as the canonical command (Suite-native gateway default path)
-   - legacy ZeroClaw CLI fallback is retired from active Suite workflows
-   - if runtime status reports an unexpected legacy gateway process, stop it and relaunch the canonical path
-   - keep any old rust/toolchain failure notes as archived diagnostics, not as active workaround guidance
-7. Watchdog collector startup gate:
+4. Preserve the product boundary:
+   - Office owns local agent, chat, and orchestration work
+   - Suite must stay free of agent UI, pairing flows, broker endpoints, and gateway scripts
+5. Watchdog collector startup gate:
    - workstation identity comes from \`.codex/config.toml\` or MCP workstation env overrides
    - use \`repo.check_watchdog_collector_startup\`, \`repo.check_watchdog_autocad_collector_startup\`, \`repo.check_watchdog_autocad_plugin\`, and \`repo.check_watchdog_autocad_readiness\` before relying on local collector telemetry when startup state is relevant
    - if the reported workstation/config mismatch is non-empty, fix workstation-specific startup config before proceeding
    - if startup is unhealthy and recoverable, rerun with \`start_if_missing=true\`
-8. Local Ollama startup gate (required before conversation/run creation):
-   - run \`npm run gateway:dev\`
-   - confirm startup logs show \`provider=ollama\` and \`mode=local\`
-   - confirm Ollama preflight reports all required profile models are available
-   - if any required model is missing, stop and pull missing models before starting single-agent chat or orchestration
-   - default required models (unless overridden by \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\`): \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`
-9. Adjacent auth-noise guidance:
+6. Adjacent auth-noise guidance:
    - Supabase "issued in the future" warning spam is handled by docs/security/supabase-clock-skew-runbook.md
-   - do not treat clock-skew warning noise as a reason to reopen gateway workaround loops
-10. Watchdog backend startup gate:
+   - do not treat clock-skew warning noise as a reason to reopen retired agent or gateway work
+7. Watchdog backend startup gate:
    - use \`repo.check_watchdog_backend_startup\` before relying on local AutoCAD telemetry, and rerun with \`start_if_missing=true\` when the server is missing
    - keep the backend service running via the standard \`python backend/api_server.py\` command and confirm it responds to \`/health\` before streaming telemetry
 `,
@@ -2715,134 +2541,6 @@ Notes: ${notes}
 		description:
 			"Return the current workstation identity exposed to suite_repo_mcp.",
 		template: () => formatWorkstationContext(),
-	},
-	"repo.agent_profile_playbook": {
-		description:
-			"Return profile-specific operating instructions for Suite's 6-agent model pack.",
-		template: () => `## Agent Profile Playbook
-
-1. koro
-- Mission: orchestration + final synthesis.
-- Use for: sequencing, dependency mapping, execution plans, final decision packets.
-- Avoid: style-only summaries without implementation actions.
-
-2. devstral
-- Mission: implementation and debugging.
-- Use for: code changes, refactors, diagnostics, typed failure handling.
-- Avoid: product-policy changes outside explicit request.
-
-3. sentinel
-- Mission: risk/compliance review.
-- Use for: regression analysis, standards checker, failure-mode audits.
-- Avoid: approving behavior changes without evidence.
-
-4. forge
-- Mission: documentation/output packaging.
-- Use for: operator runbooks, release notes, rollout instructions.
-- Avoid: ambiguous run steps.
-
-5. draftsmith
-- Mission: CAD/electrical drafting strategy.
-- Use for: route/label sequencing, AutoCAD-safe drafting guidance.
-- Avoid: geometry behavior changes without explicit approval.
-
-6. gridsage
-- Mission: electrical systems analysis and implementation constraints.
-- Use for: load/protection assumptions, electrical standards checker, implementation boundaries.
-- Avoid: ambiguous recommendations without stated assumptions.
-`,
-	},
-	"repo.agent_orchestration_runbook": {
-		description:
-			"Return a concise runbook for backend-led parallel agent orchestration endpoints.",
-		template: () => `## Orchestration Runbook
-
-0. Mandatory preflight gate (before any run creation)
-- Run \`npm run gateway:dev\`.
-- Confirm startup logs include \`provider=ollama\` and \`mode=local\`.
-- Confirm Ollama preflight passes with all required profile models available.
-- If preflight reports missing models, stop and run \`ollama pull <model>\` for each missing model, then rerun preflight.
-- Required model set:
-  - use active \`AGENT_MODEL_*\` / \`VITE_AGENT_MODEL_*\` routing values when overridden.
-  - otherwise require default pack: \`qwen3:14b\`, \`gemma3:12b\`, \`devstral-small-2:latest\`, \`qwen2.5-coder:14b\`, \`joshuaokolo/C3Dv0:latest\`, \`ALIENTELLIGENCE/electricalengineerv2:latest\`.
-
-1. Create run
-- POST /api/agent/runs
-- body: objective, profiles[], synthesisProfile?, context?, timeoutMs?
-- returns: success, runId, status, requestId
-
-2. Track run
-- GET /api/agent/runs/:runId
-- returns stage progress, per-profile outputs, synthesis output, requestId
-
-3. Stream events
-- GET /api/agent/runs/:runId/events
-- SSE events: run_started, step_started, step_completed, step_failed, run_completed, run_cancelled
-
-4. Cancel run
-- POST /api/agent/runs/:runId/cancel
-- returns success, status, requestId
-
-Operational notes:
-- create endpoint requires paired broker session.
-- use run-ledger events for traceability, not ad-hoc in-memory state.
-- keep auth flow unchanged and respect AGENTS.md guardrails.
-`,
-	},
-	"repo.agent_handoff_packet": {
-		description:
-			"Generate a handoff packet template for passing orchestration state to another Codex instance.",
-		template: ({
-			run_id = "<run-id>",
-			objective = "<objective>",
-			status = "<status>",
-		}) => `## Agent Handoff Packet
-
-- Run ID: ${run_id}
-- Objective: ${objective}
-- Current Status: ${status}
-
-### Required Context
-1. Active profiles and model routes used.
-2. Completed stages + failed/cancelled steps.
-3. Final synthesis output or current blocker.
-4. Request IDs for backend/gateway correlation.
-
-### Gateway Build State (Required)
-1. Command used:
-   - canonical: \`npm run gateway:dev\`
-2. Runtime snapshot state:
-   - configured mode: <Suite-native>
-   - detected process mode: <Suite-native | unexpected legacy process | unavailable>
-3. Result summary:
-   - status:
-   - failure signature (if any):
-   - classification: <normal | stale legacy process | runtime issue>
-4. Incident protocol:
-   - if an unexpected legacy process is detected, record it once, stop it, and continue on the canonical Suite-native path.
-
-### Model Readiness State (Required Before Conversation/Run Handoff)
-1. Provider mode:
-   - \`SUITE_AGENT_PROVIDER_MODE\`: <local | auto | config>
-2. Provider selected at startup:
-   - observed provider: <ollama | other>
-   - observed startup mode marker: <mode=local | other>
-3. Ollama preflight status:
-   - result: <pass | fail>
-   - evidence line: <copy startup preflight line>
-4. Missing-model status:
-   - missing models: <none | comma-separated model IDs>
-   - pull completion: <complete | pending>
-5. Gate policy:
-   - if preflight is fail or pull completion is pending, do not start or hand off single-agent conversation/orchestration run work.
-
-### Guardrails
-1. No Tailwind in Suite app.
-2. No major auth flow changes without approval.
-3. Preserve AutoCAD requestId/error-envelope contract.
-4. Preserve deterministic profile-model routing parity (no fallback retries).
-5. Preserve gateway policy parity with docs/development/gateway-stability-policy.md.
-	`,
 	},
 };
 
@@ -3172,16 +2870,6 @@ const TOOLS = [
 			},
 		},
 		handler: toolCheckSuiteWorkstation,
-	},
-	{
-		name: "repo.verify_agent_routing_guardrails",
-		description:
-			"Verify Suite guardrail markers and frontend/backend agent profile model-route parity.",
-		inputSchema: {
-			type: "object",
-			properties: {},
-		},
-		handler: toolVerifyAgentRoutingGuardrails,
 	},
 ];
 

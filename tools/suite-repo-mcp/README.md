@@ -32,12 +32,6 @@ Server name (to avoid conflicts): `suite_repo_mcp`
 - `repo.test_plan`
 - `repo.ui_semantics_sweep`
 - `repo.suite_guardrails`
-- `repo.agent_profile_playbook`
-- `repo.agent_orchestration_runbook`
-- `repo.agent_handoff_packet`
-
-### Verification
-- `repo.verify_agent_routing_guardrails`
 
 ### Resources
 - `repo://docs/development/autocad-electrical-2026-project-flow`
@@ -127,64 +121,19 @@ Future Codex sessions should preserve the repository guardrails in `AGENTS.md`, 
 - no Tailwind usage in Suite app paths,
 - no major auth-flow changes without explicit approval,
 - AutoCAD error envelope + `requestId` observability contract,
-- deterministic profile-based single-model routing (no fallback retries).
+- and the Office/Suite boundary that keeps local agent and orchestration ownership out of this repo.
 
-Gateway policy is locked for handoffs and MCP usage:
-
-- default path: Suite-native gateway via `npm run gateway:dev`,
-- legacy ZeroClaw CLI fallback is retired from the active workflow,
-- if runtime status detects an unexpected legacy gateway process, stop it and relaunch `npm run gateway:dev`,
-- historical rust/toolchain failures from the retired path should stay archived as diagnostics only.
-- upstream bug report only after collecting a minimal reproducible diagnostic capture.
-
-Local Ollama startup gate is required before booting conversations or orchestration:
-
-1. Run `npm run gateway:dev` (canonical path).
-2. Confirm gateway startup logs show `provider=ollama` and `mode=local`.
-3. Confirm gateway preflight reports all required profile models are available.
-4. If preflight reports missing models, stop and pull missing models before starting agent conversation or orchestration.
-
-Default required model pack (unless overridden):
-
-- `gemma3:12b`
-- `devstral-small-2:latest`
-- `qwen2.5-coder:14b`
-- `qwen3:14b`
-- `joshuaokolo/C3Dv0:latest`
-- `ALIENTELLIGENCE/electricalengineerv2:latest`
-
-Override rule:
-
-- If `AGENT_MODEL_*` and/or `VITE_AGENT_MODEL_*` model routing values are changed, those configured model IDs replace the defaults above and become the required pull set.
-
-Conversation start policy:
-
-- "Starting conversation" includes both single-agent interaction and orchestration run creation.
+Office owns local agent, chat, and orchestration work. Suite repo MCP guidance should not reintroduce the retired Suite-native agent stack.
 
 Runbooks:
 
-- gateway decision tree and incident protocol: `docs/development/gateway-stability-policy.md`
 - Supabase callback warning noise handling: `docs/security/supabase-clock-skew-runbook.md`
 
-## Parallel agent run operator flow
+Recommended startup checks before workstation-local watchdog work:
 
-Use backend orchestration endpoints to run agents while coding continues in parallel:
-
-1. `POST /api/agent/runs`
-- body: `objective`, `profiles[]`, optional `synthesisProfile`, `context`, `timeoutMs`
-2. `GET /api/agent/runs/:runId`
-- poll for current step/status snapshot
-3. `GET /api/agent/runs/:runId/events`
-- SSE stream for live progress
-4. `POST /api/agent/runs/:runId/cancel`
-- cancel in-flight background run
-
-Recommended startup checks before orchestration:
-
-1. `npm run gateway:dev`
-2. Confirm startup logs include `provider=ollama` and `mode=local`.
-3. Confirm preflight reports all required profile models are available.
-4. If any model is missing, stop and run `ollama pull <model>` for each missing model before proceeding.
-5. `repo.verify_agent_routing_guardrails`
-6. `repo.run_typecheck` with `{ \"scope\": \"all\" }`
-7. `repo.run_tests` with a focused target for changed modules
+1. `repo.check_watchdog_collector_startup`
+2. `repo.check_watchdog_autocad_collector_startup`
+3. `repo.check_watchdog_autocad_plugin`
+4. `repo.check_watchdog_autocad_readiness`
+5. `repo.run_typecheck` with `{ \"scope\": \"all\" }`
+6. `repo.run_tests` with a focused target for changed modules

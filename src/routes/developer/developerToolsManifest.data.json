@@ -1,0 +1,153 @@
+{
+	"groups": [
+		{
+			"id": "control",
+			"title": "Control",
+			"description": "Runtime handoff, diagnostics, publishing evidence, and support surfaces that stay behind the developer branch."
+		},
+		{
+			"id": "architecture",
+			"title": "Architecture",
+			"description": "Repo maps, graph views, and architecture tooling for engineering follow-through."
+		},
+		{
+			"id": "labs",
+			"title": "Labs",
+			"description": "Future product tools and experimental workflows that still need workshop time before they graduate."
+		}
+	],
+	"tools": [
+		{
+			"id": "changelog",
+			"title": "Changelog",
+			"description": "Developer publishing ledger, work evidence, and draft notes.",
+			"route": "/app/developer/control/changelog",
+			"group": "control",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "watchdog",
+			"title": "Watchdog",
+			"description": "Full drawing telemetry, collector health, and Runtime Control handoff for machine-local support work.",
+			"route": "/app/developer/control/watchdog",
+			"group": "control",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "command-center",
+			"title": "Command Center",
+			"description": "Suite doctor, local stack diagnostics, and incident controls for the shared runtime-core lane.",
+			"route": "/app/developer/control/command-center",
+			"group": "control",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "developer-docs",
+			"title": "Developer Docs",
+			"description": "Runbooks and workshop guidance that support local development and staged rollout work.",
+			"route": "/app/developer/control/docs",
+			"group": "control",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend"]
+		},
+		{
+			"id": "automation-studio",
+			"title": "Automation Studio",
+			"description": "Combined review bench for markup intent, terminal routing, and package-scoped automation receipts.",
+			"route": "/app/developer/labs/automation-studio",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "autodraft-studio",
+			"title": "AutoDraft Studio",
+			"description": "Markup-driven CAD automation workspace with review-first compare and execution flows.",
+			"route": "/app/developer/labs/autodraft-studio",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "autowire",
+			"title": "AutoWire",
+			"description": "Deterministic wire and conduit routing workflows staged as a future customer-facing automation surface.",
+			"route": "/app/developer/labs/autowire",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "ground-grid-generation",
+			"title": "Ground Grid Generation",
+			"description": "Grounding geometry capture and generation workflows that still need lab-stage refinement.",
+			"route": "/app/developer/labs/ground-grid-generation",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "batch-find-replace",
+			"title": "Batch Find & Replace",
+			"description": "Review-first drawing cleanup plus file and CAD replacement from one local workshop surface.",
+			"route": "/app/developer/labs/batch-find-replace",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "developer_beta",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "architecture-map",
+			"title": "Architecture Map",
+			"description": "Hotspot and refactor map for repo structure, extraction pressure, and module ownership.",
+			"route": "/app/developer/architecture/map",
+			"group": "architecture",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "architecture-graph",
+			"title": "Architecture Graph",
+			"description": "Alternative node-link explorer for the same architecture and memory model used in the map.",
+			"route": "/app/developer/architecture/graph",
+			"group": "architecture",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": false,
+			"runtimeRequirements": ["frontend", "backend"]
+		},
+		{
+			"id": "whiteboard",
+			"title": "Whiteboard",
+			"description": "Developer sketching and note capture surface for experiments, workflows, and support callouts.",
+			"route": "/app/developer/labs/whiteboard",
+			"group": "labs",
+			"audience": "dev",
+			"releaseState": "lab",
+			"futureProduct": true,
+			"runtimeRequirements": ["frontend"]
+		}
+	]
+}

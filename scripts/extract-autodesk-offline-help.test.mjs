@@ -3,9 +3,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+	buildDocFromRoot,
 	extractHtmlFromWrapped,
 	htmlToMarkdown,
-	buildDocFromRoot,
 } from "./extract-autodesk-offline-help.mjs";
 
 describe("Autodesk offline help extractor", () => {

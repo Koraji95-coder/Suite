@@ -16,19 +16,19 @@ This document captures the exact root causes and code changes made to stop repea
 `GroundGridContext` remains the connection owner. Other views now only subscribe to events.
 
 - Removed extra `connectWebSocket()` calls from:
-  - `src/components/apps/ground-grid-generator/GroundGridGeneratorApp.tsx`
-  - `src/components/apps/ground-grid-generator/UnifiedLog.tsx`
-  - `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts`
+  - `src/features/ground-grid-generation/ui/GroundGridGeneratorApp.tsx`
+  - `src/features/ground-grid-generation/ui/UnifiedLog.tsx`
+  - `src/features/coordinates-grabber/ui/useCoordinatesGrabberState.ts`
 
 ### 2) Removed duplicate forced reconnect loop
 - Deleted the 10-second reconnect interval in:
-  - `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts`
+  - `src/features/coordinates-grabber/ui/useCoordinatesGrabberState.ts`
 
 The service-level reconnect logic (with backoff and max attempts) is now the only reconnect mechanism.
 
 ### 3) Terminal handling for websocket auth failure
 Updated:
-- `src/components/apps/ground-grid-generator/coordinatesGrabberService.ts`
+- `src/features/ground-grid-generation/ui/coordinatesGrabberService.ts`
 
 Changes:
 1. Added an `authInvalid` state flag.
@@ -58,10 +58,10 @@ Change:
 1. Clarified that `API_KEY` must match `VITE_API_KEY` in local development for websocket auth to succeed.
 
 ## Files Edited
-1. `src/components/apps/ground-grid-generator/coordinatesGrabberService.ts`
-2. `src/components/apps/ground-grid-generator/GroundGridGeneratorApp.tsx`
-3. `src/components/apps/ground-grid-generator/UnifiedLog.tsx`
-4. `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts`
+1. `src/features/ground-grid-generation/ui/coordinatesGrabberService.ts`
+2. `src/features/ground-grid-generation/ui/GroundGridGeneratorApp.tsx`
+3. `src/features/ground-grid-generation/ui/UnifiedLog.tsx`
+4. `src/features/coordinates-grabber/ui/useCoordinatesGrabberState.ts`
 5. `backend/api_server.py`
 6. `.env.example`
 7. `docs/development/websocket-mount-dismount-fix.md` (new)
@@ -90,10 +90,10 @@ Use this on your main PC to apply and verify the same fix.
 
 ### 1) Pull/apply code changes
 1. Ensure these files contain the same updates:
-   - `src/components/apps/ground-grid-generator/coordinatesGrabberService.ts`
-   - `src/components/apps/ground-grid-generator/GroundGridGeneratorApp.tsx`
-   - `src/components/apps/ground-grid-generator/UnifiedLog.tsx`
-   - `src/components/apps/coordinatesgrabber/useCoordinatesGrabberState.ts`
+   - `src/features/ground-grid-generation/ui/coordinatesGrabberService.ts`
+   - `src/features/ground-grid-generation/ui/GroundGridGeneratorApp.tsx`
+   - `src/features/ground-grid-generation/ui/UnifiedLog.tsx`
+   - `src/features/coordinates-grabber/ui/useCoordinatesGrabberState.ts`
    - `backend/api_server.py`
    - `.env.example`
 

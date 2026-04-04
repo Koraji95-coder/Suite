@@ -15,13 +15,8 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_passkey_store.py`: shared passkey Supabase CRUD helpers
 - `api_supabase_rest.py`: shared Supabase REST transport/helpers
 - `api_supabase_auth.py`: shared Supabase auth helpers (email-link, magic-link, token verify)
-- `api_auth_decorators.py`: shared auth decorators (`require_supabase_user`, `require_agent_session`)
+- `api_auth_decorators.py`: shared auth decorators (`require_supabase_user`)
 - `api_auth_identity.py`: shared auth identity/header helpers (`_get_bearer_token`, `_get_supabase_user_id`, `_get_supabase_user_email`)
-- `api_agent_session.py`: shared agent session lifecycle helpers (`_create_agent_session`, `_get_agent_session`, `_clear_agent_session_for_request`)
-- `api_agent_pairing_challenge.py`: shared pairing challenge state helpers (`_purge_expired_agent_pairing_challenges`, `_create_agent_pairing_challenge`, `_consume_agent_pairing_challenge`)
-- `api_agent_abuse_controls.py`: shared agent pairing abuse/rate-control helpers (`_is_agent_pairing_action_allowed`, `_is_agent_pairing_confirm_blocked`, `_register_agent_pairing_confirm_failure`, `_clear_agent_pairing_confirm_failures`)
-- `api_agent_config.py`: shared static agent config validation (`_agent_broker_config_status`)
-- `api_agent_profiles.py`: shared agent-profile model catalog helpers (defaults + env overrides + route resolution)
 - `api_supabase_jwks.py`: shared Supabase JWT/JWKS support helpers (`_looks_like_uuid`, `_get_supabase_jwks_client`)
 - `api_passkey_capability.py`: shared passkey rollout/config status helper (`_auth_passkey_capability`)
 - `api_auth_email_abuse.py`: shared auth-email abuse/rate-control helpers (`_auth_email_key`, `_auth_email_ip_key`, `_compact_auth_email_state`, `_is_auth_email_request_allowed`)
@@ -52,27 +47,21 @@ This folder is the domain split for `backend/api_server.py`.
 - `api_auth_runtime.py`: shared auth/session runtime wiring (`create_auth_runtime`, `AuthRuntime`)
 - `api_passkey_runtime.py`: shared passkey runtime wiring/orchestration (`create_passkey_runtime`, `PasskeyRuntime`)
 - `api_email_runtime.py`: shared auth-email runtime wiring/orchestration (`create_email_runtime`, `EmailRuntime`)
-- `api_agent_runtime.py`: shared agent runtime wiring/orchestration (`create_agent_runtime`, `AgentRuntime`)
 - `api_security_runtime.py`: shared API-key guard + layer-config validation runtime (`create_security_runtime`, `SecurityRuntime`)
 - `api_transmittal_runtime.py`: shared transmittal helper runtime (`create_transmittal_runtime`, `TransmittalRuntime`)
 - `api_transmittal_profiles_runtime.py`: shared transmittal profile/cache runtime (`create_transmittal_profiles_runtime`, `TransmittalProfilesRuntime`)
 - `api_env_parsing.py`: shared env parsing runtime (`create_env_parsing_runtime`, `EnvParsingRuntime`)
-- `api_runtime_config.py`: shared runtime config normalization helpers (API key, Supabase URL/API key, agent webhook secret, passkey provider/RP defaults, turnstile requirement)
+- `api_runtime_config.py`: shared runtime config normalization helpers (API key, Supabase URL/API key, passkey provider/RP defaults, turnstile requirement)
 - `api_http_hardening.py`: shared HTTP hardening helpers (default allowed origins, CORS setup, limiter defaults, security headers)
-- `api_server_state.py`: shared in-memory server state initialization (stores + locks for transmittal profiles, agent sessions/challenges, passkey/auth-email abuse windows)
+- `api_server_state.py`: shared in-memory server state initialization (stores + locks for transmittal profiles, passkey/auth-email abuse windows)
 - `api_bootstrap_runtime.py`: shared startup/bootstrap helpers (logging config, gen_py read-only setup, env file loading)
-- `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `agent_deps`, `transmittal_render_deps`)
+- `api_dependency_bundle.py`: shared dependency-bundle builders for route-group registration (`passkey_deps`, `transmittal_render_deps`)
 - `api_watchdog_service.py`: shared in-memory heartbeat monitor service for recursive folder snapshots/diff events (`WatchdogMonitorService`)
-- `api_agent.py`: `/api/agent/*`
-- `api_agent_orchestration.py`: `/api/agent/runs`, `/api/agent/runs/<run_id>`, `/api/agent/runs/<run_id>/events`, `/api/agent/runs/<run_id>/cancel`
-- `api_agent_orchestration_runtime.py`: persistent run-ledger + background worker orchestration runtime for parallel agent stages
-- `api_agent_orchestration_templates.py`: profile instruction templates + stage prompt builders for orchestration flows
 - `api_dashboard.py`: `/api/dashboard/load`, `/api/dashboard/load/<job_id>`
 - `api_project_setup.py`: `/api/project-setup/tickets`, `/api/project-setup/projects/<project_id>/profile`, `/api/project-setup/preview`, `/api/project-setup/results`
 - `api_project_standards.py`: `/api/project-standards/tickets`, `/api/project-standards/projects/<project_id>/profile`, `/api/project-standards/projects/<project_id>/latest-review`, `/api/project-standards/results`
 - `api_command_center.py`: `/api/command-center/supabase-sync-status`
 - `api_work_ledger.py`: `/api/work-ledger/publishers/worktale/readiness`, `/api/work-ledger/publishers/worktale/bootstrap`, `/api/work-ledger/entries/<entry_id>/publish/worktale`, `/api/work-ledger/entries/<entry_id>/publish-jobs`, `/api/work-ledger/entries/<entry_id>/publish-jobs/<job_id>/open-artifact-folder`
-- `api_agent_helpers.py`: shared helper functions for gateway pair/unpair/code requests
 - `api_transmittal.py`: `/api/transmittal/profiles`, `/api/transmittal/template`
 - `api_transmittal_render.py`: `/api/transmittal/render`
 - `api_autocad.py`: `/api/status`, `/api/layers`, `/api/selection-count`, `/api/execute`, `/api/ground-grid/plot`, `/api/trigger-selection`, `/api/conduit-route/terminal-scan`, `/api/conduit-route/terminal-routes/draw`, `/api/conduit-route/terminal-labels/sync`, `/api/conduit-route/bridge/terminal-labels/sync`, `/api/conduit-route/obstacles/scan`, `/api/conduit-route/route/compute`

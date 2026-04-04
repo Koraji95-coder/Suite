@@ -27,34 +27,6 @@ function HookHarness() {
 const STORAGE_KEY = "watchdog-project-sync:last-completed:user-1";
 const INITIAL_SYNC_DELAY_MS = 1_200;
 const MIN_SYNC_INTERVAL_MS = 15_000;
-
-function createStorageMock(): Storage {
-	const values = new Map<string, string>();
-
-	return {
-		get length() {
-			return values.size;
-		},
-		clear() {
-			values.clear();
-		},
-		getItem(key: string) {
-			return values.has(key) ? values.get(key) ?? null : null;
-		},
-		key(index: number) {
-			return Array.from(values.keys())[index] ?? null;
-		},
-		removeItem(key: string) {
-			values.delete(key);
-		},
-		setItem(key: string, value: string) {
-			values.set(key, String(value));
-		},
-	} as Storage;
-}
-
-const storageMock = createStorageMock();
-const originalLocalStorage = window.localStorage;
 const originalRequestIdleCallback = window.requestIdleCallback;
 const originalCancelIdleCallback = window.cancelIdleCallback;
 
@@ -77,11 +49,7 @@ describe("useWatchdogProjectSync", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		vi.setSystemTime(new Date("2026-04-03T03:30:00.000Z"));
-		Object.defineProperty(window, "localStorage", {
-			configurable: true,
-			value: storageMock,
-		});
-		storageMock.clear();
+		window.localStorage.clear();
 		mockUseAuth.mockReset();
 		mockUseAuth.mockReturnValue({
 			user: { id: "user-1" },
@@ -105,11 +73,7 @@ describe("useWatchdogProjectSync", () => {
 	});
 
 	afterEach(() => {
-		storageMock.clear();
-		Object.defineProperty(window, "localStorage", {
-			configurable: true,
-			value: originalLocalStorage,
-		});
+		window.localStorage.clear();
 		Object.defineProperty(window, "requestIdleCallback", {
 			configurable: true,
 			value: originalRequestIdleCallback,

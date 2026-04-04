@@ -6,7 +6,7 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@/components/apps/ui/dialog";
+} from "@/components/system/dialog";
 import styles from "./ProjectManagerDeleteDialogs.module.css";
 
 interface ProjectManagerDeleteDialogsProps {

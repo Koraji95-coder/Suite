@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAuth } from "@/auth/useAuth";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { logger } from "@/lib/logger";
 import {
 	syncSharedDrawingActivityFromLocalRuntime,
@@ -19,12 +20,11 @@ function buildLastCompletedStorageKey(userId: string): string {
 }
 
 function readLastCompletedAt(userId: string): number {
-	if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
-		return 0;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return 0;
 
 	try {
-		const raw = window.localStorage.getItem(buildLastCompletedStorageKey(userId));
+		const raw = storage.getItem(buildLastCompletedStorageKey(userId));
 		const parsed = Number.parseInt(String(raw ?? ""), 10);
 		return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 	} catch {
@@ -33,15 +33,11 @@ function readLastCompletedAt(userId: string): number {
 }
 
 function writeLastCompletedAt(userId: string, timestamp: number): void {
-	if (typeof window === "undefined" || typeof window.localStorage === "undefined") {
-		return;
-	}
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 
 	try {
-		window.localStorage.setItem(
-			buildLastCompletedStorageKey(userId),
-			String(timestamp),
-		);
+		storage.setItem(buildLastCompletedStorageKey(userId), String(timestamp));
 	} catch {
 		// Ignore storage failures and keep sync scheduling non-fatal.
 	}

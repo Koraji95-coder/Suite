@@ -3,8 +3,8 @@ import { type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "@/appMeta";
 import { SuiteLogo } from "@/components/brand/SuiteLogo";
-import { Button } from "@/components/primitives/Button";
-import { Text } from "@/components/primitives/Text";
+import { Button } from "@/components/system/base/Button";
+import { Text } from "@/components/system/base/Text";
 import { cn } from "@/lib/utils";
 import styles from "./AuthShell.module.css";
 

@@ -12,14 +12,14 @@ const hasStorageState = fs.existsSync(storageStatePath);
 
 test.use(hasStorageState ? { storageState: storageStatePath } : {});
 
-test.describe("dashboard performance snapshot", () => {
+test.describe("home performance snapshot", () => {
 	test.skip(!hasStorageState, "Run `npm run auth:playwright:bootstrap` first.");
 
-	test("captures dashboard stage timings", async ({ page }, testInfo) => {
-		await page.goto("/app/dashboard", { waitUntil: "domcontentloaded" });
+	test("captures home stage timings", async ({ page }, testInfo) => {
+		await page.goto("/app/home", { waitUntil: "domcontentloaded" });
 
 		await expect(
-			page.getByRole("heading", { level: 1, name: "Dashboard" }),
+			page.getByRole("heading", { level: 1, name: "Home" }),
 		).toBeVisible({ timeout: 20_000 });
 
 		await page.waitForFunction(
@@ -30,10 +30,7 @@ test.describe("dashboard performance snapshot", () => {
 					};
 				};
 				const latest = suiteWindow.__suiteDashboardPerf?.latest;
-				return Boolean(
-					latest?.["dashboard.overview.load"]?.status === "ok" &&
-						latest?.["dashboard.watchdog.load"]?.status === "ok",
-				);
+				return Boolean(latest?.["dashboard.overview.load"]?.status === "ok");
 			},
 			undefined,
 			{ timeout: 45_000 },
@@ -90,8 +87,6 @@ test.describe("dashboard performance snapshot", () => {
 		console.log(JSON.stringify(snapshot, null, 2));
 
 		expect(snapshot.dashboardPerf["dashboard.overview.load"]).toBeTruthy();
-		expect(snapshot.dashboardPerf["dashboard.watchdog.load"]).toBeTruthy();
 		expect(snapshot.dashboardPerf["dashboard.overview.load"]?.status).toBe("ok");
-		expect(snapshot.dashboardPerf["dashboard.watchdog.load"]?.status).toBe("ok");
 	});
 });

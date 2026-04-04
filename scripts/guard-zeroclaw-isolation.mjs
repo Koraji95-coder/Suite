@@ -7,9 +7,7 @@ const scanFolders = ["src", "backend", "dotnet", "tools"];
 const targetedFiles = [
 	"AGENTS.md",
 	"README.md",
-	"docs/development/gateway-stability-policy.md",
-	"scripts/run-agent-gateway.mjs",
-	"scripts/suite-agent-gateway.mjs",
+	"docs/README.md",
 ];
 const scanExtensions = new Set([
 	".js",

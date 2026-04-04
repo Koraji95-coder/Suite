@@ -6,8 +6,11 @@
  * Critical: NEVER hardcode user ids. Always use the authenticated Supabase user id.
  */
 
+import {
+	getCurrentSupabaseUserId,
+	getLocalStorageApi,
+} from "@/services/projectWorkflowClientSupport";
 import type { Database, Json } from "@/supabase/database";
-import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { logger } from "../lib/logger";
 import { supabase } from "../supabase/client";
 import { isSupabaseConfigured } from "../supabase/utils";
@@ -17,8 +20,7 @@ export type UserPreferences =
 	Database["public"]["Tables"]["user_preferences"]["Row"];
 
 function isExpectedUnauthenticatedState(error: unknown): boolean {
-	const message =
-		error instanceof Error ? error.message : String(error ?? "");
+	const message = error instanceof Error ? error.message : String(error ?? "");
 	const normalized = message.trim().toLowerCase();
 	return (
 		normalized.includes("not authenticated") ||
@@ -292,9 +294,10 @@ export async function migrateFromLocalStorage(
 	settingKey: string,
 	projectId?: string | null,
 ): Promise<void> {
-	if (typeof window === "undefined") return;
+	const storage = getLocalStorageApi();
+	if (!storage) return;
 
-	const raw = window.localStorage.getItem(localStorageKey);
+	const raw = storage.getItem(localStorageKey);
 	if (raw == null) return;
 
 	let parsedValue: unknown = raw;
@@ -309,5 +312,5 @@ export async function migrateFromLocalStorage(
 		await saveSetting(settingKey, parsedValue, projectId);
 	}
 
-	window.localStorage.removeItem(localStorageKey);
+	storage.removeItem(localStorageKey);
 }

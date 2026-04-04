@@ -9,6 +9,7 @@
  * cannot be used.
  */
 
+import { getSessionStorageApi } from "./browserStorage";
 import { logger } from "./logger";
 
 interface TokenData {
@@ -21,16 +22,7 @@ const DEFAULT_TOKEN_LIFETIME_HOURS = 24;
 const MAX_TOKEN_LIFETIME_HOURS = 24 * 365;
 
 function resolveTokenLifetimeHours(): number | null {
-	const parsed = Number(
-		String(import.meta.env.VITE_AGENT_TOKEN_TTL_HOURS || "").trim(),
-	);
-	if (!Number.isFinite(parsed)) {
-		return DEFAULT_TOKEN_LIFETIME_HOURS;
-	}
-	if (parsed <= 0) {
-		return null;
-	}
-	return Math.min(MAX_TOKEN_LIFETIME_HOURS, Math.max(1, Math.trunc(parsed)));
+	return Math.min(MAX_TOKEN_LIFETIME_HOURS, DEFAULT_TOKEN_LIFETIME_HOURS);
 }
 
 class SecureTokenStorage {
@@ -44,6 +36,10 @@ class SecureTokenStorage {
 
 	private getStorageKey(): string {
 		return `${this.STORAGE_KEY_PREFIX}:${this.scope}`;
+	}
+
+	private getStorage() {
+		return getSessionStorageApi();
 	}
 
 	/**
@@ -99,6 +95,10 @@ class SecureTokenStorage {
 	 */
 	setToken(token: string): void {
 		try {
+			const storage = this.getStorage();
+			if (!storage) {
+				return;
+			}
 			const now = Date.now();
 			const tokenData: TokenData = {
 				token,
@@ -113,7 +113,7 @@ class SecureTokenStorage {
 			const obfuscated = this.obfuscate(serialized);
 
 			// Use sessionStorage instead of localStorage for better security
-			sessionStorage.setItem(this.getStorageKey(), obfuscated);
+			storage.setItem(this.getStorageKey(), obfuscated);
 
 			logger.debug("Token stored securely", "SecureTokenStorage");
 		} catch (error) {
@@ -127,7 +127,11 @@ class SecureTokenStorage {
 	 */
 	getToken(): string | null {
 		try {
-			const obfuscated = sessionStorage.getItem(this.getStorageKey());
+			const storage = this.getStorage();
+			if (!storage) {
+				return null;
+			}
+			const obfuscated = storage.getItem(this.getStorageKey());
 			if (!obfuscated) {
 				return null;
 			}
@@ -140,9 +144,7 @@ class SecureTokenStorage {
 
 			const tokenData: TokenData = JSON.parse(serialized);
 			const expiresAt =
-				typeof tokenData.expiresAt === "number"
-					? tokenData.expiresAt
-					: null;
+				typeof tokenData.expiresAt === "number" ? tokenData.expiresAt : null;
 
 			// Check if token is expired
 			if (expiresAt !== null && Date.now() > expiresAt) {
@@ -163,8 +165,16 @@ class SecureTokenStorage {
 	 * Remove token from storage
 	 */
 	clearToken(): void {
-		sessionStorage.removeItem(this.getStorageKey());
-		logger.debug("Token cleared", "SecureTokenStorage");
+		const storage = this.getStorage();
+		if (!storage) {
+			return;
+		}
+		try {
+			storage.removeItem(this.getStorageKey());
+			logger.debug("Token cleared", "SecureTokenStorage");
+		} catch (error) {
+			logger.warn("Failed to clear token", "SecureTokenStorage", { error });
+		}
 	}
 
 	/**
@@ -180,7 +190,9 @@ class SecureTokenStorage {
 	 */
 	getTimeUntilExpiry(): number {
 		try {
-			const obfuscated = sessionStorage.getItem(this.getStorageKey());
+			const storage = this.getStorage();
+			if (!storage) return 0;
+			const obfuscated = storage.getItem(this.getStorageKey());
 			if (!obfuscated) return 0;
 
 			const serialized = this.deobfuscate(obfuscated);
@@ -188,9 +200,7 @@ class SecureTokenStorage {
 
 			const tokenData: TokenData = JSON.parse(serialized);
 			const expiresAt =
-				typeof tokenData.expiresAt === "number"
-					? tokenData.expiresAt
-					: null;
+				typeof tokenData.expiresAt === "number" ? tokenData.expiresAt : null;
 			if (expiresAt === null) return Number.POSITIVE_INFINITY;
 			const remaining = expiresAt - Date.now();
 			return Math.max(0, remaining);
@@ -200,26 +210,34 @@ class SecureTokenStorage {
 	}
 
 	exportOpaqueToken(): string | null {
-		const current = sessionStorage.getItem(this.getStorageKey());
-		return typeof current === "string" ? current : null;
+		try {
+			const storage = this.getStorage();
+			if (!storage) return null;
+			const current = storage.getItem(this.getStorageKey());
+			return typeof current === "string" ? current : null;
+		} catch {
+			return null;
+		}
 	}
 
 	importOpaqueToken(obfuscated: string): boolean {
 		if (!obfuscated?.trim()) return false;
 		try {
+			const storage = this.getStorage();
+			if (!storage) {
+				return false;
+			}
 			const serialized = this.deobfuscate(obfuscated);
 			if (!serialized) return false;
 
 			const tokenData: TokenData = JSON.parse(serialized);
 			const expiresAt =
-				typeof tokenData.expiresAt === "number"
-					? tokenData.expiresAt
-					: null;
+				typeof tokenData.expiresAt === "number" ? tokenData.expiresAt : null;
 			if (!tokenData?.token || (expiresAt !== null && Date.now() > expiresAt)) {
 				return false;
 			}
 
-			sessionStorage.setItem(this.getStorageKey(), obfuscated);
+			storage.setItem(this.getStorageKey(), obfuscated);
 			return true;
 		} catch (error) {
 			logger.warn("Failed to import opaque token", "SecureTokenStorage", {

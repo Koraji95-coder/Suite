@@ -14,7 +14,6 @@ import {
 import { supabase } from "@/supabase/client";
 import type { Database } from "@/supabase/database";
 import { logger } from "../lib/logger";
-import { hasAdminClaim } from "../lib/roles";
 import {
 	type EmailAuthRequestOptions,
 	requestEmailAuthLink,
@@ -54,39 +53,6 @@ export const AuthContext = createContext<AuthContextValue | undefined>(
 	undefined,
 );
 
-function readBooleanEnv(value: unknown, fallback: boolean): boolean {
-	if (typeof value !== "string") return fallback;
-	const normalized = value.trim().toLowerCase();
-	if (["1", "true", "yes", "on"].includes(normalized)) return true;
-	if (["0", "false", "no", "off"].includes(normalized)) return false;
-	return fallback;
-}
-
-const SHOULD_UNPAIR_ON_SIGN_OUT = readBooleanEnv(
-	import.meta.env.VITE_AGENT_SIGNOUT_UNPAIR,
-	true,
-);
-
-let agentRuntimePromise:
-	| Promise<{
-			agentService: (typeof import("../services/agentService"))["agentService"];
-			agentTaskManager: (typeof import("../services/agentTaskManager"))["agentTaskManager"];
-	  }>
-	| null = null;
-
-function getAgentRuntime() {
-	if (!agentRuntimePromise) {
-		agentRuntimePromise = Promise.all([
-			import("../services/agentService"),
-			import("../services/agentTaskManager"),
-		]).then(([agentServiceModule, agentTaskManagerModule]) => ({
-			agentService: agentServiceModule.agentService,
-			agentTaskManager: agentTaskManagerModule.agentTaskManager,
-		}));
-	}
-	return agentRuntimePromise;
-}
-
 async function logAuthMethodTelemetryDeferred(
 	method: "email_link" | "passkey",
 	event:
@@ -113,23 +79,11 @@ async function logSecurityEventDeferred(
 		| "auth_sign_in_success"
 		| "auth_sign_up_success"
 		| "auth_sign_out"
-		| "auth_sign_out_global"
-		| "agent_pair_success"
-		| "agent_pair_failed"
-		| "agent_restore_success"
-		| "agent_restore_failed"
-		| "agent_unpair"
-		| "agent_task_blocked_non_admin"
-		| "agent_webhook_secret_rejected"
-		| "agent_request_unauthorized",
+		| "auth_sign_out_global",
 	description: string,
 ) {
 	const securityEventModule = await import("../services/securityEventService");
 	return securityEventModule.logSecurityEvent(type, description);
-}
-
-function isUserAdmin(authUser: User | null): boolean {
-	return hasAdminClaim(authUser);
 }
 
 async function fetchProfile(userId: string): Promise<Profile | null> {
@@ -196,50 +150,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 		let isActive = true;
 		let lastBootstrapSessionKey = "";
 
-		const restoreAgentPairing = async (
-			context: "rehydrate" | "auth-change",
-		): Promise<void> => {
-			try {
-				const { agentService } = await getAgentRuntime();
-				const result = await agentService.restorePairingForActiveUser();
-				logger.debug("Agent pairing restore evaluated", "AuthContext", {
-					context,
-					restored: result.restored,
-					reason: result.reason,
-				});
-			} catch (error) {
-				logger.warn("Agent pairing restore failed", "AuthContext", {
-					context,
-					error,
-				});
-			}
-		};
-
 		const syncSessionShellState = (
 			currentUser: User | null,
 			sessionExpiresAt: number | null,
 		): string => {
 			const sessionKey = buildSessionAuthKey(currentUser?.id, sessionExpiresAt);
 			setUser(currentUser);
-			if (currentUser || agentRuntimePromise) {
-				void getAgentRuntime()
-					.then(({ agentService, agentTaskManager }) => {
-						agentService.setActiveUser(
-							currentUser?.id ?? null,
-							currentUser?.email ?? null,
-							isUserAdmin(currentUser),
-						);
-						agentTaskManager.setScope(currentUser?.id ?? null);
-					})
-					.catch((error) => {
-						logger.warn(
-							"Failed to sync agent runtime scope with auth session",
-							"AuthContext",
-							{ error, userId: currentUser?.id ?? null },
-						);
-					});
-			}
-
 			if (currentUser) {
 				const restoredMethod = readSessionAuthMethod(sessionKey);
 				setSessionAuthMethod(restoredMethod ?? "email_link");
@@ -270,7 +186,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 			setProfileHydrating(true);
 
 			void (async () => {
-				await restoreAgentPairing(context);
 				const nextProfile = await ensureProfileForUser(currentUser);
 				if (!isActive) {
 					return;
@@ -398,26 +313,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	};
 
 	const signOut = async () => {
-		if (SHOULD_UNPAIR_ON_SIGN_OUT) {
-			try {
-				const { agentService } = await getAgentRuntime();
-				await agentService.unpair();
-			} catch (error) {
-				logger.warn(
-					"Failed to clear agent pairing on sign-out",
-					"AuthContext",
-					{
-						error,
-					},
-				);
-			}
-		} else {
-			logger.info(
-				"Preserving agent pairing on sign-out (VITE_AGENT_SIGNOUT_UNPAIR=false)",
-				"AuthContext",
-			);
-		}
-
 		const { error } = await supabase.auth.signOut();
 		if (error) throw error;
 		clearSessionAuthMarkers();

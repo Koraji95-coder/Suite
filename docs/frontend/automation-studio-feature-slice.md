@@ -14,7 +14,7 @@
 - `useAutomationStudioState.ts` owns project selection, issue-set scoping, register snapshot lookup, receipt lookup, and workflow-link composition for the Automation Studio app shell.
 - `models.ts` owns the shared queue, snapshot, and context contracts used by Automation Studio, AutoDraft compare, conduit terminal workflow, and automation persistence services.
 - `selectors.ts` owns browser-only queue merging and approved-plan/receipt summary derivation.
-- `src/components/apps/automation-studio/*` remains the UI shell and specialist panel layer:
+- `src/features/automation-studio/ui/*` remains the UI shell and specialist panel layer:
   - `AutomationStudioApp.tsx` is the route/app composition shell.
   - `AutomationRecipePanel.tsx`, `TerminalAuthoringPanel.tsx`, and `CadUtilitiesPanel.tsx` remain panel-specific UI and action surfaces.
 

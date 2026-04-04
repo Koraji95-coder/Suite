@@ -13,5 +13,6 @@ export default defineConfig({
 		environmentMatchGlobs: [["scripts/**/*.test.mjs", "node"]],
 		setupFiles: ["src/test/setup.ts"],
 		css: true,
+		maxWorkers: 4,
 	},
 });

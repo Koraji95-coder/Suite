@@ -11,11 +11,11 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { APP_TAGLINE } from "../appMeta";
 import { SuiteLogo } from "../components/brand/SuiteLogo";
-import { Badge } from "../components/primitives/Badge";
-import { Button } from "../components/primitives/Button";
-import { Panel } from "../components/primitives/Panel";
-import { HStack } from "../components/primitives/Stack";
-import { Text } from "../components/primitives/Text";
+import { Badge } from "../components/system/base/Badge";
+import { Button } from "../components/system/base/Button";
+import { Panel } from "../components/system/base/Panel";
+import { HStack } from "../components/system/base/Stack";
+import { Text } from "../components/system/base/Text";
 import styles from "./LandingPage.module.css";
 
 const COMMAND_SIGNALS = [
@@ -105,9 +105,20 @@ export default function LandingPage() {
 					</Link>
 
 					<HStack gap={2} align="center">
-						<Link to="/login" className={styles.navActionLink}>
-							Sign in
-						</Link>
+						{user ? (
+							<Link to="/app/home" className={styles.navActionLink}>
+								Open Suite
+							</Link>
+						) : (
+							<>
+								<Link to="/login" className={styles.navActionLink}>
+									Sign in
+								</Link>
+								<Link to="/signup" className={styles.navActionLink}>
+									Get started
+								</Link>
+							</>
+						)}
 					</HStack>
 				</div>
 			</nav>
@@ -142,11 +153,18 @@ export default function LandingPage() {
 							</Text>
 
 							<HStack gap={3} wrap className={styles.heroCtaRow}>
-								<Link to={user ? "/app/dashboard" : "/login"}>
+								<Link to={user ? "/app/home" : "/login"}>
 									<Button variant="primary" size="sm">
 										{user ? "Open Suite" : "Sign in"}
 									</Button>
 								</Link>
+								{!user ? (
+									<Link to="/signup">
+										<Button variant="secondary" size="sm">
+											Get started
+										</Button>
+									</Link>
+								) : null}
 							</HStack>
 						</div>
 
@@ -235,13 +253,13 @@ export default function LandingPage() {
 					</div>
 				</section>
 
-				<section className={styles.agentsSection}>
-					<Panel variant="default" padding="lg" className={styles.agentsPanel}>
-						<div className={styles.agentsHeader}>
+				<section className={styles.productSection}>
+					<Panel variant="default" padding="lg" className={styles.productPanel}>
+						<div className={styles.productHeader}>
 							<Badge
 								color="default"
 								variant="outline"
-								className={`${styles.sectionBadge} ${styles.agentsBadge}`}
+								className={`${styles.sectionBadge} ${styles.productBadge}`}
 							>
 								<span className={styles.sectionBadgeDot} />
 								Product surfaces
@@ -250,29 +268,29 @@ export default function LandingPage() {
 							<Text as="h2" size="xl" weight="semibold" block>
 								Four workflow pillars behind the product
 							</Text>
-							<Text color="muted" size="sm" className={styles.agentsCopy} block>
+							<Text color="muted" size="sm" className={styles.productCopy} block>
 								Suite stays focused on drawing delivery, review control, and
 								tracked project activity instead of scattering the work across
 								disconnected tools.
 							</Text>
 						</div>
 
-						<div className={styles.agentGrid}>
+						<div className={styles.surfaceGrid}>
 							{PRODUCT_SURFACES.map((surface) => {
 								const Icon = surface.icon;
 								return (
-									<div key={surface.label} className={styles.agentCard}>
-										<div className={styles.agentMark}>
+									<div key={surface.label} className={styles.surfaceCard}>
+										<div className={styles.surfaceMark}>
 											<Icon className={styles.heroSupportIcon} />
 										</div>
-										<div className={styles.agentCardCopy}>
+										<div className={styles.surfaceCardCopy}>
 											<Text size="sm" weight="semibold" block>
 												{surface.label}
 											</Text>
 											<Text
 												size="xs"
 												color="muted"
-												className={styles.agentTagline}
+												className={styles.surfaceTagline}
 												block
 											>
 												{surface.value}

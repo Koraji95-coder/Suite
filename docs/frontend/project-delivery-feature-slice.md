@@ -21,7 +21,7 @@
 
 - `src/features/project-review/ProjectReadinessWorkspace.tsx`
 - `src/features/project-workflow/ProjectIssueSetManager.tsx`
-- `src/components/apps/transmittal-builder/useTransmittalBuilderState.ts`
+- `src/features/transmittal-builder/ui/useTransmittalBuilderState.ts`
 - `src/features/automation-studio/useAutomationStudioState.ts`
 - `src/features/project-review/useProjectReviewInboxData.ts`
 - `src/features/project-workflow/sharedStateService.ts`

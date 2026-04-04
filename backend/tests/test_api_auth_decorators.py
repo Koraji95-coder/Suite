@@ -4,7 +4,6 @@ from types import SimpleNamespace
 import unittest
 
 from backend.route_groups.api_auth_decorators import (
-    decorate_require_agent_session,
     decorate_require_supabase_user,
 )
 from backend.route_groups.api_supabase_auth import SupabaseAuthProviderTimeoutError
@@ -99,7 +98,7 @@ class TestApiAuthDecorators(unittest.TestCase):
             g_obj=g_obj,
             logger=logger,
             get_request_id_fn=lambda: "req-timeout-1",
-            get_request_path_fn=lambda: "/api/agent/session",
+            get_request_path_fn=lambda: "/api/auth/email-link",
         )
 
         payload, status = wrapped()
@@ -109,48 +108,6 @@ class TestApiAuthDecorators(unittest.TestCase):
         self.assertEqual(payload.get("requestId"), "req-timeout-1")
         self.assertEqual((payload.get("meta") or {}).get("retryable"), True)
         self.assertGreaterEqual(len(logger.exceptions), 1)
-
-    def test_require_agent_session_rejects_missing_or_mismatched_session(self) -> None:
-        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
-
-        def endpoint():
-            return {"ok": True}, 200
-
-        wrapped_missing = decorate_require_agent_session(
-            endpoint,
-            get_agent_session_fn=lambda: None,
-            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
-            jsonify_fn=self._jsonify,
-            g_obj=g_obj,
-        )
-        self.assertEqual(wrapped_missing(), ({"error": "Agent session required"}, 401))
-
-        wrapped_mismatch = decorate_require_agent_session(
-            endpoint,
-            get_agent_session_fn=lambda: {"user_id": "user-2", "token": "t"},
-            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
-            jsonify_fn=self._jsonify,
-            g_obj=g_obj,
-        )
-        self.assertEqual(wrapped_mismatch(), ({"error": "Agent session required"}, 401))
-
-    def test_require_agent_session_sets_session_and_calls_endpoint(self) -> None:
-        g_obj = SimpleNamespace(supabase_user={"id": "user-1"})
-        session = {"user_id": "user-1", "token": "token-1"}
-
-        def endpoint():
-            return {"ok": True}, 200
-
-        wrapped = decorate_require_agent_session(
-            endpoint,
-            get_agent_session_fn=lambda: session,
-            get_supabase_user_id_fn=lambda user: str(user.get("id") or ""),
-            jsonify_fn=self._jsonify,
-            g_obj=g_obj,
-        )
-
-        self.assertEqual(wrapped(), ({"ok": True}, 200))
-        self.assertEqual(g_obj.agent_session, session)
 
 
 if __name__ == "__main__":

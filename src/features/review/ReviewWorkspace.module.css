@@ -1,0 +1,228 @@
+.root {
+	display: grid;
+	gap: 1rem;
+}
+
+.hero {
+	background:
+		radial-gradient(
+			120% 120% at 100% 0%,
+			color-mix(in srgb, var(--success) 14%, transparent),
+			transparent 58%
+		),
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--suite-surface-feature) 94%, transparent),
+			color-mix(in srgb, var(--surface) 96%, transparent)
+		);
+}
+
+.heroSummary {
+	max-width: 48rem;
+	line-height: 1.6;
+}
+
+.heroMeta,
+.heroActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.primaryLink,
+.secondaryLink,
+.supportLink,
+.surfaceRow,
+.projectRow {
+	text-decoration: none;
+}
+
+.primaryLink,
+.secondaryLink,
+.supportLink {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	border-radius: 999px;
+	padding: 0.65rem 0.95rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	transition:
+		transform 140ms ease,
+		border-color 140ms ease,
+		background 140ms ease,
+		color 140ms ease;
+}
+
+.primaryLink {
+	border: 1px solid color-mix(in srgb, var(--success) 34%, transparent);
+	background: color-mix(in srgb, var(--success) 14%, transparent);
+	color: var(--text);
+}
+
+.secondaryLink,
+.supportLink {
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--surface) 68%, transparent);
+	color: var(--text-muted);
+}
+
+.primaryLink:hover,
+.secondaryLink:hover,
+.supportLink:hover,
+.surfaceRow:hover,
+.projectRow:hover {
+	transform: translateY(-1px);
+}
+
+.signalStrip {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.signalCard,
+.priorityCard,
+.supportCard {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.signalCard {
+	padding: 0.9rem 0.95rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background: color-mix(in srgb, var(--surface) 66%, transparent);
+}
+
+.signalLabel {
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.signalValue {
+	font-size: clamp(1.05rem, 1.4vw, 1.45rem);
+	line-height: 1.1;
+	color: var(--text);
+}
+
+.signalMeta,
+.projectMeta,
+.projectFootnote,
+.supportCopy,
+.surfaceRow small {
+	font-size: 0.78rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.priorityGrid {
+	display: grid;
+	grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.9fr);
+	gap: 0.9rem;
+}
+
+.sideStack {
+	display: grid;
+	gap: 0.9rem;
+}
+
+.panelHeader,
+.projectRowHeader,
+.surfaceHeader {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.projectList,
+.surfaceList {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.emptyState {
+	border: 1px dashed color-mix(in srgb, var(--brand-border-soft) 88%, transparent);
+	border-radius: 0.95rem;
+	padding: 1rem;
+	font-size: 0.82rem;
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.projectRow,
+.surfaceRow {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.9rem;
+	padding: 0.95rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--brand-border-soft) 78%, transparent);
+	border-radius: 1rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--surface) 92%, transparent),
+			color-mix(in srgb, var(--surface-2) 76%, transparent)
+		),
+		var(--surface);
+	color: inherit;
+}
+
+.projectRowMain {
+	display: grid;
+	gap: 0.45rem;
+	min-width: 0;
+}
+
+.projectTitle {
+	font-size: 1rem;
+	line-height: 1.2;
+	color: var(--text);
+}
+
+.projectDetail {
+	font-size: 0.84rem;
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--text) 90%, transparent);
+}
+
+.projectFootnote {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+}
+
+.surfaceHeader {
+	justify-content: flex-start;
+	align-items: center;
+}
+
+@media (max-width: 1080px) {
+	.signalStrip {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.priorityGrid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 720px) {
+	.signalStrip {
+		grid-template-columns: 1fr;
+	}
+
+	.panelHeader,
+	.projectRow,
+	.projectRowHeader,
+	.surfaceRow {
+		flex-direction: column;
+		align-items: stretch;
+	}
+}

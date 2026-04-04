@@ -4,15 +4,7 @@ export type SecurityEventType =
 	| "auth_sign_in_success"
 	| "auth_sign_up_success"
 	| "auth_sign_out"
-	| "auth_sign_out_global"
-	| "agent_pair_success"
-	| "agent_pair_failed"
-	| "agent_restore_success"
-	| "agent_restore_failed"
-	| "agent_unpair"
-	| "agent_task_blocked_non_admin"
-	| "agent_webhook_secret_rejected"
-	| "agent_request_unauthorized";
+	| "auth_sign_out_global";
 
 export type AuthMethod = "email_link" | "passkey";
 

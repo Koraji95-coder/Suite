@@ -183,7 +183,9 @@ describe("ProjectDetailHeader", () => {
 		const link = screen.getByRole("link", {
 			name: /open watchdog/i,
 		}) as HTMLAnchorElement;
-		expect(link.getAttribute("href")).toBe("/app/watchdog?project=project-1");
+		expect(link.getAttribute("href")).toBe(
+			"/app/developer/control/watchdog?project=project-1",
+		);
 	});
 
 	it("renders compact watchdog activity for the current project", () => {

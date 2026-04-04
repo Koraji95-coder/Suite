@@ -3,6 +3,7 @@ import yaml from "js-yaml";
 import { FileCode, Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { APP_NAME } from "@/appMeta";
+import { getLocalStorageApi } from "@/lib/browserStorage";
 import { cn } from "@/lib/utils";
 import styles from "./EmailConfig.module.css";
 
@@ -132,8 +133,12 @@ function dumpYaml(config: EmailConfigState): string {
 }
 
 function loadYaml(): { config: EmailConfigState; yamlText: string } {
+	const storage = getLocalStorageApi();
+	if (!storage) {
+		return { config: DEFAULT_CONFIG, yamlText: dumpYaml(DEFAULT_CONFIG) };
+	}
 	try {
-		const stored = localStorage.getItem(STORAGE_KEY);
+		const stored = storage.getItem(STORAGE_KEY);
 		if (!stored) {
 			return { config: DEFAULT_CONFIG, yamlText: dumpYaml(DEFAULT_CONFIG) };
 		}
@@ -160,6 +165,11 @@ export default function EmailConfig() {
 
 	const handleSave = () => {
 		setError("");
+		const storage = getLocalStorageApi();
+		if (!storage) {
+			setError("Browser storage is unavailable in this context.");
+			return;
+		}
 		try {
 			if (viewMode === "yaml") {
 				const parsed = yaml.load(yamlText);
@@ -168,10 +178,10 @@ export default function EmailConfig() {
 
 				setConfig(safe);
 				setYamlText(normalized);
-				localStorage.setItem(STORAGE_KEY, normalized);
+				storage.setItem(STORAGE_KEY, normalized);
 			} else {
 				const normalized = dumpYaml(config);
-				localStorage.setItem(STORAGE_KEY, normalized);
+				storage.setItem(STORAGE_KEY, normalized);
 			}
 
 			setSaved(true);
@@ -245,7 +255,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder="smtp.example.com"
-							name="smtp-host"
+								name="smtp-host"
 							/>
 						</div>
 
@@ -264,7 +274,7 @@ export default function EmailConfig() {
 										smtp: { ...c.smtp, port: Number(e.target.value) || 587 },
 									}))
 								}
-							name="smtp-port"
+								name="smtp-port"
 							/>
 						</div>
 
@@ -283,7 +293,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder="user@example.com"
-							name="smtp-user"
+								name="smtp-user"
 							/>
 						</div>
 
@@ -301,7 +311,8 @@ export default function EmailConfig() {
 										smtp: { ...c.smtp, secure: e.target.value === "true" },
 									}))
 								}
-							 name="smtp-secure">
+								name="smtp-secure"
+							>
 								<option value="false">false</option>
 								<option value="true">true</option>
 							</select>
@@ -322,7 +333,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder={`noreply@${APP_SLUG}.com`}
-							name="from"
+								name="from"
 							/>
 						</div>
 
@@ -341,7 +352,7 @@ export default function EmailConfig() {
 									}))
 								}
 								placeholder={`support@${APP_SLUG}.com`}
-							name="replyto"
+								name="replyto"
 							/>
 						</div>
 
@@ -359,7 +370,7 @@ export default function EmailConfig() {
 										defaults: { ...c.defaults, subject_prefix: e.target.value },
 									}))
 								}
-							name="subj"
+								name="subj"
 							/>
 						</div>
 
@@ -372,7 +383,7 @@ export default function EmailConfig() {
 						className={styles.textarea}
 						value={yamlText}
 						onChange={(e) => setYamlText(e.target.value)}
-					name="emailconfig_textarea_365"
+						name="emailconfig_textarea_365"
 					/>
 				)}
 

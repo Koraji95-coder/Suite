@@ -33,7 +33,6 @@ function Get-SuiteRuntimePaths {
 		CurrentBootstrapPath = Join-Path $runtimeStatusDir "current-bootstrap.json"
 		RuntimeLogPath = Join-Path $runtimeStatusDir "bootstrap.log"
 		BackendLogPath = Join-Path $runtimeStatusDir "backend.log"
-		GatewayLogPath = Join-Path $runtimeStatusDir "gateway.log"
 		FrontendLogPath = Join-Path $runtimeStatusDir "frontend.log"
 		RuntimeLauncherLogPath = Join-Path $runtimeStatusDir "runtime-launcher.log"
 		RuntimeShellLogPath = Join-Path $runtimeStatusDir "runtime-shell.log"
@@ -137,25 +136,6 @@ function Ensure-SuiteOfficeWorkspaceRoots {
 		knowledgeRootExists = (Test-Path -LiteralPath $knowledgeRoot -PathType Container)
 		stateRoot = $stateRoot
 		stateRootExists = (Test-Path -LiteralPath $stateRoot -PathType Container)
-	}
-}
-
-function Get-SuiteGatewayMode {
-	return "suite_native"
-}
-
-function Get-SuiteGatewayModeLabel {
-	param([string]$GatewayMode)
-
-	$normalizedGatewayMode = if ($null -eq $GatewayMode) {
-		""
-	}
-	else {
-		([string]$GatewayMode).Trim().ToLowerInvariant()
-	}
-
-	switch ($normalizedGatewayMode) {
-		default { return "Suite-native" }
 	}
 }
 
@@ -279,10 +259,6 @@ function Convert-ToSuiteSupportSummaryLines {
 	}
 
 	if ($supportContext.Config) {
-		$gatewayModeLabel = Get-SuiteGatewayModeLabel -GatewayMode ([string]$supportContext.Config.GatewayMode)
-		if (-not [string]::IsNullOrWhiteSpace($gatewayModeLabel)) {
-			$lines.Add(("Gateway mode: {0}" -f $gatewayModeLabel))
-		}
 		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.CodexConfigPath)) {
 			$lines.Add(("Codex config: {0}" -f [string]$supportContext.Config.CodexConfigPath))
 		}
@@ -297,9 +273,6 @@ function Convert-ToSuiteSupportSummaryLines {
 		}
 		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.SupabaseConfigPath)) {
 			$lines.Add(("Supabase config: {0}" -f [string]$supportContext.Config.SupabaseConfigPath))
-		}
-		if (-not [string]::IsNullOrWhiteSpace([string]$supportContext.Config.GatewayStartupCheckScript)) {
-			$lines.Add(("Gateway check: {0}" -f [string]$supportContext.Config.GatewayStartupCheckScript))
 		}
 	}
 
@@ -920,7 +893,6 @@ function New-SuiteSupportConfigSnapshot {
 	$autocadPluginBundleRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_PLUGIN_BUNDLE_ROOT"
 	$autocadStartupCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_AUTOCAD_STARTUP_CHECK_SCRIPT"
 	$watchdogBackendCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_WATCHDOG_BACKEND_STARTUP_CHECK_SCRIPT"
-	$gatewayStartupCheckScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_GATEWAY_STARTUP_CHECK_SCRIPT"
 	$runtimeBootstrapScript = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_RUNTIME_BOOTSTRAP_SCRIPT"
 	$dailyRoot = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_DAILY_ROOT"
 	$officeExecutablePath = Get-SuiteConfigStringOverride -TomlPath $resolvedTomlPath -Key "SUITE_OFFICE_EXECUTABLE_PATH"
@@ -1088,7 +1060,6 @@ function New-SuiteSupportConfigSnapshot {
 		codexConfigPresent = [bool]($resolvedTomlPath -and (Test-Path -LiteralPath $resolvedTomlPath))
 		supabaseConfigPath = $resolvedSupabaseConfigPath
 		supabaseConfigPresent = [bool]($resolvedSupabaseConfigPath -and (Test-Path -LiteralPath $resolvedSupabaseConfigPath))
-		gatewayStartupCheckScript = Resolve-OptionalAbsolutePath -PathValue $gatewayStartupCheckScript -RepoRoot $resolvedRepoRoot
 		runtimeBootstrapScript = Resolve-OptionalAbsolutePath -PathValue $runtimeBootstrapScript -RepoRoot $resolvedRepoRoot
 		watchdogCollectorConfigPath = Resolve-OptionalAbsolutePath -PathValue $filesystemCollectorConfig -RepoRoot $resolvedRepoRoot
 		watchdogCollectorStartupCheckScript = Resolve-OptionalAbsolutePath -PathValue $filesystemCheckScript -RepoRoot $resolvedRepoRoot
@@ -1097,7 +1068,6 @@ function New-SuiteSupportConfigSnapshot {
 		watchdogAutoCadPluginBundleRoot = Resolve-OptionalAbsolutePath -PathValue $autocadPluginBundleRoot -RepoRoot $resolvedRepoRoot
 		watchdogAutoCadStartupCheckScript = Resolve-OptionalAbsolutePath -PathValue $autocadStartupCheckScript -RepoRoot $resolvedRepoRoot
 		watchdogBackendStartupCheckScript = Resolve-OptionalAbsolutePath -PathValue $watchdogBackendCheckScript -RepoRoot $resolvedRepoRoot
-		gatewayMode = Get-SuiteGatewayMode
 	}
 }
 
@@ -1114,7 +1084,6 @@ function New-SuiteSupportPathSnapshot {
 		bootstrapLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.logPath)) { [string]$runtime.logPath } else { $null }
 		frontendLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.frontendLogPath)) { [string]$runtime.frontendLogPath } else { $null }
 		backendLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.backendLogPath)) { [string]$runtime.backendLogPath } else { $null }
-		gatewayLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.gatewayLogPath)) { [string]$runtime.gatewayLogPath } else { $null }
 		runtimeLauncherLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.runtimeLauncherLogPath)) { [string]$runtime.runtimeLauncherLogPath } else { $null }
 		runtimeShellLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.runtimeShellLogPath)) { [string]$runtime.runtimeShellLogPath } else { $null }
 		officeBrokerLogPath = if ($runtime -and -not [string]::IsNullOrWhiteSpace([string]$runtime.officeBrokerLogPath)) { [string]$runtime.officeBrokerLogPath } else { $null }

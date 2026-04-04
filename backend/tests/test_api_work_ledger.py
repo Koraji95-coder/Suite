@@ -256,12 +256,12 @@ class _SubprocessStub:
         if command[:2] == ["git", "log"]:
             return _CompletedProcessStub(
                 0,
-                stdout="abc1234567890abc\x1fSplit agent transport plumbing\x1f2026-03-18T05:00:00+00:00\n",
+                stdout="abc1234567890abc\x1fSplit project watchdog signals\x1f2026-03-18T05:00:00+00:00\n",
             )
         if command[:2] == ["git", "show"]:
             return _CompletedProcessStub(
                 0,
-                stdout="src/services/agentService.ts\nsrc/components/apps/projects/ProjectDetailHeader.tsx\n",
+                stdout="src/features/project-watchdog/ProjectTelemetryPanel.tsx\nsrc/features/autodraft-studio/ui/AutoDraftComparePanel.tsx\n",
             )
         if len(command) >= 2 and command[0].endswith("node.exe"):
             script_name = Path(command[1]).name
@@ -299,30 +299,6 @@ class _SubprocessStub:
                 return _CompletedProcessStub(1, stderr="Worktale note failed")
             return _CompletedProcessStub(0, stdout="Note added")
         return _CompletedProcessStub(0, stdout="")
-
-
-class _AgentRunOrchestratorStub:
-    def list_activity(self, *, user_id: str, limit: int) -> list[dict[str, Any]]:
-        _ = limit
-        return [
-            {
-                "runId": "run-1",
-                "taskId": "task-1",
-                "profileId": "forge",
-                "eventType": "run_completed",
-                "message": "Completed project telemetry scorecard lane.",
-                "createdAt": "2026-03-18T04:00:00+00:00",
-                "payload": {
-                    "title": "Project telemetry scorecard",
-                    "projectId": "project-1",
-                },
-                "status": "completed",
-                "stage": "integration",
-                "userId": user_id,
-            }
-        ]
-
-
 class _WatchdogServiceStub:
     def list_sessions(
         self,
@@ -365,7 +341,6 @@ class TestApiWorkLedger(unittest.TestCase):
 
         self.requests_stub = _RequestsStub()
         self.subprocess_stub = _SubprocessStub(repo_root=self.repo_root)
-        self.agent_run_orchestrator = _AgentRunOrchestratorStub()
         self.watchdog_service = _WatchdogServiceStub()
 
         self.which_patcher = patch(
@@ -412,7 +387,6 @@ class TestApiWorkLedger(unittest.TestCase):
                 repo_root=self.repo_root,
                 requests_module=self.requests_stub,
                 subprocess_module=self.subprocess_stub,
-                agent_run_orchestrator=self.agent_run_orchestrator,
                 watchdog_service=self.watchdog_service,
             )
         )
@@ -555,7 +529,7 @@ class TestApiWorkLedger(unittest.TestCase):
             bool(((bootstrap_payload.get("checks") or {}).get("postPushHookInstalled")))
         )
 
-    def test_draft_suggestions_merge_git_agent_and_watchdog_sources(self) -> None:
+    def test_draft_suggestions_merge_git_and_watchdog_sources(self) -> None:
         response = self.client.get(
             "/api/work-ledger/draft-suggestions?limit=6",
             headers={"Authorization": "Bearer user-token"},
@@ -563,15 +537,13 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json() or {}
         self.assertTrue(bool(payload.get("ok")))
-        self.assertGreaterEqual(int(payload.get("count") or 0), 3)
+        self.assertGreaterEqual(int(payload.get("count") or 0), 2)
         self.assertEqual((payload.get("sources") or {}).get("git"), 1)
-        self.assertEqual((payload.get("sources") or {}).get("agent"), 1)
         self.assertEqual((payload.get("sources") or {}).get("watchdog"), 1)
         suggestions = payload.get("suggestions") or []
         self.assertTrue(
             any(item.get("sourceKind") == "git_checkpoint" for item in suggestions)
         )
-        self.assertTrue(any(item.get("sourceKind") == "agent_run" for item in suggestions))
         self.assertTrue(any(item.get("sourceKind") == "watchdog" for item in suggestions))
 
 

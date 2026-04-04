@@ -1,7 +1,7 @@
 import type { ElementType } from "react";
-import { Badge } from "@/components/primitives/Badge";
-import { HStack, Stack } from "@/components/primitives/Stack";
-import { Text } from "@/components/primitives/Text";
+import { Badge } from "@/components/system/base/Badge";
+import { HStack, Stack } from "@/components/system/base/Stack";
+import { Text } from "@/components/system/base/Text";
 import { cn } from "@/lib/utils";
 import styles from "./AccountSettings.module.css";
 

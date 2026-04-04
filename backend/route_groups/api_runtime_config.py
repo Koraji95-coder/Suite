@@ -52,27 +52,6 @@ def resolve_supabase_api_key(
         )
     return supabase_api_key
 
-
-def resolve_agent_webhook_secret(
-    *,
-    os_module: Any,
-    logger: Any,
-) -> str:
-    secret = (os_module.environ.get("AGENT_WEBHOOK_SECRET") or "").strip()
-    if secret:
-        return secret
-
-    dev_webhook_secret = (os_module.environ.get("VITE_AGENT_WEBHOOK_SECRET") or "").strip()
-    if dev_webhook_secret:
-        logger.warning(
-            "AGENT_WEBHOOK_SECRET not set; using VITE_AGENT_WEBHOOK_SECRET for development. "
-            "Set AGENT_WEBHOOK_SECRET in backend env for production."
-        )
-        return dev_webhook_secret
-
-    return ""
-
-
 def normalize_auth_passkey_provider(
     *,
     raw_value: str,

@@ -8,11 +8,7 @@ from urllib.parse import urlparse
 def default_allowed_origins() -> List[str]:
     return [
         "http://localhost:5173",  # Vite dev server
-        "http://localhost:3001",  # Suite-native gateway
-        "http://localhost:3000",  # Legacy gateway compatibility
         "http://127.0.0.1:5173",
-        "http://127.0.0.1:3001",
-        "http://127.0.0.1:3000",
     ]
 
 

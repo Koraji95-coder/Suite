@@ -5,7 +5,12 @@ test.describe("public-route smoke", () => {
 		await page.goto("/");
 		await expect(page.locator('a[href="/login"]').first()).toBeVisible();
 		await expect(page.locator('a[href="/signup"]').first()).toBeVisible();
-		await expect(page.getByText("Projects, planning, and execution in")).toBeVisible();
+		await expect(
+			page.getByRole("heading", {
+				level: 1,
+				name: "One control surface for project delivery and drawing control.",
+			}),
+		).toBeVisible();
 	});
 
 	test("login and signup pages load", async ({ page }) => {

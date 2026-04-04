@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { EventCalendar } from "@/components/apps/calendar/EventCalendar";
-import type { EventColor } from "@/components/apps/calendar/hooks/calendartypes";
+import { EventCalendar } from "@/components/system/calendar/EventCalendar";
+import type { EventColor } from "@/components/system/calendar/hooks/calendartypes";
 import type { CalendarEvent as ProjectCalendarEvent } from "@/features/project-core";
 
 interface CalendarViewProps {

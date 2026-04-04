@@ -1,6 +1,6 @@
 import { APP_NAME } from "@/appMeta";
-import { SurfaceSkeleton } from "@/components/apps/ui/SurfaceSkeleton";
-import { Text } from "@/components/primitives";
+import { SurfaceSkeleton } from "@/components/system/SurfaceSkeleton";
+import { Text } from "@/components/system/base";
 import styles from "./AuthGateLoadingScreen.module.css";
 
 export function AuthGateLoadingScreen() {

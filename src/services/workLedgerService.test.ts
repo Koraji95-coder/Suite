@@ -61,7 +61,7 @@ describe("workLedgerService", () => {
 			commitRefs: ["abc123"],
 			projectId: "project-1",
 			appArea: "ground-grid-generator",
-			architecturePaths: ["src/components/apps/ground-grid-generator/useGridGeneratorState.ts"],
+			architecturePaths: ["src/features/ground-grid-generation/ui/useGridGeneratorState.ts"],
 			hotspotIds: ["ground-grid-generator/useGridGeneratorState.ts"],
 			lifecycleState: "planned",
 			publishState: "draft",
@@ -104,14 +104,15 @@ describe("workLedgerService", () => {
 	it("builds a Worktale-ready payload from a work ledger entry", () => {
 		const payload = buildWorktalePublishPayload({
 			id: "ledger-1",
-			title: "Agent service split checkpoint",
-			summary: "Separated orchestration, pairing, and catalog flows behind the stable facade.",
+			title: "AutoDraft compare cleanup checkpoint",
+			summary:
+				"Removed advisory review drift and kept the compare flow deterministic.",
 			source_kind: "git_checkpoint",
 			commit_refs: ["efc4560", "abc1234"],
 			project_id: "project-1",
-			app_area: "agent",
-			architecture_paths: ["src/services/agentService.ts"],
-			hotspot_ids: ["agentService"],
+			app_area: "autodraft-studio",
+			architecture_paths: ["src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx"],
+			hotspot_ids: ["AutoDraftComparePanel"],
 			lifecycle_state: "active",
 			publish_state: "ready",
 			published_at: null,
@@ -122,16 +123,18 @@ describe("workLedgerService", () => {
 			updated_at: "2026-03-18T01:00:00.000Z",
 		});
 
-		expect(payload.title).toBe("Agent service split checkpoint");
-		expect(payload.markdown).toContain("# Agent service split checkpoint");
+		expect(payload.title).toBe("AutoDraft compare cleanup checkpoint");
+		expect(payload.markdown).toContain("# AutoDraft compare cleanup checkpoint");
 		expect(payload.markdown).toContain("- Source: git_checkpoint");
-		expect(payload.markdown).toContain("- Paths: src/services/agentService.ts");
+		expect(payload.markdown).toContain(
+			"- Paths: src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx",
+		);
 		expect(payload.json).toMatchObject({
 			id: "ledger-1",
 			sourceKind: "git_checkpoint",
 			lifecycleState: "active",
 			publishState: "ready",
-			appArea: "agent",
+			appArea: "autodraft-studio",
 		});
 	});
 
@@ -309,7 +312,6 @@ describe("workLedgerService", () => {
 				count: 1,
 				sources: {
 					git: 1,
-					agent: 0,
 					watchdog: 0,
 				},
 				suggestions: [
@@ -321,9 +323,13 @@ describe("workLedgerService", () => {
 						summary: "Generated from git history.",
 						commitRefs: ["abc123"],
 						projectId: "project-1",
-						appArea: "agent",
-						architecturePaths: ["src/services/agentService.ts"],
-						hotspotIds: ["src/services/agentService.ts"],
+						appArea: "autodraft-studio",
+						architecturePaths: [
+							"src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx",
+						],
+						hotspotIds: [
+							"src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx",
+						],
 						lifecycleState: "completed",
 						publishState: "draft",
 						externalReference: "suggestion:git:abc123",
@@ -337,7 +343,6 @@ describe("workLedgerService", () => {
 		expect(result.error).toBeNull();
 		expect(result.sources).toEqual({
 			git: 1,
-			agent: 0,
 			watchdog: 0,
 		});
 		expect(result.data).toHaveLength(1);
@@ -351,9 +356,11 @@ describe("workLedgerService", () => {
 			sourceKind: "git_checkpoint",
 			commitRefs: ["abc123"],
 			projectId: null,
-			appArea: "agent",
-			architecturePaths: ["src/services/agentService.ts"],
-			hotspotIds: ["agentService"],
+			appArea: "autodraft-studio",
+			architecturePaths: [
+				"src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx",
+			],
+			hotspotIds: ["AutoDraftComparePanel"],
 			lifecycleState: "completed",
 			publishState: "draft",
 			externalReference: "suggestion:git:abc123",
@@ -372,28 +379,30 @@ describe("workLedgerService", () => {
 					summary: "Already tracked.",
 					commitRefs: ["abc123"],
 					projectId: null,
-					appArea: "agent",
-					architecturePaths: ["src/services/agentService.ts"],
-					hotspotIds: ["agentService"],
+					appArea: "autodraft-studio",
+					architecturePaths: [
+						"src/features/autodraft-studio/ui/AutoDraftComparePanel.tsx",
+					],
+					hotspotIds: ["AutoDraftComparePanel"],
 					lifecycleState: "completed",
 					publishState: "draft",
 					externalReference: "suggestion:git:abc123",
 					createdAt: "2026-03-18T00:00:00.000Z",
 				},
 				{
-					suggestionId: "suggest-agent-1",
-					sourceKey: "agent:run-1",
-					sourceKind: "agent_run",
-					title: "Auto-created draft",
-					summary: "Generated from agent history.",
+					suggestionId: "suggest-watchdog-1",
+					sourceKey: "watchdog:session-1",
+					sourceKind: "watchdog",
+					title: "CAD session draft",
+					summary: "Generated from a recent workstation drawing session.",
 					commitRefs: [],
-					projectId: null,
-					appArea: "agent",
-					architecturePaths: ["src/routes/agent/AgentRoutePage.tsx"],
-					hotspotIds: ["AgentRoutePage"],
+					projectId: "project-1",
+					appArea: "project-watchdog",
+					architecturePaths: ["src/features/project-watchdog/ProjectTelemetryPanel.tsx"],
+					hotspotIds: ["ProjectTelemetryPanel"],
 					lifecycleState: "active",
 					publishState: "draft",
-					externalReference: "suggestion:agent:run-1",
+					externalReference: "suggestion:watchdog:session-1",
 					createdAt: "2026-03-18T01:00:00.000Z",
 				},
 			],
@@ -401,10 +410,10 @@ describe("workLedgerService", () => {
 
 		expect(syncResult.skipped).toBe(1);
 		expect(syncResult.created).toHaveLength(1);
-		expect(syncResult.created[0]?.title).toBe("Auto-created draft");
+		expect(syncResult.created[0]?.title).toBe("CAD session draft");
 
 		const entries = await workLedgerService.fetchEntries({ limit: 10 });
-		expect(entries.data.some((entry) => entry.title === "Auto-created draft")).toBe(
+		expect(entries.data.some((entry) => entry.title === "CAD session draft")).toBe(
 			true,
 		);
 	});

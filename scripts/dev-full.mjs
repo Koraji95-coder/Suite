@@ -1,5 +1,5 @@
-import net from "node:net";
 import { spawn, spawnSync } from "node:child_process";
+import net from "node:net";
 import { createInterface } from "node:readline";
 
 function parseBoolEnv(rawValue, fallback = false) {
@@ -15,8 +15,10 @@ const children = [];
 let shuttingDown = false;
 const autocadPipeName =
 	(process.env.AUTOCAD_DOTNET_PIPE_NAME || "").trim() || "SUITE_AUTOCAD_PIPE";
-const namedPipeServerProject = "dotnet/named-pipe-bridge/NamedPipeServer.csproj";
-const autodraftApiProject = "dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj";
+const namedPipeServerProject =
+	"dotnet/named-pipe-bridge/NamedPipeServer.csproj";
+const autodraftApiProject =
+	"dotnet/autodraft-api-contract/AutoDraft.ApiContract.csproj";
 const namedPipeBridgeAutostartEnabled = parseBoolEnv(
 	process.env.SUITE_DEV_AUTOSTART_NAMED_PIPE_BRIDGE,
 	false,
@@ -37,25 +39,24 @@ const limiterDevDegradeOnRedisFailure = parseBoolEnv(
 	process.env.API_LIMITER_DEV_DEGRADE_ON_REDIS_FAILURE,
 	true,
 );
-const limiterMode =
-	(
-		(String(process.env.API_ENV || "").trim() ||
-			String(process.env.FLASK_ENV || "").trim()) ||
-		""
-	)
-		.toLowerCase()
-		.trim();
+const limiterMode = (
+	String(process.env.API_ENV || "").trim() ||
+	String(process.env.FLASK_ENV || "").trim() ||
+	""
+)
+	.toLowerCase()
+	.trim();
 const limiterStrictMode =
-	limiterRequireSharedStorage || limiterMode === "production" || limiterMode === "prod";
+	limiterRequireSharedStorage ||
+	limiterMode === "production" ||
+	limiterMode === "prod";
 const redisContainerName =
 	(process.env.SUITE_REDIS_CONTAINER_NAME || "").trim() || "suite-redis-local";
 const redisDataVolume =
-	(process.env.SUITE_REDIS_DATA_VOLUME || "").trim() || "suite_redis_local_data";
-const redisImage = (process.env.SUITE_REDIS_IMAGE || "").trim() || "redis:7-alpine";
-const gatewayPort = Number.parseInt(
-	(process.env.AGENT_GATEWAY_PORT || "").trim() || "3001",
-	10,
-);
+	(process.env.SUITE_REDIS_DATA_VOLUME || "").trim() ||
+	"suite_redis_local_data";
+const redisImage =
+	(process.env.SUITE_REDIS_IMAGE || "").trim() || "redis:7-alpine";
 const backendPort = Number.parseInt(
 	(process.env.API_PORT || "").trim() || "5000",
 	10,
@@ -68,7 +69,8 @@ const limiterStorageUri =
 function parseRedisEndpoint(uri) {
 	try {
 		const parsed = new URL(uri);
-		if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:") return null;
+		if (parsed.protocol !== "redis:" && parsed.protocol !== "rediss:")
+			return null;
 		const host = parsed.hostname || "127.0.0.1";
 		const port = Number.parseInt(parsed.port || "6379", 10);
 		if (!Number.isFinite(port) || port < 1 || port > 65535) return null;
@@ -172,7 +174,9 @@ function parseUnixLsofPortOwners(port) {
 	if (probe.status !== 0 && !String(probe.stdout || "").trim()) return [];
 
 	const owners = [];
-	for (const [index, rawLine] of String(probe.stdout || "").split(/\r?\n/).entries()) {
+	for (const [index, rawLine] of String(probe.stdout || "")
+		.split(/\r?\n/)
+		.entries()) {
 		if (!rawLine.trim() || index === 0) continue;
 		const cols = rawLine.trim().split(/\s+/);
 		const processName = cols[0] || "unknown";
@@ -217,10 +221,7 @@ function getPortOwners(port) {
 }
 
 function ensureRequiredPortsAvailable() {
-	const required = [
-		{ name: "gateway", port: gatewayPort },
-		{ name: "backend", port: backendPort },
-	];
+	const required = [{ name: "backend", port: backendPort }];
 	const conflicts = [];
 	for (const target of required) {
 		const owners = getPortOwners(target.port);
@@ -240,7 +241,7 @@ function ensureRequiredPortsAvailable() {
 		);
 	}
 	console.error(
-		"[dev-full] Stop the conflicting process(es) or change AGENT_GATEWAY_PORT/API_PORT before retrying.",
+		"[dev-full] Stop the conflicting process(es) or change API_PORT before retrying.",
 	);
 	process.exit(1);
 }
@@ -268,7 +269,9 @@ function isPortOpen(host, port, timeoutMs = 800) {
 }
 
 function isLoopbackHost(host) {
-	const normalized = String(host || "").trim().toLowerCase();
+	const normalized = String(host || "")
+		.trim()
+		.toLowerCase();
 	return (
 		normalized === "127.0.0.1" ||
 		normalized === "localhost" ||
@@ -276,7 +279,13 @@ function isLoopbackHost(host) {
 	);
 }
 
-async function waitForPortReady(host, port, attempts = 20, timeoutMs = 500, delayMs = 250) {
+async function waitForPortReady(
+	host,
+	port,
+	attempts = 20,
+	timeoutMs = 500,
+	delayMs = 250,
+) {
 	for (let attempt = 0; attempt < attempts; attempt += 1) {
 		if (await isPortOpen(host, port, timeoutMs)) {
 			return true;
@@ -461,7 +470,9 @@ async function ensureRedis() {
 	}
 
 	if (redisAutostartDisabled) {
-		console.log("[dev-full] Redis autostart disabled via SUITE_DEV_AUTOSTART_REDIS.");
+		console.log(
+			"[dev-full] Redis autostart disabled via SUITE_DEV_AUTOSTART_REDIS.",
+		);
 		return resolveRedisUnavailableStatus(
 			`Redis endpoint ${endpointLabel} is unreachable and autostart is disabled`,
 		);
@@ -501,7 +512,8 @@ async function ensureAutoDraftApi(env, label = "autodraft-dotnet") {
 	}
 
 	const targetUrl =
-		String(env.AUTODRAFT_DOTNET_API_URL || "").trim() || "http://127.0.0.1:5275";
+		String(env.AUTODRAFT_DOTNET_API_URL || "").trim() ||
+		"http://127.0.0.1:5275";
 	const endpoint = parseHttpEndpoint(targetUrl, 5275);
 
 	if (await isPortOpen(endpoint.host, endpoint.port)) {
@@ -591,13 +603,13 @@ async function main() {
 	}
 	const frontendNpm = npmInvocation(["run", "dev"]);
 	const backendNpm = npmInvocation(["run", "backend:coords:dev"]);
-	const gatewayNpm = npmInvocation(["run", "gateway:dev"]);
 	run("frontend", frontendNpm.command, frontendNpm.args, { env: sharedEnv });
 	run("backend", backendNpm.command, backendNpm.args, { env: sharedEnv });
-	run("gateway", gatewayNpm.command, gatewayNpm.args, { env: sharedEnv });
 }
 
 main().catch((error) => {
-	console.error(`[dev-full] Startup failed: ${error?.message || String(error)}`);
+	console.error(
+		`[dev-full] Startup failed: ${error?.message || String(error)}`,
+	);
 	process.exit(1);
 });

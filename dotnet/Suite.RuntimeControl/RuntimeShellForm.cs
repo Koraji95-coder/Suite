@@ -28,7 +28,6 @@ internal sealed class RuntimeShellForm : Form
         "runtime-shell",
         "frontend",
         "backend",
-        "gateway",
         "office-broker",
         "filesystem-collector",
         "autocad-collector",
@@ -55,7 +54,6 @@ internal sealed class RuntimeShellForm : Form
     private readonly string _runtimeLogPath;
     private readonly string _frontendLogPath;
     private readonly string _backendLogPath;
-    private readonly string _gatewayLogPath;
     private readonly string _runtimeLauncherLogPath;
     private readonly string _runtimeShellLogPath;
     private readonly string _officeBrokerLogPath;
@@ -124,7 +122,6 @@ internal sealed class RuntimeShellForm : Form
         _runtimeLogPath = Path.Combine(_runtimeStatusDirectory, "bootstrap.log");
         _frontendLogPath = Path.Combine(_runtimeStatusDirectory, "frontend.log");
         _backendLogPath = Path.Combine(_runtimeStatusDirectory, "backend.log");
-        _gatewayLogPath = Path.Combine(_runtimeStatusDirectory, "gateway.log");
         _runtimeLauncherLogPath = Path.Combine(_runtimeStatusDirectory, "runtime-launcher.log");
         _runtimeShellLogPath = Path.Combine(_runtimeStatusDirectory, "runtime-shell.log");
         _officeBrokerLogPath = Path.Combine(_runtimeStatusDirectory, "office-broker.log");
@@ -1581,7 +1578,7 @@ internal sealed class RuntimeShellForm : Form
         }
 
         var rootUri = new Uri($"{parsedBaseUri.GetLeftPart(UriPartial.Authority)}/", UriKind.Absolute);
-        var normalizedRoute = string.IsNullOrWhiteSpace(routePath) ? "/app/dashboard" : routePath.Trim();
+        var normalizedRoute = string.IsNullOrWhiteSpace(routePath) ? "/app/home" : routePath.Trim();
         if (!normalizedRoute.StartsWith('/'))
         {
             normalizedRoute = "/" + normalizedRoute;
@@ -2091,7 +2088,6 @@ internal sealed class RuntimeShellForm : Form
         if (payloadNode["runtime"] is JsonObject runtimeNode)
         {
             runtimeNode["backendLogPath"] = _backendLogPath;
-            runtimeNode["gatewayLogPath"] = _gatewayLogPath;
             runtimeNode["frontendLogPath"] = _frontendLogPath;
             runtimeNode["runtimeLauncherLogPath"] = _runtimeLauncherLogPath;
             runtimeNode["runtimeShellLogPath"] = _runtimeShellLogPath;
@@ -2134,7 +2130,6 @@ internal sealed class RuntimeShellForm : Form
         if (supportNode["paths"] is JsonObject pathsNode)
         {
             pathsNode["backendLogPath"] = _backendLogPath;
-            pathsNode["gatewayLogPath"] = _gatewayLogPath;
             pathsNode["runtimeLauncherLogPath"] = _runtimeLauncherLogPath;
             pathsNode["runtimeShellLogPath"] = _runtimeShellLogPath;
             pathsNode["officeBrokerLogPath"] = _officeBrokerLogPath;
@@ -3254,7 +3249,6 @@ internal sealed class RuntimeShellForm : Form
             "supabase" => "docker",
             "frontend" => "frontend",
             "backend" => "backend",
-            "gateway" => "gateway",
             "watchdog-filesystem" => "filesystem-collector",
             "watchdog-autocad" => "autocad-collector",
             _ => "transcript",
@@ -3313,7 +3307,6 @@ internal sealed class RuntimeShellForm : Form
             BuildFileLogSource("runtime-shell", "Runtime Shell", _runtimeShellLogPath, "Desktop host and WebView bridge log."),
             BuildFileLogSource("frontend", "Suite Frontend", _frontendLogPath, "Frontend dev shell output."),
             BuildFileLogSource("backend", "Watchdog Backend", _backendLogPath, "Backend API and runtime jobs."),
-            BuildFileLogSource("gateway", "API Gateway", _gatewayLogPath, "Suite-native gateway output."),
             BuildFileLogSource("office-broker", "Office Broker", _officeBrokerLogPath, "Live Office broker process output."),
             BuildFileLogSource("filesystem-collector", "Filesystem Collector", ResolveNewestLogFile(_filesystemCollectorLogDir), "Filesystem collector daemon log."),
             BuildFileLogSource("autocad-collector", "AutoCAD Collector", ResolveNewestLogFile(_autocadCollectorLogDir), "AutoCAD collector daemon log."),

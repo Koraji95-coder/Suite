@@ -17,7 +17,6 @@ $workstationDiagnosticsScript = (Resolve-Path (Join-Path $PSScriptRoot "lib\suit
 . $runtimeSharedScript
 . $workstationDiagnosticsScript
 $backendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-backend-startup.ps1")).Path
-$gatewayCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-gateway-startup.ps1")).Path
 $frontendCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-suite-frontend-startup.ps1")).Path
 $filesystemCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-filesystem-collector-startup.ps1")).Path
 $autocadCheckScript = (Resolve-Path (Join-Path $PSScriptRoot "check-watchdog-autocad-collector-startup.ps1")).Path
@@ -29,7 +28,6 @@ $runtimeStatusPath = $runtimePaths.RuntimeStatusPath
 $currentBootstrapPath = $runtimePaths.CurrentBootstrapPath
 $runtimeLogPath = $runtimePaths.RuntimeLogPath
 $backendLogPath = $runtimePaths.BackendLogPath
-$gatewayLogPath = $runtimePaths.GatewayLogPath
 $frontendLogPath = $runtimePaths.FrontendLogPath
 $runtimeLauncherLogPath = $runtimePaths.RuntimeLauncherLogPath
 $runtimeShellLogPath = $runtimePaths.RuntimeShellLogPath
@@ -475,7 +473,6 @@ $services += (New-ServiceStatus `
 
 $parallelCheckResults = Invoke-JsonPowerShellFilesParallel -Tasks @(
     [pscustomobject]@{ Name = "backend"; ScriptPath = $backendCheckScript; Arguments = @("-Json") },
-    [pscustomobject]@{ Name = "gateway"; ScriptPath = $gatewayCheckScript; Arguments = @("-Json") },
     [pscustomobject]@{ Name = "frontend"; ScriptPath = $frontendCheckScript; Arguments = @("-Json") },
     [pscustomobject]@{ Name = "filesystem"; ScriptPath = $filesystemCheckScript; Arguments = @("-Json") },
     [pscustomobject]@{ Name = "autocad"; ScriptPath = $autocadCheckScript; Arguments = @("-Json") },
@@ -576,131 +573,6 @@ $services += (New-ServiceStatus `
         kind = "path"
         label = "Backend Log"
         target = $backendLogPath
-    }))
-
-$gatewayResult = $parallelCheckResults["gateway"]
-$gatewayRunning = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Running)
-$gatewayHealthy = [bool]($gatewayResult.Payload -and $gatewayResult.Payload.Healthy)
-$gatewayStartupMode = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "StartupMode") { [string]$gatewayResult.Payload.StartupMode } else { $null }
-$gatewayModeMatches = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayModeMatches") {
-    [bool]$gatewayResult.Payload.GatewayModeMatches
-}
-else {
-    $true
-}
-$gatewayProcessId = if ($gatewayRunning -or $gatewayHealthy) { [int]$gatewayResult.Payload.ProcessId } else { $null }
-$gatewayPort = if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "Port" -and $gatewayResult.Payload.Port) {
-    [int]$gatewayResult.Payload.Port
-}
-else {
-    3001
-}
-$gatewayOwnershipDrift = ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "OwnershipDrift" -and [bool]$gatewayResult.Payload.OwnershipDrift) -or ($gatewayRunning -and $gatewayStartupMode -eq "native_process")
-$gatewayState = if ($gatewayHealthy) {
-    "running"
-}
-elseif ($gatewayOwnershipDrift) {
-    "error"
-}
-elseif ($gatewayRunning -and -not $gatewayModeMatches) {
-    "error"
-}
-elseif ($gatewayRunning) {
-    "starting"
-}
-else {
-    "stopped"
-}
-$gatewayDetails = if ($gatewayHealthy -or $gatewayRunning) {
-    [string]$gatewayResult.Payload.CommandLine
-}
-elseif ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
-    [string]$gatewayResult.Payload.Error
-}
-else {
-    $gatewayResult.OutputTail
-}
-$gatewaySummary = if ($gatewayHealthy) {
-    "Gateway is healthy through runtime-core Docker."
-}
-elseif ($gatewayOwnershipDrift) {
-    "Gateway ownership drift needs attention."
-}
-elseif ($gatewayRunning -and -not $gatewayModeMatches) {
-    "Gateway mode needs attention."
-}
-elseif ($gatewayRunning) {
-    "Gateway is running but still warming up."
-}
-else {
-    "Gateway is not running."
-}
-$gatewayNotes = @()
-if ($gatewayStartupMode -eq "docker_compose") {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Owner"
-        value = "Docker runtime core"
-    }
-}
-elseif ($gatewayOwnershipDrift) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Owner"
-        value = "Native process detected. Expected Docker runtime core."
-    }
-}
-if (($gatewayHealthy -or $gatewayRunning) -and $gatewayResult.Payload -and $gatewayResult.Payload.CommandLine) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Command"
-        value = [string]$gatewayResult.Payload.CommandLine
-    }
-}
-if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayModeLabel") {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Gateway mode"
-        value = [string]$gatewayResult.Payload.GatewayModeLabel
-    }
-}
-if ($gatewayResult.Payload -and $gatewayResult.Payload.PSObject.Properties.Name -contains "GatewayProcessMode" -and -not [string]::IsNullOrWhiteSpace([string]$gatewayResult.Payload.GatewayProcessMode)) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Process mode"
-        value = Get-SuiteGatewayModeLabel -GatewayMode ([string]$gatewayResult.Payload.GatewayProcessMode)
-    }
-}
-if (-not [string]::IsNullOrWhiteSpace($gatewayLogPath)) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Log file"
-        value = $gatewayLogPath
-    }
-}
-if ($gatewayResult.Payload -and $gatewayResult.Payload.Error) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Status"
-        value = [string]$gatewayResult.Payload.Error
-    }
-}
-if ($gatewayNotes.Count -eq 0) {
-    $gatewayNotes += [pscustomobject]@{
-        label = "Recovery"
-        value = "Use Bootstrap All or Start to restore the gateway through Docker runtime core."
-    }
-}
-$services += (New-ServiceStatus `
-    -Id "gateway" `
-    -Name "API Gateway" `
-    -State $gatewayState `
-    -Ok $gatewayHealthy `
-    -Summary $gatewaySummary `
-    -Details $gatewayDetails `
-    -Port $gatewayPort `
-    -ProcessId $gatewayProcessId `
-    -UptimeSeconds (Get-ProcessUptimeSeconds -ProcessId $gatewayProcessId) `
-    -StartupMode $gatewayStartupMode `
-    -Notes $gatewayNotes `
-    -Substatus $null `
-    -LogTarget ([pscustomobject]@{
-        kind = "path"
-        label = "Gateway Log"
-        target = $gatewayLogPath
     }))
 
 $frontendResult = $parallelCheckResults["frontend"]
@@ -1161,7 +1033,6 @@ $result = [ordered]@{
         companionStateDir = $runtimePaths.CompanionStateDir
         logPath = $runtimeLogPath
         backendLogPath = $backendLogPath
-        gatewayLogPath = $gatewayLogPath
         frontendLogPath = $frontendLogPath
         runtimeLauncherLogPath = $runtimeLauncherLogPath
         runtimeShellLogPath = $runtimeShellLogPath

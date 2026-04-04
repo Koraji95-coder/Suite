@@ -117,7 +117,7 @@ function resolvePackageContextStage(args: {
 		} satisfies PackageContextStage;
 	}
 
-	if (standardMode && hasProject && hasDocuments && nativeStandardsReviewLoading) {
+	if (standardMode && hasDocuments && nativeStandardsReviewLoading) {
 		return {
 			state: "background",
 			label: "Load standards review",
@@ -128,7 +128,7 @@ function resolvePackageContextStage(args: {
 		} satisfies PackageContextStage;
 	}
 
-	if (standardMode && hasProject && hasDocuments && nativeStandardsReviewError) {
+	if (standardMode && hasDocuments && nativeStandardsReviewError) {
 		return {
 			state: "needs-attention",
 			label: "Reload standards review",
@@ -140,7 +140,6 @@ function resolvePackageContextStage(args: {
 
 	if (
 		standardMode &&
-		hasProject &&
 		hasDocuments &&
 		(!nativeStandardsReview || !nativeStandardsReview.hasRecordedReview)
 	) {
@@ -156,7 +155,6 @@ function resolvePackageContextStage(args: {
 
 	if (
 		standardMode &&
-		hasProject &&
 		hasDocuments &&
 		nativeStandardsReview?.isBlocking
 	) {

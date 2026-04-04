@@ -86,16 +86,16 @@ class Logger {
 		if (this.isDevelopment) {
 			switch (level) {
 				case LogLevel.DEBUG:
-					console.log(formattedMessage, data || "");
+					console.log("%s", formattedMessage, data || "");
 					break;
 				case LogLevel.INFO:
-					console.info(formattedMessage, data || "");
+					console.info("%s", formattedMessage, data || "");
 					break;
 				case LogLevel.WARN:
-					console.warn(formattedMessage, data || "");
+					console.warn("%s", formattedMessage, data || "");
 					break;
 				case LogLevel.ERROR:
-					console.error(formattedMessage, error || data || "");
+					console.error("%s", formattedMessage, error || data || "");
 					if (error?.stack) {
 						console.error(error.stack);
 					}

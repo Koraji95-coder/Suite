@@ -1157,12 +1157,10 @@ function renderHeroPanel() {
   const doctor = getDoctor();
   const office = getOfficeSnapshot();
   const broker = getOfficeBroker();
-  const chat = getOfficeChatState();
   const provider = getOfficeProviderState();
   const study = getOfficeStudyState();
   const library = getOfficeLibraryState();
   const growth = getOfficeGrowthState();
-  const inbox = getOfficeInboxState();
   const companionStatus = getCompanionStatus();
   const activeView = getActiveView();
   const startupOwner = getStartupOwner();
@@ -2115,11 +2113,9 @@ function renderWorkspaceContent() {
 function buildContextUtilityHtml() {
   const office = getOfficeSnapshot();
   const broker = getOfficeBroker();
-  const chat = getOfficeChatState();
   const provider = getOfficeProviderState();
   const library = getOfficeLibraryState();
   const growth = getOfficeGrowthState();
-  const inbox = getOfficeInboxState();
   const doctor = getDoctor();
   const workstation = getWorkstationIdentity();
   const shell = getShellHealth();

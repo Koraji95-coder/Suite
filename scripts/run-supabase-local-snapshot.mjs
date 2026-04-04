@@ -297,11 +297,14 @@ async function runExport(options) {
 		statusPayload,
 		migrationFingerprint,
 	});
+	const manifestPath = getSnapshotManifestPath(snapshotDir);
+	const manifestTmp = `${manifestPath}.tmp`;
 	fs.writeFileSync(
-		getSnapshotManifestPath(snapshotDir),
+		manifestTmp,
 		`${JSON.stringify(manifest, null, 2)}\n`,
 		"utf8",
 	);
+	fs.renameSync(manifestTmp, manifestPath);
 
 	console.log(
 		`Snapshot saved: ${snapshotId} (${formatBytes(dataSizeBytes)}) at ${snapshotDir}`,
@@ -414,8 +417,9 @@ async function runImport(options) {
 	}
 
 	const importReportPath = path.join(descriptor.snapshotDir, "last-import.json");
+	const importReportTmp = `${importReportPath}.tmp`;
 	fs.writeFileSync(
-		importReportPath,
+		importReportTmp,
 		`${JSON.stringify(
 			{
 				importedAt: new Date().toISOString(),
@@ -429,6 +433,7 @@ async function runImport(options) {
 		)}\n`,
 		"utf8",
 	);
+	fs.renameSync(importReportTmp, importReportPath);
 
 	console.log(`Snapshot import completed: ${descriptor.snapshotId}`);
 	if (migrationDrift) {

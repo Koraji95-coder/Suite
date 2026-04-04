@@ -50,6 +50,13 @@ export class ErrorBoundary extends React.Component<
 						</details>
 					)}
 
+					{isDev && this.state.errorInfo?.componentStack && (
+						<details className={styles.details}>
+							<summary className={styles.summary}>Component Stack</summary>
+							<pre className={styles.pre}>{this.state.errorInfo.componentStack}</pre>
+						</details>
+					)}
+
 					<button
 						onClick={() => {
 							this.setState({ hasError: false, error: null, errorInfo: null });

@@ -125,12 +125,10 @@ function buildProjectSummary(args: {
 		deadlineDate && deadlineDate >= today && deadlineDate <= dueSoonBoundary,
 	);
 
-	let state: TrustState = "background";
-	let stateLabel = "In progress";
-	let summary = "Start packaging work from the project workspace.";
-	let detail = latestIssueSet
-		? latestIssueSet.summary || "A project issue set is in progress."
-		: "Create the first issue set to capture package scope, review blockers, and transmittal prep.";
+	let state: TrustState;
+	let stateLabel: string;
+	let summary: string;
+	let detail: string;
 
 	if (needsSetup) {
 		state = "needs-attention";

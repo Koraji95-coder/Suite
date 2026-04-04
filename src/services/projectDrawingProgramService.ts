@@ -551,8 +551,8 @@ const BUILTIN_R3P_ELECTRICAL_CATALOG: BuiltinDrawingCatalogSeed[] = [
 	},
 ];
 
-function createId() {
-	return localId();
+function createId(prefix?: string) {
+	return localId(prefix);
 }
 
 function nowIso() {

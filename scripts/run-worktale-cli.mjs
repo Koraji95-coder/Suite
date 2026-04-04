@@ -12,7 +12,7 @@ const result = runWorktale(args, {
 
 if (!result.ok) {
 	if (result.error) {
-		console.error(result.error);
+		console.error("%s", result.error);
 	}
 	process.exit(result.status || 1);
 }

@@ -115,7 +115,7 @@ async function generateMagicLink() {
 	console.log(`email: ${options.email}`);
 	console.log(`redirect: ${redirectUrl}`);
 	console.log("");
-	console.log(actionLink);
+	console.log("%s", actionLink);
 	console.log("");
 
 	try {

@@ -97,7 +97,7 @@ class Logger {
 				case LogLevel.ERROR:
 					console.error("%s", formattedMessage, error || data || "");
 					if (error?.stack) {
-						console.error(error.stack);
+						console.error("%s", error.stack);
 					}
 					break;
 			}
@@ -105,7 +105,7 @@ class Logger {
 			// In production, you might want to send logs to a service
 			// For now, only log warnings and errors
 			if (level === LogLevel.WARN || level === LogLevel.ERROR) {
-				console[level === LogLevel.WARN ? "warn" : "error"](formattedMessage);
+				console[level === LogLevel.WARN ? "warn" : "error"]("%s", formattedMessage);
 			}
 		}
 

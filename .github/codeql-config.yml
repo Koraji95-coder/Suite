@@ -3,3 +3,4 @@ paths-ignore:
   - docs/autodraft/upgrade-archive
   - docs/autodraft/reference
   - scripts/testdata
+  - dotnet/Suite.RuntimeControl/Assets

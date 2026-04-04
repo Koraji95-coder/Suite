@@ -227,7 +227,7 @@ async function bootstrap() {
 	}
 
 	const baseUrl = supabaseUrl.replace(/\/+$/, "");
-	const randomSuffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
+	const randomSuffix = `${Date.now()}${crypto.randomInt(10_000)}`;
 	const safePrefix = args.emailPrefix
 		.replace(/[^a-zA-Z0-9._-]/g, "")
 		.toLowerCase();

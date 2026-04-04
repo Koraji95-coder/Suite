@@ -6,6 +6,7 @@ import {
 	useState,
 } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
+import { secureRandom } from "@/lib/secureRandom";
 import { supabase } from "@/supabase/client";
 import {
 	buildDrawingAnnotationInsert,
@@ -68,7 +69,7 @@ export function useStandardsDrawingCheckerState() {
 						const enabledRules = rules.filter((rule) => rule.enabled);
 						const issues: Issue[] = [];
 
-						const random = Math.random();
+						const random = secureRandom();
 						if (random > 0.3) {
 							issues.push({
 								type: "title_block",

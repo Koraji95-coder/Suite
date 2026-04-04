@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
 import http, {
   type IncomingMessage,
   type Server,
@@ -26,7 +27,7 @@ export class TestServer {
      */
     const min = 10101;
     const max = 20202;
-    return Math.floor(Math.random() * (max - min + 1) + min);
+    return crypto.randomInt(min, max + 1);
   }
 
   #routes: Record<string, (req: IncomingMessage, res: ServerResponse) => void> =

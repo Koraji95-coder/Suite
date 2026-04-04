@@ -135,7 +135,7 @@ for (const target of lockTargets) {
 			.filter((item) => !ignoredPackages.has(item.name.toLowerCase()))
 			.sort((left, right) => left.name.localeCompare(right.name));
 		totalUpdates += updates.length;
-		console.log(formatUpdates(updates));
+		console.log("%s", formatUpdates(updates));
 	} catch (error) {
 		console.error(`python-updates: ${error.message}`);
 		process.exitCode = 1;

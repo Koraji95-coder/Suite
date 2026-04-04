@@ -39,7 +39,9 @@ const pidFilePath = getPidFilePath();
 fs.mkdirSync(path.dirname(pidFilePath), {
   recursive: true,
 });
-fs.writeFileSync(pidFilePath, process.pid.toString());
+const pidTmpPath = `${pidFilePath}.tmp`;
+fs.writeFileSync(pidTmpPath, process.pid.toString());
+fs.renameSync(pidTmpPath, pidFilePath);
 logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath();

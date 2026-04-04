@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/useAuth";
 import { Section } from "@/components/system/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
+import { secureRandom, secureRandomInt } from "@/lib/secureRandom";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import styles from "./CircuitGenerator.module.css";
@@ -104,7 +105,7 @@ export function CircuitGenerator() {
 	}, [drawCircuit]);
 
 	const generateRandomCircuit = () => {
-		const numComponents = Math.floor(Math.random() * 4) + 3;
+		const numComponents = secureRandomInt(3, 6);
 		const newComponents: Component[] = [];
 
 		newComponents.push({
@@ -116,9 +117,9 @@ export function CircuitGenerator() {
 		});
 
 		for (let i = 0; i < numComponents - 1; i++) {
-			const compType = componentTypes[Math.floor(Math.random() * 3)];
+			const compType = componentTypes[secureRandomInt(0, 2)];
 			const value =
-				compType.values[Math.floor(Math.random() * compType.values.length)];
+				compType.values[secureRandomInt(0, compType.values.length - 1)];
 
 			newComponents.push({
 				type: compType.type,

@@ -1188,7 +1188,7 @@ export function DrawingListManager({
 								onChange={(event) =>
 									updateProfile("projectRootPath", event.target.value)
 								}
-								placeholder="C:\\Projects\\R3P-25074"
+								placeholder="C:\\Projects\\MyProject"
 							/>
 						</label>
 						<div className={styles.setupChecklist}>
@@ -1292,7 +1292,7 @@ export function DrawingListManager({
 												event.target.value,
 											)
 										}
-										placeholder="C:\\Projects\\Nanulak\\Nanulak.wdp"
+										placeholder="C:\\Projects\\MyProject\\MyProject.wdp"
 									/>
 								</label>
 								<label className={styles.field}>

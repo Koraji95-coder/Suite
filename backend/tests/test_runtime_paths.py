@@ -15,7 +15,7 @@ from backend.watchdog.filesystem import ensure_absolute_roots
 
 class TestRuntimePaths(unittest.TestCase):
     def test_is_absolute_path_value_supports_windows_and_posix(self) -> None:
-        self.assertTrue(is_absolute_path_value(r"C:\Users\DustinWard\Documents\GitHub\Suite"))
+        self.assertTrue(is_absolute_path_value(r"C:\Users\Dev\Documents\GitHub\Suite"))
         self.assertTrue(is_absolute_path_value(r"\\server\share\folder"))
         self.assertTrue(is_absolute_path_value("/workspace/output"))
         self.assertFalse(is_absolute_path_value("relative/path"))
@@ -40,7 +40,7 @@ class TestRuntimePaths(unittest.TestCase):
             self.assertEqual(resolved_directory, expected_directory.resolve())
 
     def test_ensure_absolute_roots_preserves_windows_roots_for_rule_sync(self) -> None:
-        root_value = r"C:\Users\DustinWard\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project"
+        root_value = r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project"
 
         resolved_roots = ensure_absolute_roots([root_value], allow_missing=True)
 
@@ -48,13 +48,13 @@ class TestRuntimePaths(unittest.TestCase):
 
     def test_join_under_absolute_root_rebuilds_windows_host_paths(self) -> None:
         joined_path = join_under_absolute_root(
-            r"C:\Users\DustinWard\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project",
+            r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project",
             ["wddemo.wdp"],
         )
 
         self.assertEqual(
             joined_path,
-            r"C:\Users\DustinWard\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project\wddemo.wdp",
+            r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project\wddemo.wdp",
         )
 
 

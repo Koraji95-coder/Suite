@@ -5,7 +5,7 @@
 		"schemaVersion": "suite.autodesk.acade.regression-fixtures.v1",
 		"generatedAt": "2026-04-02T17:25:12.856Z"
 	},
-	"stageRoot": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures",
+	"stageRoot": "output/autodesk-acade-regression-fixtures",
 	"fixtures": [
 		{
 			"id": "wddemo-project",
@@ -18,12 +18,12 @@
 				"project_sidecars"
 			],
 			"sourceRoot": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Demo",
-			"stagedRoot": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures/wddemo-project/project",
+			"stagedRoot": "output/autodesk-acade-regression-fixtures/wddemo-project/project",
 			"stagedProjectFiles": [
 				{
 					"name": "wddemo.wdp",
 					"relativePath": "wddemo.wdp",
-					"path": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures/wddemo-project/project/wddemo.wdp"
+					"path": "output/autodesk-acade-regression-fixtures/wddemo-project/project/wddemo.wdp"
 				}
 			]
 		},
@@ -37,12 +37,12 @@
 				"single_drawing_validation"
 			],
 			"sourceRoot": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/UserDataCache/My Documents/Acade 2026/AeData/Proj/Point2Point",
-			"stagedRoot": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures/point2point-project/project",
+			"stagedRoot": "output/autodesk-acade-regression-fixtures/point2point-project/project",
 			"stagedProjectFiles": [
 				{
 					"name": "Point2Point.wdp",
 					"relativePath": "Point2Point.wdp",
-					"path": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures/point2point-project/project/Point2Point.wdp"
+					"path": "output/autodesk-acade-regression-fixtures/point2point-project/project/Point2Point.wdp"
 				}
 			]
 		},
@@ -56,7 +56,7 @@
 				"non_plc_drawing_flow"
 			],
 			"sourceFile": "C:/Program Files/Autodesk/AutoCAD 2026/Acade/Sample/Safety Circuit.dwg",
-			"stagedFile": "C:/Users/DustinWard/Documents/GitHub/Suite/output/autodesk-acade-regression-fixtures/safety-circuit-drawing/drawing/Safety Circuit.dwg"
+			"stagedFile": "output/autodesk-acade-regression-fixtures/safety-circuit-drawing/drawing/Safety Circuit.dwg"
 		}
 	]
 }

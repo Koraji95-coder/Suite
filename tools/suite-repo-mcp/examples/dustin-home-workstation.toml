@@ -3,8 +3,90 @@
 #   PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-HOME
 # Target config path is %USERPROFILE%\.codex\config.toml.
 
+# ── Suite Repo MCP (custom repo-native server) ──
+[mcp_servers.suite_repo_mcp]
+command = "node"
+args = ["tools/suite-repo-mcp/server.mjs"]
+
 [mcp_servers.suite_repo_mcp.env]
 SUITE_MCP_ENV_STAMPED_BY = "scripts/sync-suite-workstation-profile.ps1"
 SUITE_WORKSTATION_ID = "DUSTIN-HOME"
 SUITE_WORKSTATION_LABEL = "Dustin Home station"
 SUITE_WORKSTATION_ROLE = "home"
+
+# ── GitHub (issues, PRs, commits, repo browsing) ──
+# Requires a GitHub PAT with repo scope.
+# [mcp_servers.github]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-github"]
+#
+# [mcp_servers.github.env]
+# GITHUB_PERSONAL_ACCESS_TOKEN = "<your-github-pat>"
+
+# ── Filesystem (sandboxed read/write/search) ──
+# Roots restrict which directories the server can access.
+# [mcp_servers.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\koraj\\Documents\\GitHub\\Suite", "C:\\Users\\koraj\\Documents\\GitHub\\Office"]
+
+# ── Fetch (web page retrieval for docs/reference lookup) ──
+# [mcp_servers.fetch]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-fetch"]
+
+# ── Memory (persistent cross-session knowledge graph) ──
+# [mcp_servers.memory]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-memory"]
+
+# ── Chrome DevTools (live browser inspection/debugging) ──
+# [mcp_servers.chrome_devtools]
+# command = "npx"
+# args = ["chrome-devtools-mcp@latest"]
+
+# ══════════════════════════════════════════════════════════
+# FUTURE / ML / DATA SCIENCE SERVERS
+# Uncomment these when the ML pilot lane or Autodesk API
+# integration becomes active.
+# ══════════════════════════════════════════════════════════
+
+# ── Jupyter MCP (notebook execution, kernel management) ──
+# Use when ML pilots produce notebooks for training/evaluation.
+# Requires: pip install jupyter-mcp-server
+# [mcp_servers.jupyter]
+# command = "python"
+# args = ["-m", "jupyter_mcp_server"]
+
+# ── PostgreSQL MCP (direct Supabase/Postgres introspection) ──
+# Use for direct SQL introspection of Supabase local or hosted databases.
+# [mcp_servers.postgres]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"]
+
+# ── Docker MCP (container management for runtime-core) ──
+# Use for Docker container lifecycle management.
+# [mcp_servers.docker]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-docker"]
+
+# ══════════════════════════════════════════════════════════
+# CODEX CLI EXTRA FLAGS
+# Pass these as additional instructions/sandbox hints when
+# launching Codex sessions for advanced tasks.
+# ══════════════════════════════════════════════════════════
+#
+# Codex sandbox hints (pass via CLI or CODEX_SANDBOX_INSTRUCTIONS):
+#
+#   --sandbox-permissions filesystem:write
+#   --sandbox-permissions network:local
+#
+# Codex model hints:
+#   codex --model o4-mini       (fast iteration, lint/type tasks)
+#   codex --model o3            (complex refactors, architecture)
+#
+# Codex approval mode:
+#   codex --approval-mode full-auto   (trusted repos, CI-like runs)
+#   codex --approval-mode suggest     (review-first, safer)
+#
+# MCP-aware Codex invocation:
+#   codex --mcp-config %USERPROFILE%\.codex\config.toml

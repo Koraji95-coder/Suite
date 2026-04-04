@@ -99,7 +99,7 @@ pyjwt[crypto]==2.11.0
     #   pyjwt
 pyopenssl==25.3.0
     # via webauthn
-pypdf==6.8.0
+pypdf==6.9.2
     # via -r backend/requirements-api.in
 pytest==9.0.2
     # via -r backend/requirements-api.in

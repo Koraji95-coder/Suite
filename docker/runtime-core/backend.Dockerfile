@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim@sha256:80fdb3f57c815e1b638d221f30a826823467c4a56c8f6a8d7aa091cd9b1675ea AS node_runtime
+FROM node:25-bookworm-slim@sha256:387eebd0a6a38d7f7ea2201586088765455330038b9601f0a262fb0b86cca20b AS node_runtime
 
 FROM python:3.14.3-slim@sha256:fb83750094b46fd6b8adaa80f66e2302ecbe45d513f6cece637a841e1025b4ca
 

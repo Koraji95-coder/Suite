@@ -143,6 +143,62 @@ const STATIC_RESOURCES = [
 		mimeType: "text/markdown",
 		filePath: AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_PATH,
 	},
+	{
+		uri: "repo://docs/development/long-term-overhaul-todo-plan",
+		name: "Long-Term Overhaul Todo Plan",
+		description: "Master backlog and overhaul plan for the Suite codebase.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "development", "long-term-overhaul-todo-plan.md"),
+	},
+	{
+		uri: "repo://docs/development/post-bridge-tranche-handoff",
+		name: "Latest Tranche Handoff Note",
+		description: "Cold-start handoff note from the most recent development tranche.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "development", "post-bridge-tranche-handoff-2026-04-03.md"),
+	},
+	{
+		uri: "repo://docs/app-feature-roadmap-opinions",
+		name: "App Feature Roadmap & Opinions",
+		description: "Opinionated filter layer over raw feature ideas with build priority recommendations.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "app-feature-roadmap-opinions.md"),
+	},
+	{
+		uri: "repo://docs/runtime-control/mcp-workstation-matrix",
+		name: "MCP Workstation Matrix",
+		description: "Canonical workstation profile data, naming rules, and MCP env overrides.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "runtime-control", "mcp-workstation-matrix.md"),
+	},
+	{
+		uri: "repo://docs/runtime-control/workstation-bringup",
+		name: "Windows Workstation Bring-Up",
+		description: "First-time bring-up and cross-PC workstation setup guide.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "runtime-control", "workstation-bringup.md"),
+	},
+	{
+		uri: "repo://docs/security/auth-architecture-canonical",
+		name: "Auth Architecture (Canonical)",
+		description: "Canonical auth architecture reference for Suite.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "security", "auth-architecture-canonical.md"),
+	},
+	{
+		uri: "repo://docs/development/documentation-structure",
+		name: "Documentation Structure",
+		description: "Documentation structure and organization guide for Suite.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "development", "documentation-structure.md"),
+	},
+	{
+		uri: "repo://docs/deep-repo-hardening-backlog",
+		name: "Deep Repo Hardening Backlog",
+		description: "Tracked hardening and cleanup backlog for the Suite codebase.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "deep-repo-hardening-backlog.md"),
+	},
 ];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";
 const SUPPORTED_PROTOCOL_VERSIONS = new Set([
@@ -2423,6 +2479,123 @@ async function toolCheckSuiteWorkstation(args = {}) {
 	return createTextResult(JSON.stringify(payload, null, 2), !payload.ok);
 }
 
+async function toolRunCheck(args = {}) {
+	const result = await runProcess("npm", ["run", "check"], {
+		timeoutMs: 300_000,
+	});
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
+async function toolGitStatus() {
+	const [statusResult, branchResult] = await Promise.all([
+		runProcess("git", ["status", "--porcelain=v1"], { timeoutMs: 10_000 }),
+		runProcess("git", ["rev-parse", "--abbrev-ref", "HEAD"], { timeoutMs: 5_000 }),
+	]);
+	const branch = (branchResult.stdout || "").trim();
+	const statusLines = (statusResult.stdout || "").trim();
+	const fileCount = statusLines ? statusLines.split(/\r?\n/).length : 0;
+	const lines = [
+		`Branch: ${branch}`,
+		`Changed files: ${fileCount}`,
+	];
+	if (statusLines) {
+		lines.push("", statusLines);
+	} else {
+		lines.push("", "Working tree clean.");
+	}
+	return createTextResult(lines.join("\n"));
+}
+
+async function toolGitLog(args = {}) {
+	const count = Math.max(1, Math.min(Number(args.count) || 15, 100));
+	const result = await runProcess(
+		"git",
+		["log", `--oneline`, `-${count}`, "--no-color"],
+		{ timeoutMs: 10_000 },
+	);
+	return createTextResult(
+		result.stdout?.trim() || "No commits found.",
+		!result.ok,
+	);
+}
+
+async function toolReadFile(args = {}) {
+	const filePath = typeof args.path === "string" ? args.path.trim() : "";
+	if (!filePath) throw new Error("path is required");
+	const fileAbs = resolveRepoPath(filePath);
+	const stat = await statSafe(fileAbs);
+	if (!stat?.isFile()) throw new Error(`Not a file or does not exist: ${filePath}`);
+	if (stat.size > 512_000) {
+		throw new Error(`File too large (${(stat.size / 1024).toFixed(0)} KB). Use repo.search to find content.`);
+	}
+	const content = await fs.readFile(fileAbs, "utf8");
+	return createTextResult(content);
+}
+
+async function toolListDirectory(args = {}) {
+	const dirPath = typeof args.path === "string" ? args.path.trim() : ".";
+	const maxDepth = Math.max(1, Math.min(Number(args.depth) || 2, 5));
+	const dirAbs = resolveRepoPath(dirPath);
+	const stat = await statSafe(dirAbs);
+	if (!stat?.isDirectory()) throw new Error(`Not a directory or does not exist: ${dirPath}`);
+
+	const skipDirNames = new Set([
+		".git", "node_modules", "dist", "build", "coverage",
+		"target", ".next", ".turbo", ".venv", "venv", "__pycache__",
+	]);
+
+	const lines = [];
+	const stack = [{ abs: dirAbs, depth: 0, prefix: "" }];
+	while (stack.length) {
+		const current = stack.pop();
+		if (!current) continue;
+		let entries = [];
+		try {
+			entries = await fs.readdir(current.abs, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+		entries.sort((a, b) => {
+			if (a.isDirectory() && !b.isDirectory()) return -1;
+			if (!a.isDirectory() && b.isDirectory()) return 1;
+			return a.name.localeCompare(b.name);
+		});
+		for (const entry of entries) {
+			if (entry.name.startsWith(".") && current.depth === 0 && entry.name !== ".env.example") continue;
+			if (entry.isDirectory() && skipDirNames.has(entry.name)) continue;
+			const icon = entry.isDirectory() ? "📁" : "📄";
+			lines.push(`${current.prefix}${icon} ${entry.name}`);
+			if (entry.isDirectory() && current.depth < maxDepth) {
+				stack.push({
+					abs: path.join(current.abs, entry.name),
+					depth: current.depth + 1,
+					prefix: current.prefix + "  ",
+				});
+			}
+		}
+		if (lines.length > 500) {
+			lines.push("... (truncated)");
+			break;
+		}
+	}
+	return createTextResult(lines.join("\n") || "(empty directory)");
+}
+
+async function toolEnvCheck() {
+	const result = await runProcess("npm", ["run", "env:check"], { timeoutMs: 30_000 });
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
+async function toolDocsManifestVerify() {
+	const result = await runProcess("npm", ["run", "docs:manifest:verify"], { timeoutMs: 30_000 });
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
+async function toolArchitectureVerify() {
+	const result = await runProcess("npm", ["run", "arch:verify"], { timeoutMs: 30_000 });
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
 const PROMPTS = {
 	"repo.pr_description": {
 		description: "Generate a structured PR description for this repo.",
@@ -2541,6 +2714,95 @@ Notes: ${notes}
 		description:
 			"Return the current workstation identity exposed to suite_repo_mcp.",
 		template: () => formatWorkstationContext(),
+	},
+	"repo.handoff_context": {
+		description:
+			"Generate a cold-start handoff summary combining workstation context, recent git log, current branch, and project state.",
+		template: () => `## Handoff Context
+
+Use this prompt at the start of a new session to orient without relying on thread memory.
+
+### Quick Status
+- Run \`repo.get_workstation_context\` for workstation identity
+- Run \`repo.git_status\` for current branch and pending changes
+- Run \`repo.git_log\` for recent commits
+- Run \`repo.check_suite_workstation\` for full workstation health
+
+### Key Docs
+- \`docs/development/post-bridge-tranche-handoff-2026-04-03.md\` — latest handoff note
+- \`docs/development/long-term-overhaul-todo-plan.md\` — overhaul plan
+- \`docs/app-feature-roadmap-opinions.md\` — product roadmap
+- \`docs/runtime-control/mcp-workstation-matrix.md\` — MCP matrix
+- \`docs/security/auth-architecture-canonical.md\` — auth architecture
+
+### Workflow
+1. Read the latest handoff note first
+2. Check \`repo.git_log\` for what landed since the last handoff
+3. Run \`repo.run_check\` to confirm the repo is green
+4. Begin the next tranche
+`,
+	},
+	"repo.code_review": {
+		description:
+			"Structured code review prompt with Suite guardrails baked in.",
+		template: ({ scope = "" }) => `## Code Review Checklist
+
+Review scope: ${scope || "current staged changes"}
+
+### Correctness
+- Does the change do what it claims?
+- Are edge cases handled?
+- Are error paths covered?
+
+### Suite Guardrails
+- No Tailwind in Suite app paths (CSS Modules only)
+- No auth-flow changes without explicit approval
+- AutoCAD error envelope preserved (success/code/message/requestId/meta)
+- No silent broad exception swallowing
+- Office/Suite product boundary respected
+- Watchdog startup gates used before relying on local telemetry
+
+### Standards
+- Biome lint clean (\`npm run lint\`)
+- Type-safe (\`npm run typecheck\`)
+- Env parity maintained (\`npm run env:check\`)
+- Docs manifest current (\`npm run docs:manifest:verify\`)
+- Architecture model current (\`npm run arch:verify\`)
+
+### Validation Commands
+\`\`\`
+npm run check
+npm run test:unit
+\`\`\`
+`,
+	},
+	"repo.tranche_planning": {
+		description:
+			"Prompt for planning the next tranche of work using backlog docs.",
+		template: () => `## Tranche Planning
+
+Use this prompt when starting a new tranche of work.
+
+### Input Sources
+1. Read \`docs/development/long-term-overhaul-todo-plan.md\` for the master backlog
+2. Read \`docs/development/post-bridge-tranche-handoff-2026-04-03.md\` for the latest handoff
+3. Read \`docs/app-feature-roadmap-opinions.md\` for product priorities
+4. Read \`docs/deep-repo-hardening-backlog.md\` for hardening items
+
+### Planning Rules
+- Each tranche should be a coherent, shippable unit
+- Do not mix cleanup tranches with feature tranches
+- Always end with \`npm run check\` green
+- Always write a handoff note for the next session
+- Keep the overhaul todo plan updated after each tranche
+
+### Output Format
+- Tranche title
+- Scope (which files/systems)
+- Expected validation commands
+- Exit criteria
+- Handoff note location
+`,
 	},
 };
 
@@ -2870,6 +3132,109 @@ const TOOLS = [
 			},
 		},
 		handler: toolCheckSuiteWorkstation,
+	},
+	{
+		name: "repo.run_check",
+		description:
+			"Run the full npm run check pipeline (docs manifest, arch verify, env check, guards, biome lint, typecheck).",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolRunCheck,
+	},
+	{
+		name: "repo.git_status",
+		description:
+			"Return current branch, changed file count, and porcelain status.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolGitStatus,
+	},
+	{
+		name: "repo.git_log",
+		description:
+			"Return recent commit log (oneline format).",
+		inputSchema: {
+			type: "object",
+			properties: {
+				count: {
+					type: "number",
+					description: "Number of commits to show (1-100, default 15).",
+					default: 15,
+				},
+			},
+		},
+		handler: toolGitLog,
+	},
+	{
+		name: "repo.read_file",
+		description:
+			"Read a repo-relative file and return its content (max 512 KB).",
+		inputSchema: {
+			type: "object",
+			required: ["path"],
+			properties: {
+				path: {
+					type: "string",
+					description: "Repo-relative file path.",
+				},
+			},
+		},
+		handler: toolReadFile,
+	},
+	{
+		name: "repo.list_directory",
+		description:
+			"List a repo-relative directory tree with configurable depth.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				path: {
+					type: "string",
+					description: "Repo-relative directory path (default: repo root).",
+					default: ".",
+				},
+				depth: {
+					type: "number",
+					description: "Max directory depth to list (1-5, default 2).",
+					default: 2,
+				},
+			},
+		},
+		handler: toolListDirectory,
+	},
+	{
+		name: "repo.env_check",
+		description:
+			"Run env parity check (npm run env:check) and return structured result.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolEnvCheck,
+	},
+	{
+		name: "repo.docs_manifest_verify",
+		description:
+			"Run docs manifest verification (npm run docs:manifest:verify) and return pass/fail.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolDocsManifestVerify,
+	},
+	{
+		name: "repo.architecture_verify",
+		description:
+			"Run architecture model verification (npm run arch:verify) and return pass/fail.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolArchitectureVerify,
 	},
 ];
 

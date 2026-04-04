@@ -3,8 +3,43 @@
 #   PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-HOME
 # Target config path is %USERPROFILE%\.codex\config.toml.
 
+# ── Suite Repo MCP (custom repo-native server) ──
+[mcp_servers.suite_repo_mcp]
+command = "node"
+args = ["tools/suite-repo-mcp/server.mjs"]
+
 [mcp_servers.suite_repo_mcp.env]
 SUITE_MCP_ENV_STAMPED_BY = "scripts/sync-suite-workstation-profile.ps1"
 SUITE_WORKSTATION_ID = "DUSTIN-HOME"
 SUITE_WORKSTATION_LABEL = "Dustin Home station"
 SUITE_WORKSTATION_ROLE = "home"
+
+# ── GitHub (issues, PRs, commits, repo browsing) ──
+# Requires a GitHub PAT with repo scope.
+# [mcp_servers.github]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-github"]
+#
+# [mcp_servers.github.env]
+# GITHUB_PERSONAL_ACCESS_TOKEN = "<your-github-pat>"
+
+# ── Filesystem (sandboxed read/write/search) ──
+# Roots restrict which directories the server can access.
+# [mcp_servers.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\koraj\\Documents\\GitHub\\Suite", "C:\\Users\\koraj\\Documents\\GitHub\\Office"]
+
+# ── Fetch (web page retrieval for docs/reference lookup) ──
+# [mcp_servers.fetch]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-fetch"]
+
+# ── Memory (persistent cross-session knowledge graph) ──
+# [mcp_servers.memory]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-memory"]
+
+# ── Chrome DevTools (live browser inspection/debugging) ──
+# [mcp_servers.chrome_devtools]
+# command = "npx"
+# args = ["chrome-devtools-mcp@latest"]

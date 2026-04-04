@@ -238,19 +238,6 @@ codex --model o3
 codex --mcp-config %USERPROFILE%\.codex\config.toml
 ```
 
-## Profiles
-
-| Workstation ID | Computer names | Label | Role |
-| --- | --- | --- | --- |
-| `DUSTIN-WORK` | `DUSTIN-WORK` | `Dustin Work station` | `work` |
-| `DUSTIN-HOME` | `DUSTIN-HOME` | `Dustin Home station` | `home` |
-
-If a machine is not listed in the matrix, the sync helper falls back to:
-
-- `workstationId = COMPUTERNAME`
-- `workstationLabel = "<Computer Name> workstation"`
-- `workstationRole = secondary`
-
 ## Deterministic Naming Rules
 
 - Filesystem collector id: `watchdog-fs-{slug(workstationId)}`

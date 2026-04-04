@@ -164,6 +164,12 @@ npm run workstation:bringup:validate
 npm run workstation:bringup -- -WorkstationId YOUR-WORKSTATION
 ```
 
+### Frontend Preview
+
+For a shareable frontend-only preview, the repo now includes a root [`vercel.json`](./vercel.json) for Vercel.
+Use that lane for UI review only, not as a replacement for the local backend or Runtime Control.
+See [`docs/development/vercel-frontend-preview.md`](./docs/development/vercel-frontend-preview.md).
+
 ## Validation
 
 ```bash

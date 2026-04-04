@@ -22,6 +22,7 @@ This note captures the immediate backlog split after the project-setup/title-blo
 - APS Viewer / hyperlink-review exploration (`web`)
 - Scikit-learn or PyTorch assistive scoring (`hosted core`)
 - Anaconda/Conda sandbox for future ML-heavy experimentation without replacing the repo default CPython + venv workflow (`tooling`)
+- PostgresAI / DBLab SE for realistic cloned Postgres test environments once hosted-core data workflows need safer production-like debugging (`hosted core`)
 
 ## Skip
 

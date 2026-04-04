@@ -318,7 +318,7 @@ class _WatchdogServiceStub:
                     "status": "completed",
                     "durationMs": 45 * 60 * 1000,
                     "commandCount": 12,
-                    "workstationId": "DUSTIN-HOME",
+                    "workstationId": "DEV-WORKSTATION",
                 }
             ]
         }
@@ -354,7 +354,7 @@ class TestApiWorkLedger(unittest.TestCase):
             "os.environ",
             {
                 "SUITE_WORK_LEDGER_ARTIFACT_ROOT": str(self.artifact_root),
-                "SUITE_WORKSTATION_ID": "DUSTIN-HOME",
+                "SUITE_WORKSTATION_ID": "DEV-WORKSTATION",
             },
             clear=False,
         )

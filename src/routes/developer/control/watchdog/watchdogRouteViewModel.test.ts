@@ -11,16 +11,16 @@ import {
 	buildWorkstationRows,
 } from "./watchdogRouteViewModel";
 
-const PROJECT_MAP = new Map([["project-1", { name: "Nanulak" }]]);
+const PROJECT_MAP = new Map([["project-1", { name: "MyProject" }]]);
 
 function createCollector(
 	overrides: Partial<WatchdogCollector> = {},
 ): WatchdogCollector {
 	return {
 		collectorId: "collector-1",
-		name: "Dustin CAD",
+		name: "Dev CAD",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		capabilities: ["autocad", "drawing_sessions", "commands"],
 		metadata: {
 			sourceAvailable: true,
@@ -47,9 +47,9 @@ function createSession(
 		sessionId: "session-1",
 		collectorId: "collector-1",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		projectId: "project-1",
-		drawingPath: "C:/Projects/Nanulak/Drawing1.dwg",
+		drawingPath: "C:/Projects/MyProject/Drawing1.dwg",
 		status: "live",
 		active: true,
 		startedAt: 100,
@@ -75,13 +75,13 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-1",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		eventType: "command_executed",
 		sourceType: "autocad",
 		timestamp: 700,
 		projectId: "project-1",
 		sessionId: "session-1",
-		drawingPath: "C:/Projects/Nanulak/Drawing1.dwg",
+		drawingPath: "C:/Projects/MyProject/Drawing1.dwg",
 		metadata: {
 			commandName: "QSAVE",
 		},
@@ -99,7 +99,7 @@ describe("watchdogRouteViewModel", () => {
 		});
 
 		expect(rows).toHaveLength(1);
-		expect(rows[0].projectLabel).toBe("Nanulak");
+		expect(rows[0].projectLabel).toBe("MyProject");
 		expect(rows[0].drawingLabel).toBe("Drawing1.dwg");
 		expect(rows[0].sessionCount).toBe(1);
 		expect(rows[0].latestActionLabel).toMatch(/saved|qsave/i);
@@ -155,7 +155,7 @@ describe("watchdogRouteViewModel", () => {
 		});
 
 		expect(workstationRows[0].needsAttention).toBe(true);
-		expect(workstationRows[0].projectLabels).toContain("Nanulak");
+		expect(workstationRows[0].projectLabels).toContain("MyProject");
 		expect(attentionRows.map((row) => row.key)).toEqual(
 			expect.arrayContaining(["collectors", "idle"]),
 		);
@@ -185,7 +185,7 @@ describe("watchdogRouteViewModel", () => {
 				createEvent(),
 				createEvent({
 					eventId: 2,
-					drawingPath: "C:/Projects/Nanulak/Drawing2.dwg",
+					drawingPath: "C:/Projects/MyProject/Drawing2.dwg",
 					sessionId: "session-2",
 				}),
 			],
@@ -193,7 +193,7 @@ describe("watchdogRouteViewModel", () => {
 				createSession(),
 				createSession({
 					sessionId: "session-2",
-					drawingPath: "C:/Projects/Nanulak/Drawing2.dwg",
+					drawingPath: "C:/Projects/MyProject/Drawing2.dwg",
 					commandCount: 2,
 					durationMs: 600,
 					lastActivityAt: 650,
@@ -206,7 +206,7 @@ describe("watchdogRouteViewModel", () => {
 		const rollups = buildProjectRollupRows({ daybookRows });
 
 		expect(rollups).toHaveLength(1);
-		expect(rollups[0].projectLabel).toBe("Nanulak");
+		expect(rollups[0].projectLabel).toBe("MyProject");
 		expect(rollups[0].drawingCount).toBe(2);
 		expect(rollups[0].activeDrawingCount).toBe(2);
 		expect(rollups[0].totalCommands).toBe(3);

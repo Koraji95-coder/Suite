@@ -278,7 +278,7 @@ How I would use it:
 
 Recommendation:
 
-- treat `G:\Shared drives\R3P RESOURCES\APPS` as a research queue, not an implementation list
+- treat `G:\Shared drives\Company Resources\APPS` as a research queue, not an implementation list
 
 ### Transmittal Builder Reference
 

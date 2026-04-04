@@ -165,7 +165,7 @@ describe("StandardsChecker", () => {
 						project_id: "project-1",
 						user_id: "user-1",
 						block_name: "R3P-24x36BORDER&TITLE",
-						project_root_path: "C:/Projects/Nanulak",
+						project_root_path: "C:/Projects/MyProject",
 						acade_project_file_path: null,
 						acade_line1: "",
 						acade_line2: "",
@@ -262,14 +262,14 @@ describe("StandardsChecker", () => {
 			error: null,
 		});
 		mockProjectOrder.mockResolvedValue({
-			data: [{ id: "project-1", name: "Nanulak" }],
+			data: [{ id: "project-1", name: "MyProject" }],
 			error: null,
 		});
 		mockFetchIssueSet.mockResolvedValue({
 			data: {
 				id: "issue-set-1",
 				projectId: "project-1",
-				name: "Nanulak IFC package",
+				name: "MyProject IFC package",
 				issueTag: "IFC-01",
 				status: "review",
 				targetDate: "2026-03-31",
@@ -277,7 +277,7 @@ describe("StandardsChecker", () => {
 				transmittalDocumentName: "IFC package",
 				summary: "Ready for review.",
 				notes: null,
-				selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+				selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 				snapshot: {
 					drawingCount: 1,
 					selectedDrawingCount: 1,
@@ -433,7 +433,7 @@ describe("StandardsChecker", () => {
 			error: null,
 		});
 		mockProjectOrder.mockResolvedValue({
-			data: [{ id: "project-1", name: "Nanulak" }],
+			data: [{ id: "project-1", name: "MyProject" }],
 			error: null,
 		});
 		mockFetchIssueSet.mockResolvedValue({ data: null, error: null });

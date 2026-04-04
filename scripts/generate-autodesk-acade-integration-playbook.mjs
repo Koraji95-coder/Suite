@@ -53,6 +53,10 @@ function toPosix(filePath) {
 	return String(filePath || "").replaceAll("\\", "/");
 }
 
+function crossPlatformBasename(filePath) {
+	return path.basename(toPosix(filePath));
+}
+
 function formatInlineCode(value) {
 	return `\`${String(value || "").replaceAll("`", "\\`")}\``;
 }
@@ -250,22 +254,22 @@ function buildAutomationSurfaceSection(summary) {
 		(script) => script.fileName.toLowerCase() === "wd_load.lsp",
 	);
 	const defaultCat = summary.databaseInventories.find((database) =>
-		path.basename(database.filePath).toLowerCase() === "default_cat.mdb",
+		crossPlatformBasename(database.filePath).toLowerCase() === "default_cat.mdb",
 	);
 	const acePlc = summary.databaseInventories.find((database) =>
-		path.basename(database.filePath).toLowerCase() === "ace_plc.mdb",
+		crossPlatformBasename(database.filePath).toLowerCase() === "ace_plc.mdb",
 	);
 	const viaMap = summary.databaseInventories.find((database) =>
-		path.basename(database.filePath).toLowerCase() === "wdviacmp.mdb",
+		crossPlatformBasename(database.filePath).toLowerCase() === "wdviacmp.mdb",
 	);
 	const footprintLookup = summary.databaseInventories.find((database) =>
-		path.basename(database.filePath).toLowerCase() === "footprint_lookup.mdb",
+		crossPlatformBasename(database.filePath).toLowerCase() === "footprint_lookup.mdb",
 	);
 	const plcSample = summary.sampleDrawings.find((filePath) =>
-		path.basename(filePath).toLowerCase().includes("plc"),
+		crossPlatformBasename(filePath).toLowerCase().includes("plc"),
 	);
 	const demoProject = summary.demoProjects.find((project) =>
-		project.projectFiles.some((filePath) => path.basename(filePath).toLowerCase() === "wddemo.wdp"),
+		project.projectFiles.some((filePath) => crossPlatformBasename(filePath).toLowerCase() === "wddemo.wdp"),
 	);
 
 	const lines = [
@@ -338,12 +342,12 @@ function buildAutomationSurfaceSection(summary) {
 	);
 	if (plcSample) {
 		lines.push(
-			`- PLC-focused sample drawing: ${formatInlineCode(path.basename(plcSample))}.`,
+			`- PLC-focused sample drawing: ${formatInlineCode(crossPlatformBasename(plcSample))}.`,
 		);
 	}
 	if (demoProject) {
 		lines.push(
-			`- Demo project seed worth treating as a canonical test project: ${formatInlineCode(path.basename(demoProject.projectFiles[0]))}.`,
+			`- Demo project seed worth treating as a canonical test project: ${formatInlineCode(crossPlatformBasename(demoProject.projectFiles[0]))}.`,
 		);
 	}
 

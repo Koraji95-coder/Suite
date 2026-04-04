@@ -49,6 +49,10 @@ function toPosix(filePath) {
 	return String(filePath || "").replaceAll("\\", "/");
 }
 
+function crossPlatformBasename(filePath) {
+	return path.basename(toPosix(filePath));
+}
+
 function previewTable(table) {
 	return {
 		name: normalizeText(table.name),
@@ -128,7 +132,7 @@ function recommendedDefaults(databases) {
 export function buildLookupIndexFromInstallationSummary(summary) {
 	const databases = (summary.databaseInventories || [])
 		.map((database) => {
-			const fileName = path.basename(String(database.filePath || ""));
+			const fileName = crossPlatformBasename(database.filePath);
 			const role = lookupRoleInfo(fileName);
 			const tables = (database.tables || [])
 				.map((table) => previewTable(table))

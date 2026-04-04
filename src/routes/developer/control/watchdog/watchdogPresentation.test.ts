@@ -7,7 +7,7 @@ import {
 	presentWatchdogOperatorFeed,
 } from "./watchdogPresentation";
 
-const projectNameById = new Map([["project-1", { name: "Nanulak" }]]);
+const projectNameById = new Map([["project-1", { name: "MyProject" }]]);
 
 function createEvent(
 	overrides: Partial<WatchdogCollectorEvent>,
@@ -16,13 +16,13 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DUSTIN-HOME",
+		workstationId: "DEV-WORKSTATION",
 		eventType: "command_executed",
 		sourceType: "autocad",
 		timestamp: Date.now(),
 		projectId: "project-1",
 		sessionId: "session-1",
-		drawingPath: "C:/Projects/Nanulak/Drawing-01.dwg",
+		drawingPath: "C:/Projects/MyProject/Drawing-01.dwg",
 		path: null,
 		metadata: {},
 		...overrides,
@@ -38,7 +38,7 @@ describe("watchdogPresentation", () => {
 		expect(presentWatchdogOperatorEvent(event, projectNameById)).toMatchObject({
 			label: "Saved drawing",
 			detail: "Drawing-01.dwg",
-			context: "Nanulak • DUSTIN-HOME",
+			context: "MyProject • DEV-WORKSTATION",
 			rawCommandName: "QSAVE",
 		});
 	});
@@ -56,7 +56,7 @@ describe("watchdogPresentation", () => {
 			eventId: 2,
 			eventType: "modified",
 			sourceType: "filesystem",
-			path: "C:/Projects/Nanulak/Submittals/index.xlsx",
+			path: "C:/Projects/MyProject/Submittals/index.xlsx",
 			drawingPath: null,
 			metadata: {},
 		});

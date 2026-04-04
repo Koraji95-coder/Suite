@@ -533,7 +533,7 @@ export function ProjectIssueSetManager({
 							onChange={(event) =>
 								setForm((current) => ({ ...current, name: event.target.value }))
 							}
-							placeholder="Nanulak IFC package"
+							placeholder="MyProject IFC package"
 						/>
 						<Input
 							label="Issue tag"

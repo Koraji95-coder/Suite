@@ -63,7 +63,7 @@ vi.mock("./useDeveloperPortalOverviewData", () => ({
 				readiness: {
 					ok: true,
 					publisher: "worktale",
-					workstationId: "DUSTIN",
+					workstationId: "DEV",
 					ready: true,
 					checks: {
 						cliPath: "C:/tools/worktale.exe",

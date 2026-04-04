@@ -7,7 +7,7 @@ Use this when Supabase returns `429 email rate limit exceeded` for auth emails.
 Generate a one-time magic link directly with service-role credentials:
 
 ```bash
-npm run auth:magiclink:generate -- --email koraji95coder@gmail.com --redirect http://localhost:5173/login
+npm run auth:magiclink:generate -- --email dev@example.com --redirect http://localhost:5173/login
 ```
 
 Open the printed `action_link` in the browser profile you use for Suite.

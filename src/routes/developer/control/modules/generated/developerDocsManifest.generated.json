@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-04T17:56:46.408Z",
+	"generatedAt": "2026-04-04T18:51:59.417Z",
 	"docCount": 78,
 	"sections": [
 		{
@@ -15,9 +15,7 @@
 					"summary": "This section is the canonical home for browser-owned architecture and feature-slice flow notes.",
 					"relativePath": "docs/frontend/README.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": true
 				},
 				{
@@ -26,9 +24,7 @@
 					"summary": "src/features/automation-studio is the browser-owned source of truth for Automation Studio workflow state, shared queue models, and cross-specialist plan/receipt summaries.",
 					"relativePath": "docs/frontend/automation-studio-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -37,9 +33,7 @@
 					"summary": "This is the running log for frontend performance and diagnostics fixes. Append future dates here instead of creating one-off notes.",
 					"relativePath": "docs/frontend/Performance Fix Log.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -48,9 +42,7 @@
 					"summary": "This document now tracks active frontend performance follow-ups only. Items that were fixed move to Performance Fix Log.",
 					"relativePath": "docs/frontend/Performance Insights.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -59,9 +51,7 @@
 					"summary": "src/features/project-core is the browser-owned source of truth for shared project data models, selectors, and project UI helper utilities.",
 					"relativePath": "docs/frontend/project-core-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -70,9 +60,7 @@
 					"summary": "src/features/project-delivery is the browser-owned source of truth for project delivery packaging data and evidence composition.",
 					"relativePath": "docs/frontend/project-delivery-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -81,9 +69,7 @@
 					"summary": "This note tracks the browser-owned project detail shell composition that used to sit directly in the projects app surface.",
 					"relativePath": "docs/frontend/project-detail-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -92,9 +78,7 @@
 					"summary": "This is the canonical frontend note for the project-documents slice.",
 					"relativePath": "docs/frontend/project-documents-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -103,9 +87,7 @@
 					"summary": "This note tracks the current browser ownership boundary for project creation and project setup wizard state.",
 					"relativePath": "docs/frontend/project-manager-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -114,9 +96,7 @@
 					"summary": "src/features/project-review is the browser-owned source of truth for project review inbox/readiness orchestration.",
 					"relativePath": "docs/frontend/project-review-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -125,9 +105,7 @@
 					"summary": "This note tracks the browser-owned revision register state that used to live directly in the project detail view.",
 					"relativePath": "docs/frontend/project-revisions-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -136,9 +114,7 @@
 					"summary": "This is the canonical architecture note for the first project-setup/title-block slice.",
 					"relativePath": "docs/frontend/project-setup-title-block-runtime-flow.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -147,10 +123,7 @@
 					"summary": "src/features/project-watchdog is the browser-owned source of truth for project-scoped Watchdog telemetry loading and tracked-drawing summary shaping.",
 					"relativePath": "docs/frontend/project-watchdog-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app",
-						"watchdog"
-					],
+					"tags": ["frontend-app", "watchdog"],
 					"startHere": false
 				},
 				{
@@ -159,9 +132,7 @@
 					"summary": "src/features/project-workflow is the browser-owned source of truth for issue-set records and shared project workflow aggregation.",
 					"relativePath": "docs/frontend/project-workflow-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -170,9 +141,7 @@
 					"summary": "This is the canonical frontend note for the browser-owned standards-checker slice.",
 					"relativePath": "docs/frontend/standards-checker-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -181,9 +150,7 @@
 					"summary": "src/features/transmittal-builder is the browser-owned source of truth for transmittal-builder workflow state and core package models.",
 					"relativePath": "docs/frontend/transmittal-builder-feature-slice.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				}
 			]
@@ -200,10 +167,7 @@
 					"summary": "This folder tracks the migration from a one-off Python COM script to a staged",
 					"relativePath": "docs/autodraft/README.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": true
 				},
 				{
@@ -212,10 +176,7 @@
 					"summary": "Developer documentation for Suite.",
 					"relativePath": "docs/autodraft/todo-color-semantics-swap.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": false
 				},
 				{
@@ -224,10 +185,7 @@
 					"summary": "This document defines when to switch from current staged AutoDraft behavior to",
 					"relativePath": "docs/autodraft/execute-cutover.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": false
 				},
 				{
@@ -236,10 +194,7 @@
 					"summary": "Bluebeam markup recognition and CAD action planning through a deterministic, .NET-ready pipeline.",
 					"relativePath": "docs/autodraft/autodrawingcleaner-readme.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": false
 				}
 			]
@@ -256,9 +211,7 @@
 					"summary": "This section is the canonical home for hosted-core Python API and service ownership.",
 					"relativePath": "docs/backend/README.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": true
 				},
 				{
@@ -267,9 +220,7 @@
 					"summary": "This note captures concrete machine-learning opportunities for Suite after the current runtime/ownership overhaul is stable.",
 					"relativePath": "docs/backend/local-learning-opportunities.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": false
 				},
 				{
@@ -278,9 +229,7 @@
 					"summary": "This is the canonical backend note for the hosted-core project standards profile and native-review slice.",
 					"relativePath": "docs/backend/project-standards-profile.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": false
 				}
 			]
@@ -297,9 +246,7 @@
 					"summary": "This section is the canonical home for workstation-local companion behavior, bring-up, transfer, and local action ownership.",
 					"relativePath": "docs/runtime-control/README.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": true
 				},
 				{
@@ -308,9 +255,7 @@
 					"summary": "Suite now uses a deliberate hybrid runtime model with two supported startup lanes.",
 					"relativePath": "docs/runtime-control/local-vs-container-ownership.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -319,9 +264,7 @@
 					"summary": "Canonical workstation profile data lives in tools/suite-repo-mcp/workstation-profiles.json.",
 					"relativePath": "docs/runtime-control/mcp-workstation-matrix.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -330,9 +273,7 @@
 					"summary": "This is the canonical Runtime Control note for the workstation-local project standards review handoff.",
 					"relativePath": "docs/runtime-control/project-standards-native-review.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -341,9 +282,7 @@
 					"summary": "Use this when setting up Suite on a new Windows workstation or when standardizing an existing machine onto the cross-workstation layout.",
 					"relativePath": "docs/runtime-control/workstation-bringup.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -352,10 +291,7 @@
 					"summary": "Use this when moving active development between Windows workstations and you want the destination machine to pick up:",
 					"relativePath": "docs/runtime-control/workstation-transfer-runbook.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runbook",
-						"runtime-control"
-					],
+					"tags": ["runbook", "runtime-control"],
 					"startHere": false
 				}
 			]
@@ -372,9 +308,7 @@
 					"summary": "This section is the canonical home for AutoCAD execution, local CAD transport, and workstation-CAD integration references.",
 					"relativePath": "docs/cad/README.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": true
 				},
 				{
@@ -383,10 +317,7 @@
 					"summary": "This note is the canonical inventory of local-only Autodesk material under C:\\Program Files\\Autodesk\\AutoCAD 2026 that is useful to Suite architecture and CAD/runtime work.",
 					"relativePath": "docs/cad/autodesk-local-install-reference.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"autodesk",
-						"cad-local"
-					],
+					"tags": ["autodesk", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -395,10 +326,7 @@
 					"summary": "This is the canonical comparison between Autodesk's built-in standards surfaces and Suite's standards-checker workflow.",
 					"relativePath": "docs/cad/autodesk-standards-checker-comparison.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"autodesk",
-						"cad-local"
-					],
+					"tags": ["autodesk", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -407,10 +335,7 @@
 					"summary": "Status: this is a compatibility/reference doc for backend-served local AutoCAD status and coordinates endpoints. Project setup/title block local actions no longer use a backend-owned folder-picker model; they go through ",
 					"relativePath": "docs/cad/coordinates-grabber-api.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"api",
-						"cad-local"
-					],
+					"tags": ["api", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -419,9 +344,7 @@
 					"summary": "This is the canonical runtime note for the Drawing Cleanup workflow that now lives inside Batch Find & Replace.",
 					"relativePath": "docs/cad/drawing-cleanup.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": false
 				},
 				{
@@ -430,9 +353,7 @@
 					"summary": "Status: this is the canonical low-level reference for explicit diagnostic/manual bridge validation. Project setup/title block, project standards review, AutoDraft / automation-recipe markup apply, terminal authoring prev",
 					"relativePath": "docs/cad/named-pipe-bridge.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": false
 				}
 			]
@@ -449,9 +370,7 @@
 					"summary": "This section is for operational and support docs. It is not the canonical home for runtime architecture when an owning section already exists.",
 					"relativePath": "docs/development/README.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": true
 				},
 				{
@@ -460,12 +379,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the installed Autodesk CHM help.",
 					"relativePath": "docs/development/AutoCAD Electrical 2026 AutoLISP Reference API Documentation.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"api",
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["api", "autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -474,11 +388,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the installed Autodesk AutoCAD Electrical payload on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-installation-context-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -487,11 +397,7 @@
 					"summary": "Generated at 2026-04-02T17:24:57.376Z.",
 					"relativePath": "docs/development/autocad-electrical-2026-reference-pack.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -500,11 +406,7 @@
 					"summary": "Generated from allowlisted wrapped Autodesk Offline Help payloads under C:\\Program Files\\Autodesk\\Offline Help for AutoCAD Electrical 2026 - English. This focused reference is the authoritative Suite-side doc for ACADE p",
 					"relativePath": "docs/development/autocad-electrical-2026-project-flow-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -513,11 +415,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the local ACADE install summary on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-regression-fixtures.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -526,11 +424,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the locally installed ACADE reference set on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-suite-integration-playbook.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -539,9 +433,7 @@
 					"summary": "Right now your data flow is: Supabase metadata → React UI. You'd want to move to: DWG files on disk → .NET AutoCAD backend extracts real data → API serves it → React renders it.",
 					"relativePath": "docs/development/block-library-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -550,9 +442,7 @@
 					"summary": "Command Center is the developer-only diagnostics toolshed for Suite.",
 					"relativePath": "docs/development/command-center.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -561,10 +451,7 @@
 					"summary": "This runbook now documents the post-cutover state for conduit terminal label sync. The staged bridge rollout is complete; dotnet-backed label sync now uses the in-process ACADE host, and the old bridge endpoint remains o",
 					"relativePath": "docs/development/conduit-terminal-label-sync-rollout.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"rollout"
-					],
+					"tags": ["developer-workshop", "rollout"],
 					"startHere": false
 				},
 				{
@@ -573,9 +460,7 @@
 					"summary": "This document defines the permanent documentation move/archive policy for Suite.",
 					"relativePath": "docs/development/documentation-structure.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -584,10 +469,7 @@
 					"summary": "Use this before the first focused test pass of the new R3P Electrical v1 drawing-program workflow.",
 					"relativePath": "docs/development/electrical-drawing-program-test-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -596,9 +478,7 @@
 					"summary": "This is the canonical long-term handoff and planning note for the current Suite overhaul.",
 					"relativePath": "docs/development/long-term-overhaul-todo-plan.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -607,9 +487,7 @@
 					"summary": "This is the \"for later\" backlog for turning Suite into something customers can pay for.",
 					"relativePath": "docs/development/monetization-readiness-backlog.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -618,10 +496,7 @@
 					"summary": "Use this when automation needs access to protected /app/ routes without",
 					"relativePath": "docs/development/playwright-auth-bootstrap.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"auth",
-						"developer-workshop"
-					],
+					"tags": ["auth", "developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -630,9 +505,7 @@
 					"summary": "Use this note to start the next chat without depending on thread memory.",
 					"relativePath": "docs/development/post-bridge-tranche-handoff-2026-04-03.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -641,9 +514,7 @@
 					"summary": "This note captures the immediate backlog split after the project-setup/title-block cutover tranche. It is a planning bucket list, not a canonical runtime architecture spec.",
 					"relativePath": "docs/development/post-overhaul-feature-backlog.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -652,10 +523,7 @@
 					"summary": "Use this checklist before exposing the app to non-dev users.",
 					"relativePath": "docs/development/public-rollout-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"rollout"
-					],
+					"tags": ["developer-workshop", "rollout"],
 					"startHere": false
 				},
 				{
@@ -664,9 +532,7 @@
 					"summary": "This playbook cleans tracked build artifacts from git history going forward without deleting your local working files.",
 					"relativePath": "docs/development/repo-hygiene-playbook.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -675,10 +541,7 @@
 					"summary": "Suite now treats local and hosted Supabase as explicit targets instead of one blended runtime.",
 					"relativePath": "docs/development/supabase-local-hosted-workflow.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"supabase"
-					],
+					"tags": ["developer-workshop", "supabase"],
 					"startHere": false
 				},
 				{
@@ -687,9 +550,7 @@
 					"summary": "Scope: dashboard, changelog, projects, Ground Grid, Coordinates, Conduit, AutoDraft, Graph, Architecture, and developer support surfaces",
 					"relativePath": "docs/development/ui-overhaul-audit-2026-03-18.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -698,9 +559,7 @@
 					"summary": "This repo can use Vercel for a frontend-only preview deployment.",
 					"relativePath": "docs/development/vercel-frontend-preview.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				}
 			]
@@ -717,9 +576,7 @@
 					"summary": "This section is the canonical home for auth, passkey, Supabase security, and secrets guidance.",
 					"relativePath": "docs/security/README.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": true
 				},
 				{
@@ -728,11 +585,7 @@
 					"summary": "2. Auth method telemetry expansion",
 					"relativePath": "docs/security/auth-readiness-checklist.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"checklist",
-						"security-auth"
-					],
+					"tags": ["auth", "checklist", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -741,10 +594,7 @@
 					"summary": "Auth method telemetry is written to activitylog.action with this format:",
 					"relativePath": "docs/security/auth-telemetry.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"security-auth"
-					],
+					"tags": ["auth", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -753,9 +603,7 @@
 					"summary": "This project uses environment variables for runtime configuration and keeps secrets out of source control.",
 					"relativePath": "docs/security/environment-and-secrets.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -764,10 +612,7 @@
 					"summary": "Passkeys are the target primary login method, but rollout should avoid lockout risk and preserve operational stability.",
 					"relativePath": "docs/security/passkey-rollout-plan.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"rollout",
-						"security-auth"
-					],
+					"tags": ["rollout", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -776,10 +621,7 @@
 					"summary": "This is the canonical auth reference for Suite after agent retirement.",
 					"relativePath": "docs/security/auth-architecture-canonical.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"security-auth"
-					],
+					"tags": ["auth", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -788,9 +630,7 @@
 					"summary": "This document is the Suite-side source of truth for external passkey callback wiring.",
 					"relativePath": "docs/security/passkey-external-callback-contract.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -799,10 +639,7 @@
 					"summary": "This is the execution flow to apply Suite database/storage hardening and verify isolation.",
 					"relativePath": "docs/security/supabase-apply-and-verify.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -811,11 +648,7 @@
 					"summary": "Browser or terminal logs can repeat:",
 					"relativePath": "docs/security/supabase-clock-skew-runbook.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"runbook",
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["runbook", "security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -824,11 +657,7 @@
 					"summary": "Use this when Supabase returns 429 email rate limit exceeded for auth emails.",
 					"relativePath": "docs/security/supabase-custom-smtp-runbook.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"runbook",
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["runbook", "security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -837,10 +666,7 @@
 					"summary": "This runbook applies row-level security hardening for user-owned records (projects, tasks, files, calendar events, activity logs, settings).",
 					"relativePath": "docs/security/supabase-rls-hardening.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["security-auth", "supabase"],
 					"startHere": false
 				}
 			]
@@ -857,9 +683,7 @@
 					"summary": "This section is for historical notes only. Files here may explain how older implementations worked, but they should not be treated as the canonical guide for active development.",
 					"relativePath": "docs/archive/legacy/README.md",
 					"sectionId": "legacy-archive",
-					"tags": [
-						"legacy-archive"
-					],
+					"tags": ["legacy-archive"],
 					"startHere": true
 				},
 				{
@@ -868,10 +692,7 @@
 					"summary": "Historical-only note. This document should not be used as the implementation guide for active AutoWire work.",
 					"relativePath": "docs/archive/legacy/autowire-legacy-artifacts-archive.md",
 					"sectionId": "legacy-archive",
-					"tags": [
-						"automation",
-						"legacy-archive"
-					],
+					"tags": ["automation", "legacy-archive"],
 					"startHere": false
 				}
 			]
@@ -888,20 +709,16 @@
 					"summary": "This is the canonical entry point for repository documentation. People and tooling should start here, then move into the owning section README before drilling into individual notes.",
 					"relativePath": "docs/README.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": true
 				},
 				{
 					"id": "docs-app-feature-ideas-md",
 					"title": "App Feature Ideas",
-					"summary": "Shared drive resources and specifications — we are only using \"Electrical\" so we would have to talk further this is our drawing list standard",
+					"summary": "G:\\Shared drives\\Company Resources\\SPECIFICATIONS\\DRAFTING we are only using \"Electrical\" so we would have to talk further this is our drawing list standard",
 					"relativePath": "docs/app feature ideas.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -910,9 +727,7 @@
 					"summary": "This note is the opinionated filter layer on top of App Feature Ideas.",
 					"relativePath": "docs/app-feature-roadmap-opinions.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -921,10 +736,7 @@
 					"summary": "Historical note (2026-04-03): conduit-route dotnet-provider actions now use the",
 					"relativePath": "docs/autowire-todo-list.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"automation",
-						"workspace-docs"
-					],
+					"tags": ["automation", "workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -933,9 +745,7 @@
 					"summary": "This backlog captures the deep-scan findings for frontend/backend/.NET and",
 					"relativePath": "docs/deep-repo-hardening-backlog.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -944,9 +754,7 @@
 					"summary": "https://apps.autodesk.com/ACD/en/Detail/Index?id=5349251522304654929&appLang=en&os=Win3264",
 					"relativePath": "docs/info.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -955,9 +763,7 @@
 					"summary": "Date captured: March 10, 2026",
 					"relativePath": "docs/performance-baseline.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				},
 				{
@@ -966,9 +772,7 @@
 					"summary": "This document captures the exact root causes and code changes made to stop repeated websocket connect/disconnect behavior in Ground Grid Generation, and to harden API key alignment between Vite frontend and Python backen",
 					"relativePath": "docs/websocket-mount-dismount-fix.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": false
 				}
 			]

@@ -131,17 +131,17 @@ describe("TransmittalBuilderApp", () => {
 				projectOptions: [
 					{
 						id: "project-1",
-						name: "Nanulak",
+						name: "MyProject",
 						description: "Substation package",
 						projectPeName: "Jamie River, PE",
 						firmNumber: "AB - Firm #99887",
-						watchdogRootPath: "C:/Projects/Nanulak",
+						watchdogRootPath: "C:/Projects/MyProject",
 					},
 				],
 				draft: {
 					...createState().draft,
 					selectedProjectId: "project-1",
-					projectName: "Nanulak",
+					projectName: "MyProject",
 					standardDocuments: [
 						{
 							id: "doc-1",
@@ -179,7 +179,7 @@ describe("TransmittalBuilderApp", () => {
 				preferredIssueSet: {
 					id: "issue-set-1",
 					projectId: "project-1",
-					name: "Nanulak IFC package",
+					name: "MyProject IFC package",
 					issueTag: "IFC-01",
 					status: "review",
 					targetDate: "2026-03-31",
@@ -188,9 +188,9 @@ describe("TransmittalBuilderApp", () => {
 					registerSnapshotId: "register-1",
 					summary: "Ready for final review.",
 					notes: null,
-					selectedDrawingPaths: ["Issued/R3P-25074-E0-0001 - DRAWING INDEX.dwg"],
+					selectedDrawingPaths: ["Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg"],
 					selectedRegisterRowIds: ["register-row-1"],
-					selectedDrawingNumbers: ["R3P-25074-E0-0001"],
+					selectedDrawingNumbers: ["PROJ-00001-E0-0001"],
 					selectedPdfFileIds: ["file-1"],
 					snapshot: {
 						drawingCount: 1,
@@ -220,7 +220,7 @@ describe("TransmittalBuilderApp", () => {
 		expect(
 			screen.getByText("1 document still needs review before issue."),
 		).toBeTruthy();
-		expect(screen.getByText("Nanulak")).toBeTruthy();
+		expect(screen.getByText("MyProject")).toBeTruthy();
 		expect(screen.getByText("Project metadata ready")).toBeTruthy();
 		expect(screen.getByText(/IFC-01 (?:\||•) 1 row/i)).toBeTruthy();
 		expect(
@@ -234,17 +234,17 @@ describe("TransmittalBuilderApp", () => {
 				projectOptions: [
 					{
 						id: "project-1",
-						name: "Nanulak",
+						name: "MyProject",
 						description: "Substation package",
 						projectPeName: "Jamie River, PE",
 						firmNumber: "AB - Firm #99887",
-						watchdogRootPath: "C:/Projects/Nanulak",
+						watchdogRootPath: "C:/Projects/MyProject",
 					},
 				],
 				draft: {
 					...createState().draft,
 					selectedProjectId: "project-1",
-					projectName: "Nanulak",
+					projectName: "MyProject",
 					transmittalNumber: "XMTL-009",
 					standardDocuments: [
 						{
@@ -304,7 +304,7 @@ describe("TransmittalBuilderApp", () => {
 		);
 
 		expect(
-			screen.getByText("Run the native standards review before issuing Nanulak."),
+			screen.getByText("Run the native standards review before issuing MyProject."),
 		).toBeTruthy();
 		expect(
 			screen.getByText(

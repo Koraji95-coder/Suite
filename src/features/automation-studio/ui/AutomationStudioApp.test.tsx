@@ -26,7 +26,7 @@ vi.mock("@/features/automation-studio/useAutomationStudioState", () => {
       projectOptions: [
         {
           id: "project-1",
-          name: "Nanulak 180MW Substation",
+          name: "MyProject Substation",
           description: "Demo",
           watchdogRootPath: "G:/Drawings",
           pdfPackageRootPath: "G:/Package",
@@ -34,7 +34,7 @@ vi.mock("@/features/automation-studio/useAutomationStudioState", () => {
       ],
       selectedProject: {
         id: "project-1",
-        name: "Nanulak 180MW Substation",
+        name: "MyProject Substation",
         description: "Demo",
         watchdogRootPath: "G:/Drawings",
         pdfPackageRootPath: "G:/Package",
@@ -80,7 +80,7 @@ vi.mock("@/features/automation-studio/useAutomationStudioState", () => {
       latestReceipt: null,
       studioContext: {
         projectId: "project-1",
-        projectName: "Nanulak 180MW Substation",
+        projectName: "MyProject Substation",
         issueSetId: "issue-1",
         issueSetLabel: "IFC-01 / IFC package",
         registerSnapshotId: "snapshot-1",

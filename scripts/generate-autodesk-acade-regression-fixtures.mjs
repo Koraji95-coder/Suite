@@ -50,7 +50,7 @@ function slugify(value) {
 }
 
 function pathFileName(filePath) {
-	return path.basename(String(filePath || ""));
+	return path.basename(toPosix(filePath));
 }
 
 function makeFileEntry(filePath) {

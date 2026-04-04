@@ -1,5 +1,13 @@
 {
-    "recommendations": [
-        "openai.chatgpt"
-    ]
+	"recommendations": [
+		"openai.chatgpt",
+		"github.vscode-github-actions",
+		"github.vscode-pull-request-github",
+		"biomejs.biome",
+		"ms-python.python",
+		"ms-python.vscode-pylance",
+		"ms-vscode.powershell",
+		"ms-dotnettools.csdevkit",
+		"ms-dotnettools.csharp"
+	]
 }

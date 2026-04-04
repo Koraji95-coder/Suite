@@ -10,7 +10,7 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "npm"
+      - "javascript"
 
   - package-ecosystem: "pip"
     directory: "/backend"

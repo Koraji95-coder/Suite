@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { localId } from "@/lib/localId";
 
 export interface SwapRule {
 	id: string;
@@ -44,10 +45,7 @@ export const DEFAULT_SHEET_TYPES = [
 	"LOG",
 ];
 
-export const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+export const createId = () => localId();
 
 export const escapeRegExp = (value: string) =>
 	value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

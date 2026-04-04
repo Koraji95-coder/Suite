@@ -3,6 +3,7 @@ import {
 	mapFetchErrorCode,
 	mapFetchErrorMessage,
 } from "@/lib/fetchWithTimeout";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
@@ -91,14 +92,7 @@ class ConduitTerminalService {
 	}
 
 	private createRequestId(): string {
-		try {
-			if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-				return `terminal-${crypto.randomUUID()}`;
-			}
-		} catch {
-			// Ignore and use timestamp fallback.
-		}
-		return `terminal-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+		return localId("terminal");
 	}
 
 	private async getAccessToken(): Promise<string | null> {

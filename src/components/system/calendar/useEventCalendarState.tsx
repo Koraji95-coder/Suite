@@ -10,6 +10,7 @@ import {
 	subMonths,
 	subWeeks,
 } from "date-fns";
+import { localId } from "@/lib/localId";
 import {
 	type ReactNode,
 	startTransition,
@@ -200,7 +201,7 @@ export function useEventCalendarState({
 		} else {
 			onEventAdd?.({
 				...event,
-				id: Math.random().toString(36).substring(2, 11),
+				id: localId(),
 			});
 		}
 		setIsEventDialogOpen(false);

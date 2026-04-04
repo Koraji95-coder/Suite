@@ -1,5 +1,6 @@
 import { FileArchive, FileText } from "lucide-react";
 import type { ProjectDeliverableRegisterRow } from "@/features/project-delivery";
+import { localId } from "@/lib/localId";
 import {
 	buildProjectMetadataRowsForFiles,
 	type ProjectDocumentMetadataRow,
@@ -276,10 +277,7 @@ export const OUTPUT_FORMATS: Array<{
 	},
 ];
 
-export const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+export const createId = () => localId();
 
 export const formatDate = (value: Date) => {
 	const mm = String(value.getMonth() + 1).padStart(2, "0");

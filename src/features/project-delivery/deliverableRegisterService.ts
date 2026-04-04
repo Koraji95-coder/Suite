@@ -1,5 +1,6 @@
 import type { CellValue, Worksheet } from "exceljs";
 import type { ProjectFile } from "@/features/project-core";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { deleteSetting, loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
@@ -116,11 +117,7 @@ const deliverableRegisterFetchCache = createProjectScopedFetchCache<{
 }>();
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `deliverable-register-${Date.now()}-${Math.random()
-				.toString(16)
-				.slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

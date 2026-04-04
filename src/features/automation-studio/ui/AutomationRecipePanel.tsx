@@ -35,12 +35,11 @@ import {
   projectMarkupSnapshotService,
   type ProjectMarkupSnapshotRecord,
 } from "@/services/projectMarkupSnapshotService";
+import { localId } from "@/lib/localId";
 import styles from "./AutomationRecipePanel.module.css";
 
-function createLocalId(prefix: string) {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createLocalId() {
+  return localId();
 }
 
 function buildRecipeMode(args: {
@@ -131,10 +130,10 @@ export function AutomationRecipePanel({
   const { showToast } = useToast();
   const [simulateOnCopy, setSimulateOnCopy] = useState(true);
   const [workPackageId, setWorkPackageId] = useState<string>(() =>
-    createLocalId("work-package"),
+    createLocalId(),
   );
   const [recipeId, setRecipeId] = useState<string>(() =>
-    createLocalId("recipe"),
+    createLocalId(),
   );
   const [enabledSources, setEnabledSources] = useState({
     autodraft: false,
@@ -169,9 +168,9 @@ export function AutomationRecipePanel({
 
   useEffect(() => {
     setWorkPackageId(
-      selectedIssueSet?.workPackageId || createLocalId("work-package"),
+      selectedIssueSet?.workPackageId || createLocalId(),
     );
-    setRecipeId(selectedIssueSet?.recipeSnapshotId || createLocalId("recipe"));
+    setRecipeId(selectedIssueSet?.recipeSnapshotId || createLocalId());
   }, [
     selectedIssueSet?.recipeSnapshotId,
     selectedIssueSet?.workPackageId,

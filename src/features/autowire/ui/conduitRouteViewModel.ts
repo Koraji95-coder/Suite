@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import {
 	DEFAULT_WIRE_FUNCTIONS,
 	SECTION_METRICS,
@@ -32,7 +33,7 @@ export function formatLength(length: number): string {
 }
 
 export function makeRouteId(): string {
-	return `route_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+	return localId("route");
 }
 
 export function toCsvValue(value: string | number): string {

@@ -4,6 +4,7 @@ import {
 	mapFetchErrorMessage,
 	parseResponseErrorMessage,
 } from "@/lib/fetchWithTimeout";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/supabase/client";
 import type {
@@ -27,14 +28,7 @@ class ConduitRouteService {
 	}
 
 	private createRequestId(): string {
-		try {
-			if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-				return `conduit-${crypto.randomUUID()}`;
-			}
-		} catch {
-			// Ignore and use timestamp fallback.
-		}
-		return `conduit-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+		return localId("conduit");
 	}
 
 	private async getAccessToken(): Promise<string | null> {

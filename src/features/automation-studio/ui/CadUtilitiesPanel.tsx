@@ -29,15 +29,13 @@ import type {
   CadUtilityAutomationDrawingSummary,
   CadUtilityAutomationSnapshot,
 } from "@/features/automation-studio";
+import { localId } from "@/lib/localId";
 import styles from "./CadUtilitiesPanel.module.css";
 
 const DEFAULT_BLOCK_NAME_HINT = "R3P-24x36BORDER&TITLE";
 
 const createRule = (): CadReplaceRule => ({
-  id:
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `cad-rule-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  id: localId(),
   find: "",
   replace: "",
   useRegex: false,

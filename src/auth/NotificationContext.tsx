@@ -11,6 +11,7 @@ import {
 	useContext,
 	useState,
 } from "react";
+import { localId } from "@/lib/localId";
 import { logger } from "../lib/logger";
 
 export type NotificationType = "success" | "error" | "warning" | "info";
@@ -47,11 +48,7 @@ const DEFAULT_DURATION = 5000;
 export function NotificationProvider({ children }: { children: ReactNode }) {
 	const [notifications, setNotifications] = useState<Notification[]>([]);
 
-	const generateId = useCallback(
-		() =>
-			`notification-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-		[],
-	);
+	const generateId = useCallback(() => localId(), []);
 
 	const dismissNotification = useCallback((id: string) => {
 		setNotifications((prev) => prev.filter((n) => n.id !== id));

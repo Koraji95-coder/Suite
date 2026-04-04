@@ -129,7 +129,11 @@ export function makeCadSessionId(): string {
 	} catch {
 		// Ignore and use timestamp fallback.
 	}
-	return `cad-session-${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join("")}`;
+	const bytes = crypto.getRandomValues(new Uint8Array(4));
+	const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
+		"",
+	);
+	return `cad-session-${Date.now()}-${hex}`;
 }
 
 export function makeRouteId(): string {

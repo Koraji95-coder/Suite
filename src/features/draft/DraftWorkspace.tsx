@@ -1,5 +1,4 @@
 import { ArrowUpRight, FolderKanban, Replace, SquareLibrary, Wrench } from "lucide-react";
-import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/useAuth";
 import { PageContextBand } from "@/components/system/PageContextBand";
@@ -57,14 +56,11 @@ export function DraftWorkspace() {
 	const { user } = useAuth();
 	const showDeveloperLabs = isDevAudience(user);
 	const releasedCount = RELEASED_TOOLS.length;
-	const laneSignals = useMemo(
-		() => [
-			`${releasedCount} released drafting surface${releasedCount === 1 ? "" : "s"}`,
-			"Release and transmittal context stays inside Projects",
-			"Labs stay behind Developer until they pass the readiness gate",
-		],
-		[releasedCount],
-	);
+	const laneSignals = [
+		`${releasedCount} released drafting surface${releasedCount === 1 ? "" : "s"}`,
+		"Release and transmittal context stays inside Projects",
+		"Labs stay behind Developer until they pass the readiness gate",
+	];
 
 	return (
 		<div className={styles.root}>

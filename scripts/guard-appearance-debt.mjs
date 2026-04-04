@@ -37,7 +37,6 @@ const visualInlineStyleAllowlist = new Set(
 		"src/routes/developer/control/command-center/CommandCenterPage.tsx",
 		"src/routes/settings/SettingsPage.tsx",
 		"src/routes/settings/AccountSettings.tsx",
-		"src/routes/settings/EmailConfig.tsx",
 	].map(normalizeRelPath),
 );
 

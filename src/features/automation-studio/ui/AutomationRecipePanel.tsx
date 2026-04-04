@@ -21,6 +21,12 @@ import {
   type ProjectAutomationWorkPackageRecord,
 } from "@/services/projectAutomationRecipeService";
 import { projectCadWritePassService } from "@/services/projectCadWritePassService";
+import type {
+  AutoDraftAutomationSnapshot,
+  AutomationStudioContext,
+  AutoWireAutomationSnapshot,
+  CadUtilityAutomationSnapshot,
+} from "@/features/automation-studio/models";
 import {
   projectIssueSetService,
   type ProjectIssueSetRecord,
@@ -29,12 +35,6 @@ import {
   projectMarkupSnapshotService,
   type ProjectMarkupSnapshotRecord,
 } from "@/services/projectMarkupSnapshotService";
-import type {
-  AutoDraftAutomationSnapshot,
-  AutomationStudioContext,
-  AutoWireAutomationSnapshot,
-  CadUtilityAutomationSnapshot,
-} from "@/features/automation-studio";
 import styles from "./AutomationRecipePanel.module.css";
 
 function createLocalId(prefix: string) {

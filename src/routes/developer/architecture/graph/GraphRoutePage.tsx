@@ -1,6 +1,5 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { GraphVisualization } from "@/features/graph/ui/GraphVisualization";
-import type { SourceFilter } from "@/features/graph/ui/types";
 import { PageFrame } from "@/components/system/PageFrame";
 import { useRegisterPageHeader } from "@/components/system/PageHeaderContext";
 import { Badge } from "@/components/system/base/Badge";
@@ -13,10 +12,6 @@ import {
 } from "@/data/architectureModel";
 import styles from "./GraphRoutePage.module.css";
 
-function parseSourceFilter(_value: string | null): SourceFilter {
-	return "architecture";
-}
-
 export default function GraphRoutePage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	useRegisterPageHeader({
@@ -24,10 +19,7 @@ export default function GraphRoutePage() {
 		subtitle:
 			"Alternate node-link view over the architecture model used by Architecture Map.",
 	});
-	const sourceFilter = parseSourceFilter(searchParams.get("source"));
 	const searchQuery = searchParams.get("query") ?? "";
-
-	const setFilter = (_value: SourceFilter) => {};
 
 	const setQuery = (value: string) => {
 		const next = new URLSearchParams(searchParams);
@@ -86,8 +78,6 @@ export default function GraphRoutePage() {
 				<Panel variant="default" padding="md" className={styles.graphShell}>
 					<div className={styles.graphViewport}>
 						<GraphVisualization
-							sourceFilter={sourceFilter}
-							onSourceFilterChange={setFilter}
 							searchQuery={searchQuery}
 							onSearchQueryChange={setQuery}
 						/>

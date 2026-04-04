@@ -17,7 +17,6 @@
 
 ## Active Code Roots
 
-- `src/features/project-review/index.ts`
 - `src/features/project-review/descriptors.ts`
 - `src/features/project-review/ProjectReadinessWorkspace.tsx`
 - `src/features/project-review/ProjectReviewInboxWorkspace.tsx`

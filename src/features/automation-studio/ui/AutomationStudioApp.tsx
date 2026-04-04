@@ -15,6 +15,21 @@ import { AutoDraftComparePanel } from "@/features/autodraft-studio/ui/AutoDraftC
 import { AutomationRecipePanel } from "@/features/automation-studio/ui/AutomationRecipePanel";
 import { CadUtilitiesPanel } from "@/features/automation-studio/ui/CadUtilitiesPanel";
 import { TerminalAuthoringPanel } from "@/features/automation-studio/ui/TerminalAuthoringPanel";
+import {
+  type AutoDraftAutomationSnapshot,
+  type AutoWireAutomationSnapshot,
+  type AutomationBindingKind,
+  type AutomationQueueItem,
+  type AutomationStudioTab,
+  type AutomationWorkbenchMode,
+  type CadUtilityAutomationSnapshot,
+} from "@/features/automation-studio/models";
+import {
+  buildAutomationPlanSummary,
+  buildAutomationReceiptSummary,
+  buildUnifiedAutomationQueue,
+} from "@/features/automation-studio/selectors";
+import { useAutomationStudioState } from "@/features/automation-studio/useAutomationStudioState";
 import { PageContextBand } from "@/components/system/PageContextBand";
 import { PageFrame, Section } from "@/components/system/PageFrame";
 import { ProjectWorkflowLinks } from "@/components/system/ProjectWorkflowLinks";
@@ -24,19 +39,6 @@ import { Button } from "@/components/system/base/Button";
 import { Panel } from "@/components/system/base/Panel";
 import { buildProjectIssueSetAppHref } from "@/lib/projectWorkflowNavigation";
 import { projectAutomationReceiptService } from "@/services/projectAutomationReceiptService";
-import {
-  buildAutomationPlanSummary,
-  buildAutomationReceiptSummary,
-  buildUnifiedAutomationQueue,
-  AutoDraftAutomationSnapshot,
-  AutoWireAutomationSnapshot,
-  AutomationBindingKind,
-  AutomationQueueItem,
-  AutomationStudioTab,
-  AutomationWorkbenchMode,
-  CadUtilityAutomationSnapshot,
-  useAutomationStudioState,
-} from "@/features/automation-studio";
 import styles from "./AutomationStudioApp.module.css";
 
 const STAGE_COPY: Record<

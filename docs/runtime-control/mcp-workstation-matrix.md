@@ -128,6 +128,8 @@ If a machine is not listed in the matrix, the sync helper falls back to:
 
 These can be added to `config.toml` alongside `suite_repo_mcp`. See `tools/suite-repo-mcp/examples/dustin-home-workstation.toml` for the full reference config.
 
+### Core Companions
+
 | Server | What it adds |
 | --- | --- |
 | `@modelcontextprotocol/server-github` | Issues, PRs, commits, repo browsing |
@@ -135,6 +137,106 @@ These can be added to `config.toml` alongside `suite_repo_mcp`. See `tools/suite
 | `@modelcontextprotocol/server-fetch` | Web page retrieval for docs/reference |
 | `@modelcontextprotocol/server-memory` | Persistent cross-session knowledge |
 | `chrome-devtools-mcp` | Live browser inspection/debugging |
+
+### Future / ML / Data Science Companions
+
+| Server | When to activate | What it adds |
+| --- | --- | --- |
+| `jupyter-mcp-server` | ML pilot lane active | Notebook execution, kernel management |
+| `@modelcontextprotocol/server-postgres` | Direct Supabase introspection needed | SQL queries, schema browsing |
+| `@modelcontextprotocol/server-docker` | Container management needed | Docker lifecycle, logs, exec |
+
+## Future-Proofing: ML & Data Science
+
+Suite's ML roadmap is documented in `docs/backend/local-learning-opportunities.md`. The recommended stack order:
+
+### Stack Progression
+
+| Technology | When to use | Suite domain |
+| --- | --- | --- |
+| **scikit-learn** (installed) | First. Tabular features, small datasets, fast training | `transmittal_titleblock`, `autodraft_replacement`, watchdog anomaly |
+| **PyTorch** | Second. Image crops, multi-modal, sequence modeling | `autodraft_markup`, title-block crop classification |
+| **TensorFlow/Keras** | Alternative to PyTorch when TFLite/Keras deployment matters | Same domains as PyTorch |
+| **Anaconda/conda** | ML dependencies conflict with Flask API deps | Environment isolation for training workloads |
+| **Jupyter** | Training experimentation, model evaluation | All ML domains |
+| **pandas** (installed) | Tabular data wrangling for ML features | All ML domains |
+| **NumPy** | Core numerical operations | All ML domains |
+
+### MCP Tools for ML Work
+
+| Tool | Description |
+| --- | --- |
+| `repo.check_python_env` | Check Python version, ML packages, conda, Jupyter availability |
+| `repo.run_python_tests` | Run pytest on backend/ML tests |
+| `repo.run_backend_tests` | Run unittest discovery on backend modules |
+
+### MCP Prompts for ML Work
+
+| Prompt | Description |
+| --- | --- |
+| `repo.ml_pilot_planning` | Planning prompt with ML stack order, domains, and guardrails |
+
+### MCP Resources for ML Work
+
+| Resource URI | Description |
+| --- | --- |
+| `repo://docs/backend/local-learning-opportunities` | Concrete ML opportunities and stack recommendations |
+| `repo://docs/development/post-overhaul-feature-backlog` | Where ML fits in the feature backlog |
+
+## Future-Proofing: Autodesk API & AutoCAD
+
+Suite's AutoCAD integration spans COM bridge, .NET plugin, and potential cloud API work. The relevant MCP surfaces:
+
+### Current AutoCAD Integration Points
+
+| Layer | Technology | Status |
+| --- | --- | --- |
+| COM/pywin32 bridge | Flask → AutoCAD process | Active, stable |
+| .NET plugin (WatchdogCadTracker) | In-process ObjectARX/.NET | Active, production |
+| Named-pipe bridge | .NET ↔ Python IPC | Opt-in, manual only |
+| AutoLISP/Visual LISP | In-process scripting | Reference only |
+
+### Future Autodesk API Considerations
+
+| API | What it enables | When to pursue |
+| --- | --- | --- |
+| **APS Design Automation** | Headless batch CAD processing in the cloud | When a concrete batch use case exists (plot-to-PDF, metadata extraction) |
+| **APS Model Derivative** | Cloud-based model translation and viewing | When web-based DWG viewing is needed |
+| **APS Viewer** | Embeddable 3D/2D viewer for web | When in-browser CAD preview becomes a product lane |
+| **AutoCAD .NET API (ObjectARX)** | Deep in-process plugin beyond WatchdogCadTracker | When new plugin features are needed |
+| **AutoCAD Electrical API** | ACADE-specific commands (AEPROJECT, etc.) | Active via integration playbook |
+
+### MCP Prompts for Autodesk Work
+
+| Prompt | Description |
+| --- | --- |
+| `repo.autodesk_api_planning` | Planning prompt with integration architecture and API landscape |
+
+### MCP Resources for Autodesk Work
+
+| Resource URI | Description |
+| --- | --- |
+| `repo://docs/cad/autodesk-local-install-reference` | Local install inventory and sample assets |
+| `repo://docs/cad/coordinates-grabber-api` | Flask-to-COM bridge reference |
+| `repo://docs/cad/autodesk-standards-checker-comparison` | Standards checking comparison |
+
+## Codex CLI Quick Reference
+
+When launching Codex for advanced Suite tasks, use these extras:
+
+```bash
+# Full-auto mode with filesystem write permissions
+codex --approval-mode full-auto --sandbox-permissions filesystem:write
+
+# Fast iteration (lint, type, small fixes)
+codex --model o4-mini
+
+# Complex refactors, architecture changes
+codex --model o3
+
+# MCP-aware invocation (loads all suite_repo_mcp tools)
+codex --mcp-config %USERPROFILE%\.codex\config.toml
+```
 
 ## Profiles
 

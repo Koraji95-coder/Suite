@@ -199,6 +199,46 @@ const STATIC_RESOURCES = [
 		mimeType: "text/markdown",
 		filePath: path.join(REPO_ROOT, "docs", "deep-repo-hardening-backlog.md"),
 	},
+	{
+		uri: "repo://docs/backend/local-learning-opportunities",
+		name: "Local Learning Opportunities (ML Pilots)",
+		description:
+			"Concrete ML opportunities for Suite: scikit-learn confidence scoring, PyTorch markup classification, anomaly detection, and recommended stack order.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "backend", "local-learning-opportunities.md"),
+	},
+	{
+		uri: "repo://docs/development/post-overhaul-feature-backlog",
+		name: "Post-Overhaul Feature Backlog",
+		description:
+			"Immediate feature backlog after overhaul including ML pilot candidates and Autodesk API exploration items.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "development", "post-overhaul-feature-backlog.md"),
+	},
+	{
+		uri: "repo://docs/cad/autodesk-local-install-reference",
+		name: "Autodesk Local Install Reference",
+		description:
+			"Canonical inventory of local Autodesk install material useful for Suite CAD/runtime integration, including sample projects, catalogs, Design Automation manifests, and COM/ActiveX references.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "cad", "autodesk-local-install-reference.md"),
+	},
+	{
+		uri: "repo://docs/cad/coordinates-grabber-api",
+		name: "Coordinates Grabber API (CAD Bridge)",
+		description:
+			"Flask backend CAD bridge reference: COM connection management, AutoCAD status endpoints, selection, layers, transmittal rendering, and WebSocket events.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "cad", "coordinates-grabber-api.md"),
+	},
+	{
+		uri: "repo://docs/cad/autodesk-standards-checker-comparison",
+		name: "Autodesk Standards Checker Comparison",
+		description:
+			"Comparison of Autodesk built-in standards checker vs Suite standards checking approach for CAD drawing validation.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "cad", "autodesk-standards-checker-comparison.md"),
+	},
 ];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";
 const SUPPORTED_PROTOCOL_VERSIONS = new Set([
@@ -2596,6 +2636,82 @@ async function toolArchitectureVerify() {
 	return createTextResult(summarizeResult(result), !result.ok);
 }
 
+async function toolRunPythonTests(args = {}) {
+	const target = typeof args.target === "string" ? args.target.trim() : "";
+	const commandArgs = ["-m", "pytest", "-v"];
+	if (target) commandArgs.push(target);
+	else commandArgs.push("backend/tests");
+	const result = await runProcess("python", commandArgs, { timeoutMs: 180_000 });
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
+async function toolCheckPythonEnv() {
+	const checks = [];
+
+	const pythonVersion = await runProcess("python", ["--version"], { timeoutMs: 5_000 });
+	checks.push(`Python: ${(pythonVersion.stdout || pythonVersion.stderr || "not found").trim()}`);
+
+	const pipList = await runProcess("python", ["-m", "pip", "list", "--format=columns"], { timeoutMs: 15_000 });
+	const installed = (pipList.stdout || "").trim();
+
+	const mlPackages = ["scikit-learn", "torch", "torchvision", "tensorflow", "pandas", "numpy", "joblib", "Pillow", "pytesseract"];
+	const found = [];
+	const missing = [];
+	for (const pkg of mlPackages) {
+		if (installed.toLowerCase().includes(pkg.toLowerCase())) {
+			const match = installed.split(/\r?\n/).find((line) => line.toLowerCase().startsWith(pkg.toLowerCase()));
+			found.push(match?.trim() || pkg);
+		} else {
+			missing.push(pkg);
+		}
+	}
+
+	checks.push("");
+	checks.push("## ML/Data Packages");
+	if (found.length) {
+		checks.push("Installed:");
+		for (const pkg of found) checks.push(`  ✅ ${pkg}`);
+	}
+	if (missing.length) {
+		checks.push("Not installed:");
+		for (const pkg of missing) checks.push(`  ⬜ ${pkg}`);
+	}
+
+	const condaCheck = await runProcess("conda", ["--version"], { timeoutMs: 5_000 });
+	if (condaCheck.code === 0) {
+		checks.push("");
+		checks.push(`Conda: ${(condaCheck.stdout || "").trim()}`);
+		const condaEnvs = await runProcess("conda", ["env", "list"], { timeoutMs: 10_000 });
+		if (condaEnvs.ok) {
+			checks.push("Conda environments:");
+			checks.push((condaEnvs.stdout || "").trim());
+		}
+	} else {
+		checks.push("");
+		checks.push("Conda: not installed");
+	}
+
+	const jupyterCheck = await runProcess("jupyter", ["--version"], { timeoutMs: 5_000 });
+	if (jupyterCheck.code === 0) {
+		checks.push("");
+		checks.push(`Jupyter: ${(jupyterCheck.stdout || "").trim()}`);
+	} else {
+		checks.push("");
+		checks.push("Jupyter: not installed");
+	}
+
+	return createTextResult(checks.join("\n"));
+}
+
+async function toolRunBackendTests(args = {}) {
+	const module = typeof args.module === "string" ? args.module.trim() : "";
+	const commandArgs = ["-m", "unittest"];
+	if (module) commandArgs.push(module);
+	else commandArgs.push("discover", "-s", "backend/tests", "-p", "test_*.py");
+	const result = await runProcess("python", commandArgs, { timeoutMs: 120_000 });
+	return createTextResult(summarizeResult(result), !result.ok);
+}
+
 const PROMPTS = {
 	"repo.pr_description": {
 		description: "Generate a structured PR description for this repo.",
@@ -2802,6 +2918,86 @@ Use this prompt when starting a new tranche of work.
 - Expected validation commands
 - Exit criteria
 - Handoff note location
+`,
+	},
+	"repo.ml_pilot_planning": {
+		description:
+			"Prompt for planning ML pilot work using local learning docs, stack recommendations, and guardrails.",
+		template: () => `## ML Pilot Planning
+
+Use this prompt when starting ML-related work in Suite.
+
+### Input Sources
+1. Read \`docs/backend/local-learning-opportunities.md\` for concrete ML opportunities and stack order
+2. Read \`docs/app-feature-roadmap-opinions.md\` (Scikit-learn And PyTorch section) for product-level opinions
+3. Read \`docs/development/post-overhaul-feature-backlog.md\` for where ML fits in the backlog
+4. Run \`repo.check_python_env\` to see what ML packages are already installed
+
+### ML Stack Order
+1. **scikit-learn first** — tabular features, small training sets, fast local training, explainable
+2. **PyTorch second** — image crops, multi-modal signals, sequence modeling, larger reviewed datasets
+3. **TensorFlow** — alternative to PyTorch when Keras/TFLite deployment matters or team preference
+4. **Anaconda/conda** — environment isolation when ML dependencies conflict with Flask API dependencies
+
+### Active Learning Domains
+- \`transmittal_titleblock\` — confidence scoring on title-block extraction
+- \`autodraft_markup\` — markup intent classification
+- \`autodraft_replacement\` — replacement candidate ranking
+- \`watchdog_anomaly\` — anomaly detection on telemetry
+
+### Guardrails
+- ML is advisory only; never replaces deterministic CAD geometry or business-rule enforcement
+- Learning data and model artifacts stay local-only unless explicitly promoted
+- ML must not silently override promoted local model output
+- Keep deterministic extraction as the primary path
+- Every ML feature needs a confidence threshold and a "needs review" fallback
+
+### Recommended First Pilots
+1. \`transmittal_titleblock\` confidence scoring with scikit-learn
+2. \`autodraft_replacement\` candidate ranking refinement
+3. Watchdog anomaly detection (Isolation Forest)
+
+### Validation
+- \`python -m pytest backend/tests\`
+- \`npm run check\`
+- Model artifact isolation confirmed
+`,
+	},
+	"repo.autodesk_api_planning": {
+		description:
+			"Prompt for planning Autodesk API and AutoCAD integration work.",
+		template: () => `## Autodesk API & AutoCAD Integration Planning
+
+Use this prompt when working on AutoCAD/AutoCAD Electrical integration.
+
+### Input Sources
+1. Read \`docs/cad/autodesk-local-install-reference.md\` for local install inventory
+2. Read \`docs/cad/coordinates-grabber-api.md\` for the current Flask-to-COM bridge
+3. Read \`docs/cad/autodesk-standards-checker-comparison.md\` for standards checking approach
+4. Read \`docs/development/autocad-electrical-2026-suite-integration-playbook.md\` for integration guidance
+5. Read \`docs/cad/named-pipe-bridge.md\` for the .NET named-pipe bridge architecture
+
+### Integration Architecture
+- **COM/pywin32**: current local bridge for status, layers, selection, coordinates
+- **.NET plugin (WatchdogCadTracker)**: in-process AutoCAD plugin for session/drawing events
+- **Named pipe bridge**: optional .NET-to-Python IPC for advanced command dispatch
+- **Design Automation API (APS)**: Autodesk cloud-hosted batch processing for headless jobs
+- **AutoLISP**: in-process scripting for lightweight automation inside AutoCAD
+
+### Key Autodesk APIs To Consider
+- **APS (Autodesk Platform Services)**: cloud viewer, model derivative, design automation
+- **AutoCAD .NET API**: in-process plugin via ObjectARX/.NET
+- **AutoCAD Electrical API**: ACADE-specific commands (AEPROJECT, AEUPDATETITLEBLOCK, etc.)
+- **AutoLISP/Visual LISP**: lightweight in-process scripting
+- **COM/ActiveX**: out-of-process bridge (current Suite approach)
+- **Database Connectivity (CAO/ADO)**: drawing-to-database workflows
+
+### Guardrails
+- Suite stays as the runtime owner; AutoCAD is a CAD execution target
+- COM bridge is the stable local path; named-pipe bridge is opt-in
+- Do not copy Autodesk install assets into the Suite repo
+- AutoCAD plugin must preserve error envelope contract
+- Design Automation API work should stay in the "Explore" bucket until a concrete batch use case exists
 `,
 	},
 };
@@ -3235,6 +3431,46 @@ const TOOLS = [
 			properties: {},
 		},
 		handler: toolArchitectureVerify,
+	},
+	{
+		name: "repo.run_python_tests",
+		description:
+			"Run Python tests with pytest on a specific target or all backend tests.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				target: {
+					type: "string",
+					description: "Optional pytest target path or module (default: backend/tests).",
+				},
+			},
+		},
+		handler: toolRunPythonTests,
+	},
+	{
+		name: "repo.check_python_env",
+		description:
+			"Check Python environment: version, ML packages (scikit-learn, torch, tensorflow, pandas, numpy), conda, and Jupyter availability.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+		},
+		handler: toolCheckPythonEnv,
+	},
+	{
+		name: "repo.run_backend_tests",
+		description:
+			"Run Python unittest discovery on backend tests or a specific module.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				module: {
+					type: "string",
+					description: "Optional unittest module path (e.g., backend.tests.test_api_server). Default: discover all.",
+				},
+			},
+		},
+		handler: toolRunBackendTests,
 	},
 ];
 

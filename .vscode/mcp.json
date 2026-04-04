@@ -1,0 +1,46 @@
+{
+	"mcpServers": {
+		"suite-repo-mcp": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["tools/suite-repo-mcp/server.mjs"],
+			"env": {
+				"SUITE_WORKSTATION_ID": "GITHUB-CLOUD",
+				"SUITE_WORKSTATION_LABEL": "GitHub Copilot Cloud Agent",
+				"SUITE_WORKSTATION_ROLE": "ci"
+			},
+			"tools": [
+				"repo.add_api_error_wrapper",
+				"repo.add_error_boundary",
+				"repo.add_structured_log",
+				"repo.architecture_verify",
+				"repo.check_python_env",
+				"repo.check_suite_workstation",
+				"repo.check_watchdog_autocad_collector_startup",
+				"repo.check_watchdog_autocad_plugin",
+				"repo.check_watchdog_autocad_readiness",
+				"repo.check_watchdog_backend_startup",
+				"repo.check_watchdog_collector_startup",
+				"repo.dependency_graph",
+				"repo.docs_manifest_verify",
+				"repo.env_check",
+				"repo.find_symbol_usages",
+				"repo.generate_component",
+				"repo.generate_db_migration",
+				"repo.generate_route",
+				"repo.get_workstation_context",
+				"repo.git_log",
+				"repo.git_status",
+				"repo.list_directory",
+				"repo.read_file",
+				"repo.run_backend_tests",
+				"repo.run_check",
+				"repo.run_lint_fix",
+				"repo.run_python_tests",
+				"repo.run_tests",
+				"repo.run_typecheck",
+				"repo.search"
+			]
+		}
+	}
+}

@@ -2,19 +2,19 @@
   "profiles": [
     {
       "id": "DEV-WORKSTATION",
-      "label": "Dustin Home station",
+      "label": "Dev Home station",
       "role": "home",
       "computerNames": ["DEV-WORKSTATION"],
-      "gitUserName": "koraji95-coder",
-      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
+      "gitUserName": "dev-user",
+      "gitUserEmail": "dev@example.com"
     },
     {
-      "id": "DUSTIN-WORK",
-      "label": "Dustin Work station",
+      "id": "DEV-WORK",
+      "label": "Dev Work station",
       "role": "work",
-      "computerNames": ["DUSTIN-WORK", "DUSTINWARD"],
-      "gitUserName": "koraji95-coder",
-      "gitUserEmail": "dustinwardelectricalengineer@outlook.com"
+      "computerNames": ["DEV-WORK"],
+      "gitUserName": "dev-user",
+      "gitUserEmail": "dev@example.com"
     }
   ]
 }

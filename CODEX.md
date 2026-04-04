@@ -27,6 +27,9 @@ When writing or modifying **any** file — including test fixtures, placeholder 
 | Project name (client) | `Nanulak` | `MyProject` |
 | Project number (specific) | `R3P-25074` | `PROJ-00001` |
 | Workstation ID | `DUSTIN-HOME` | `DEV-WORKSTATION` |
+| Workstation ID (work) | `DUSTIN-WORK` | `DEV-WORK` |
+| Display name | `Dustin`, `Dustin Ward` | `Dev`, `Dev User` |
+| Email | `dustinward...@outlook.com`, `koraji95coder@gmail.com` | `dev@example.com` |
 | Shared-drive folder | `R3P RESOURCES` | `Company Resources` |
 | Shared-drive path | `G:\Shared drives\Root 3 Power\...` | `G:\Shared drives\Company\...` |
 | Fixture manifest paths | Absolute `C:/Users/*/...` for `stageRoot`, `stagedRoot`, `path`, `stagedFile` | Repo-relative path starting at `output/` |
@@ -51,14 +54,17 @@ Previous cleanup attempts missed test files because agents only checked UI code.
 
 ```bash
 # Run from repo root — MUST return zero results
-grep -rn \
+grep -rni \
   -e 'DustinWard' \
+  -e 'Dustin Ward' \
   -e 'Root 3 Power' \
   -e 'R3P RESOURCES' \
   -e 'Nanulak' \
   -e 'R3P-25074' \
   -e 'DUSTIN-HOME' \
-  --include='*.ts' --include='*.tsx' --include='*.py' --include='*.json' --include='*.mjs' --include='*.md' \
+  -e 'DUSTIN-WORK' \
+  -e 'dustinward' \
+  --include='*.ts' --include='*.tsx' --include='*.py' --include='*.json' --include='*.mjs' --include='*.md' --include='*.toml' \
   . | grep -v node_modules | grep -v '.git/' | grep -v 'CODEX.md'
 ```
 

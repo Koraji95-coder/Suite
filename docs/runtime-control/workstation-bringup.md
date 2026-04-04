@@ -95,7 +95,7 @@ That does a no-side-effects validation pass and reports:
 For the real bootstrap:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
+npm run workstation:bringup -- -WorkstationId DEV-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
 ```
 
 If both repos are already cloned into the preferred roots, use that instead:
@@ -105,7 +105,7 @@ git clone https://github.com/Koraji95-coder/Suite.git C:\Users\<you>\Documents\G
 git clone https://github.com/Koraji95-coder/Office.git C:\Users\<you>\Documents\GitHub\Office
 cd C:\Users\<you>\Documents\GitHub\Suite
 npm run workstation:bringup:validate
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
+npm run workstation:bringup -- -WorkstationId DEV-WORK
 ```
 
 That is the preferred path. The bootstrap script will detect the existing `Documents\GitHub\Office` workspace and use it without needing `-DailyRepoUrl`.
@@ -113,7 +113,7 @@ That is the preferred path. The bootstrap script will detect the existing `Docum
 If `Office` is not yet in its own Git repo, you can hydrate the workspace from an existing local source path instead:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\Users\koraj\OneDrive\Desktop\Daily"
+npm run workstation:bringup -- -WorkstationId DEV-WORK -DailySourcePath "C:\Users\Dev\OneDrive\Desktop\Daily"
 ```
 
 The bootstrap script will:
@@ -183,12 +183,12 @@ Do not casually toggle workstation identity between machines.
 Each physical workstation should keep one permanent workstation id, for example:
 
 - `DEV-WORKSTATION`
-- `DUSTIN-WORK`
+- `DEV-WORK`
 
 You can re-stamp the current workstation identity without a full bootstrap:
 
 ```powershell
-npm run workstation:sync -- -WorkstationId DUSTIN-WORK
+npm run workstation:sync -- -WorkstationId DEV-WORK
 ```
 
 Runtime Control also now exposes an `Apply workstation profile` support action for this.
@@ -267,7 +267,7 @@ Commands:
 
 ```powershell
 npm run workstation:mirror
-npm run workstation:restore -- -WorkstationId DUSTIN-WORK
+npm run workstation:restore -- -WorkstationId DEV-WORK
 ```
 
 The mirror intentionally does not copy Codex auth or the full Codex SQLite databases. It is meant to reduce machine-switch friction, not to guarantee that an exact live terminal thread reattaches automatically on another PC.

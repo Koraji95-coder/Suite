@@ -12,7 +12,7 @@ const mockState = vi.hoisted(() => ({
 			id: "user-1",
 			email: "user@example.com",
 			user_metadata: {
-				display_name: "Dustin",
+				display_name: "Dev",
 			},
 			app_metadata: {} as Record<string, unknown>,
 		} as {
@@ -22,7 +22,7 @@ const mockState = vi.hoisted(() => ({
 			app_metadata: Record<string, unknown>;
 		},
 		profile: {
-			display_name: "Dustin",
+			display_name: "Dev",
 		} as { display_name: string | null } | null,
 		loading: false,
 		profileHydrating: false,
@@ -110,12 +110,12 @@ describe("AppShell", () => {
 			id: "user-1",
 			email: "user@example.com",
 			user_metadata: {
-				display_name: "Dustin",
+				display_name: "Dev",
 			},
 			app_metadata: {},
 		};
 		mockState.auth.profile = {
-			display_name: "Dustin",
+			display_name: "Dev",
 		};
 		mockState.auth.loading = false;
 		mockState.auth.profileHydrating = false;
@@ -303,7 +303,7 @@ describe("AppShell", () => {
 			id: "admin-1",
 			email: "admin@example.com",
 			user_metadata: {
-				display_name: "Dustin",
+				display_name: "Dev",
 			},
 			app_metadata: {
 				role: "admin",

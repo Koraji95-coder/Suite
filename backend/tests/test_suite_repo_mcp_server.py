@@ -581,7 +581,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         with _McpServerProcess(
             env={
                 "SUITE_WORKSTATION_ID": "suite-secondary",
-                "SUITE_WORKSTATION_LABEL": "Dustin travel workstation",
+                "SUITE_WORKSTATION_LABEL": "Dev travel workstation",
                 "SUITE_WORKSTATION_ROLE": "secondary",
                 "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "C:\\Autodesk\\OfflineHelp",
                 "COMPUTERNAME": "TEST-WS",
@@ -601,7 +601,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         content = messages[0].get("content", {}) if isinstance(messages[0], dict) else {}
         text = str(content.get("text") or "")
         self.assertIn("Workstation ID: suite-secondary", text)
-        self.assertIn("Label: Dustin travel workstation", text)
+        self.assertIn("Label: Dev travel workstation", text)
         self.assertIn("Role: secondary", text)
         self.assertIn("Computer Name: TEST-WS", text)
         self.assertIn("Source: mcp_env", text)
@@ -645,7 +645,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         with _McpServerProcess(
             env={
                 "SUITE_WORKSTATION_ID": "suite-main",
-                "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
+                "SUITE_WORKSTATION_LABEL": "Dev main workstation",
                 "SUITE_WORKSTATION_ROLE": "primary",
                 "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "D:\\Docs\\Autodesk",
                 "COMPUTERNAME": "MAIN-WS",
@@ -667,7 +667,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         self.assertTrue(content)
         text = str(content[0].get("text") if isinstance(content[0], dict) else "")
         self.assertIn("Workstation ID: suite-main", text)
-        self.assertIn("Label: Dustin main workstation", text)
+        self.assertIn("Label: Dev main workstation", text)
         self.assertIn("Role: primary", text)
         self.assertIn("Computer Name: MAIN-WS", text)
         self.assertIn("Source: mcp_env", text)
@@ -688,7 +688,7 @@ class TestSuiteRepoMcpServer(unittest.TestCase):
         with _McpServerProcess(
             env={
                 "SUITE_WORKSTATION_ID": "suite-main",
-                "SUITE_WORKSTATION_LABEL": "Dustin main workstation",
+                "SUITE_WORKSTATION_LABEL": "Dev main workstation",
                 "SUITE_WORKSTATION_ROLE": "primary",
                 "SUITE_AUTODESK_OFFLINE_HELP_ROOT": "E:\\Autodesk\\OfflineHelp",
                 "SUITE_MCP_ENV_STAMPED_BY": "scripts/sync-suite-workstation-profile.ps1",

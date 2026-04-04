@@ -7,13 +7,13 @@ Use the profile sync script to rewrite the local `suite_repo_mcp` block in `%USE
 ```powershell
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORKSTATION
-PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-WORK
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORK
 ```
 
 If you want to preview the generated MCP block without writing `config.toml`, use:
 
 ```powershell
-PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-WORK -PrintToml
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORK -PrintToml
 ```
 
 Restart Codex after any MCP config change.
@@ -24,8 +24,8 @@ Restart Codex after any MCP config change.
 
 | Workstation ID | Computer names | Label | Role |
 | --- | --- | --- | --- |
-| `DUSTIN-WORK` | `DUSTIN-WORK` | `Dustin Work station` | `work` |
-| `DEV-WORKSTATION` | `DEV-WORKSTATION` | `Dustin Home station` | `home` |
+| `DEV-WORK` | `DEV-WORK` | `Dev Work station` | `work` |
+| `DEV-WORKSTATION` | `DEV-WORKSTATION` | `Dev Home station` | `home` |
 
 If a machine is not listed in the matrix, the sync helper falls back to:
 
@@ -126,7 +126,7 @@ If a machine is not listed in the matrix, the sync helper falls back to:
 
 ## Optional Companion MCP Servers
 
-These can be added to `config.toml` alongside `suite_repo_mcp`. See `tools/suite-repo-mcp/examples/dustin-home-workstation.toml` for the full reference config.
+These can be added to `config.toml` alongside `suite_repo_mcp`. See `tools/suite-repo-mcp/examples/dev-home-workstation.toml` for the full reference config.
 
 ### Core Companions
 

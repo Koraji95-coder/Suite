@@ -37,8 +37,8 @@ describe("jamMetadata", () => {
 			search: "?projectId=proj-123&view=overview&token=secret",
 		});
 		updateSuiteJamAuthContext({
-			displayName: "Dustin Ward",
-			email: "dustin@example.com",
+			displayName: "Dev User",
+			email: "dev@example.com",
 			isAuthenticated: true,
 			loading: false,
 			profileHydrating: false,
@@ -70,8 +70,8 @@ describe("jamMetadata", () => {
 				name: "Suite",
 			},
 			auth: {
-				displayName: "Dustin Ward",
-				email: "dustin@example.com",
+				displayName: "Dev User",
+				email: "dev@example.com",
 				isAuthenticated: true,
 				loading: false,
 				profileHydrating: false,

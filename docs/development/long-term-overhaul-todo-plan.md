@@ -166,7 +166,7 @@ Constraints:
 - ML stays assistive, not deterministic CAD authority
 - APS Viewer work should be staged against real Suite workflows, not as a random SDK branch
 
-## Questions Still Expected From Dustin
+## Open Questions
 
 Future chats should expect recurring product-direction questions, especially around:
 

@@ -18,7 +18,7 @@ function createCollector(
 ): WatchdogCollector {
 	return {
 		collectorId: "collector-1",
-		name: "Dustin CAD",
+		name: "Dev CAD",
 		collectorType: "autocad_state",
 		workstationId: "DEV-WORKSTATION",
 		capabilities: ["autocad", "drawing_sessions", "commands"],

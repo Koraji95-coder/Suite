@@ -1,6 +1,6 @@
 # Legacy reference only. Do not stamp MCP env manually from this file.
 # Supported path:
-#   PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-HOME
+#   PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORKSTATION
 # Target config path is %USERPROFILE%\.codex\config.toml.
 
 # ── Suite Repo MCP (custom repo-native server) ──
@@ -10,8 +10,8 @@ args = ["tools/suite-repo-mcp/server.mjs"]
 
 [mcp_servers.suite_repo_mcp.env]
 SUITE_MCP_ENV_STAMPED_BY = "scripts/sync-suite-workstation-profile.ps1"
-SUITE_WORKSTATION_ID = "DUSTIN-HOME"
-SUITE_WORKSTATION_LABEL = "Dustin Home station"
+SUITE_WORKSTATION_ID = "DEV-WORKSTATION"
+SUITE_WORKSTATION_LABEL = "Dev Home station"
 SUITE_WORKSTATION_ROLE = "home"
 
 # ── GitHub (issues, PRs, commits, repo browsing) ──
@@ -27,7 +27,7 @@ SUITE_WORKSTATION_ROLE = "home"
 # Roots restrict which directories the server can access.
 # [mcp_servers.filesystem]
 # command = "npx"
-# args = ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\koraj\\Documents\\GitHub\\Suite", "C:\\Users\\koraj\\Documents\\GitHub\\Office"]
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\Dev\\Documents\\GitHub\\Suite", "C:\\Users\\Dev\\Documents\\GitHub\\Office"]
 
 # ── Fetch (web page retrieval for docs/reference lookup) ──
 # [mcp_servers.fetch]

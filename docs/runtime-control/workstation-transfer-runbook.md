@@ -18,7 +18,7 @@ Do not reuse workstation ids across machines.
 Recommended pattern:
 
 - Home machine: `DEV-WORKSTATION`
-- Work machine: `DUSTIN-WORK`
+- Work machine: `DEV-WORK`
 
 Each physical machine should keep one permanent id. Do not restore the work PC as `DEV-WORKSTATION`.
 
@@ -83,25 +83,25 @@ npm run workstation:bringup:validate
 4. Run the full bootstrap:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK
+npm run workstation:bringup -- -WorkstationId DEV-WORK
 ```
 
 If you want bootstrap to perform the Daily clone itself instead of cloning `Daily` manually first, use:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
+npm run workstation:bringup -- -WorkstationId DEV-WORK -DailyRepoUrl https://github.com/Koraji95-coder/Office.git
 ```
 
 If the Daily workspace is not yet in its own repo, use a local source path instead:
 
 ```powershell
-npm run workstation:bringup -- -WorkstationId DUSTIN-WORK -DailySourcePath "C:\Users\koraj\OneDrive\Desktop\Daily"
+npm run workstation:bringup -- -WorkstationId DEV-WORK -DailySourcePath "C:\Users\Dev\OneDrive\Desktop\Daily"
 ```
 
 5. If you carried a local-state mirror across, restore it:
 
 ```powershell
-npm run workstation:restore -- -WorkstationId DUSTIN-WORK
+npm run workstation:restore -- -WorkstationId DEV-WORK
 ```
 
 After restore, review `C:\Users\<you>\Dropbox\SuiteLocalStateMirror\codex-handoff.md` if you need help finding the last machine's active thread context quickly.
@@ -109,7 +109,7 @@ After restore, review `C:\Users\<you>\Dropbox\SuiteLocalStateMirror\codex-handof
 6. If needed, explicitly re-stamp the workstation profile:
 
 ```powershell
-npm run workstation:sync -- -WorkstationId DUSTIN-WORK
+npm run workstation:sync -- -WorkstationId DEV-WORK
 ```
 
 ## Runtime Control Expectations

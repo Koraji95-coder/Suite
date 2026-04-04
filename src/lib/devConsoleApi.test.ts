@@ -8,11 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("devConsoleApi", () => {
 	beforeEach(() => {
-		vi.spyOn(console, "debug").mockImplementation(() => {});
-		vi.spyOn(console, "error").mockImplementation(() => {});
-		vi.spyOn(console, "info").mockImplementation(() => {});
-		vi.spyOn(console, "log").mockImplementation(() => {});
-		vi.spyOn(console, "warn").mockImplementation(() => {});
+		const noop = () => undefined;
+		vi.spyOn(console, "debug").mockImplementation(noop);
+		vi.spyOn(console, "error").mockImplementation(noop);
+		vi.spyOn(console, "info").mockImplementation(noop);
+		vi.spyOn(console, "log").mockImplementation(noop);
+		vi.spyOn(console, "warn").mockImplementation(noop);
 
 		logger.clearHistory();
 		clearAppDiagnostics();

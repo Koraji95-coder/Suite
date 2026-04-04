@@ -1166,6 +1166,7 @@ export function DrawingListManager({
 							<span className={styles.fieldLabel}>Project</span>
 							<select
 								className={styles.input}
+								name="drawing-list-project"
 								value={selectedProjectId}
 								onChange={(event) => setSelectedProjectId(event.target.value)}
 								disabled={loadingProjects}
@@ -1182,6 +1183,7 @@ export function DrawingListManager({
 							<span className={styles.fieldLabel}>Project Root Path</span>
 							<input
 								className={styles.input}
+								name="drawing-list-project-root-path"
 								value={profile.projectRootPath || ""}
 								onChange={(event) =>
 									updateProfile("projectRootPath", event.target.value)
@@ -1233,6 +1235,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Block Name</span>
 									<input
 										className={styles.input}
+										name="drawing-list-block-name"
 										value={profile.blockName}
 										onChange={(event) =>
 											updateProfile("blockName", event.target.value)
@@ -1243,6 +1246,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Client / Utility</span>
 									<input
 										className={styles.input}
+										name="drawing-list-acade-line1"
 										value={profile.acadeLine1}
 										onChange={(event) =>
 											updateProfile("acadeLine1", event.target.value)
@@ -1254,6 +1258,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Facility / Site</span>
 									<input
 										className={styles.input}
+										name="drawing-list-acade-line2"
 										value={profile.acadeLine2}
 										onChange={(event) =>
 											updateProfile("acadeLine2", event.target.value)
@@ -1265,6 +1270,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Project number</span>
 									<input
 										className={styles.input}
+										name="drawing-list-acade-line4"
 										value={profile.acadeLine4}
 										onChange={(event) =>
 											updateProfile("acadeLine4", event.target.value)
@@ -1278,6 +1284,7 @@ export function DrawingListManager({
 									</span>
 									<input
 										className={styles.input}
+										name="drawing-list-acade-project-file-path"
 										value={profile.acadeProjectFilePath || ""}
 										onChange={(event) =>
 											updateProfile(
@@ -1292,6 +1299,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Drawn By Default</span>
 									<input
 										className={styles.input}
+										name="drawing-list-signer-drawn-by"
 										value={profile.signerDrawnBy}
 										onChange={(event) =>
 											updateProfile("signerDrawnBy", event.target.value)
@@ -1302,6 +1310,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Checked By Default</span>
 									<input
 										className={styles.input}
+										name="drawing-list-signer-checked-by"
 										value={profile.signerCheckedBy}
 										onChange={(event) =>
 											updateProfile("signerCheckedBy", event.target.value)
@@ -1312,6 +1321,7 @@ export function DrawingListManager({
 									<span className={styles.fieldLabel}>Engineer Default</span>
 									<input
 										className={styles.input}
+										name="drawing-list-signer-engineer"
 										value={profile.signerEngineer}
 										onChange={(event) =>
 											updateProfile("signerEngineer", event.target.value)
@@ -1458,6 +1468,7 @@ export function DrawingListManager({
 											<td>
 												<input
 													type="checkbox"
+													name={`drawing-list-selected-${row.id}`}
 													checked={selected}
 													onChange={() => toggleSelectedPath(row.relativePath)}
 													disabled={row.fileType !== "dwg"}
@@ -1504,6 +1515,7 @@ export function DrawingListManager({
 														<span>Scale</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-scale-${row.id}`}
 															value={row.editableFields.scale}
 															onChange={(event) =>
 																updateEditableField(
@@ -1518,6 +1530,7 @@ export function DrawingListManager({
 														<span>Drawn</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-drawn-by-${row.id}`}
 															value={row.editableFields.drawnBy}
 															onChange={(event) =>
 																updateEditableField(
@@ -1532,6 +1545,7 @@ export function DrawingListManager({
 														<span>Drawn Date</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-drawn-date-${row.id}`}
 															value={row.editableFields.drawnDate}
 															onChange={(event) =>
 																updateEditableField(
@@ -1546,6 +1560,7 @@ export function DrawingListManager({
 														<span>Checked</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-checked-by-${row.id}`}
 															value={row.editableFields.checkedBy}
 															onChange={(event) =>
 																updateEditableField(
@@ -1560,6 +1575,7 @@ export function DrawingListManager({
 														<span>Checked Date</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-checked-date-${row.id}`}
 															value={row.editableFields.checkedDate}
 															onChange={(event) =>
 																updateEditableField(
@@ -1574,6 +1590,7 @@ export function DrawingListManager({
 														<span>Engineer</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-engineer-${row.id}`}
 															value={row.editableFields.engineer}
 															onChange={(event) =>
 																updateEditableField(
@@ -1588,6 +1605,7 @@ export function DrawingListManager({
 														<span>Engineer Date</span>
 														<input
 															className={styles.inlineInput}
+															name={`drawing-list-engineer-date-${row.id}`}
 															value={row.editableFields.engineerDate}
 															onChange={(event) =>
 																updateEditableField(
@@ -1777,6 +1795,7 @@ export function DrawingListManager({
 										<input
 											ref={acadeReportInputRef}
 											type="file"
+											name="drawing-list-acade-report"
 											accept=".xlsx,.csv,.tsv"
 											className={styles.hiddenFileInput}
 											onChange={(event) => void handleAcadeReportSelection(event)}

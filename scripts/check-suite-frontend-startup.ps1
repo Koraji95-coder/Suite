@@ -366,7 +366,7 @@ else {
 if (-not $frontendContainerRunning -and $StartIfMissing) {
     if ($listening -or $null -ne $workerProcess) {
         $ownershipDrift = $true
-        $errorMessage = "Native frontend dev server detected outside runtime-core Docker ownership. Stop the native frontend and rerun bootstrap."
+        $errorMessage = "Native frontend process detected outside runtime-core Docker ownership. Stop the native frontend and rerun bootstrap."
     }
     else {
         $composeStart = Invoke-RuntimeCoreComposeJson -Action "up" -Services @("frontend")
@@ -453,13 +453,13 @@ if (-not $healthy -and [string]::IsNullOrWhiteSpace($errorMessage)) {
         $errorMessage = "Frontend is responding outside runtime-core Docker ownership."
     }
     elseif ($startAttempted) {
-        $errorMessage = "Frontend compose start was requested but the Vite server did not become ready within $StartupTimeoutSeconds seconds."
+        $errorMessage = "Frontend compose start was requested but the managed frontend runtime did not become ready within $StartupTimeoutSeconds seconds."
     }
     elseif (-not $running) {
-        $errorMessage = "Frontend dev server is not running."
+        $errorMessage = "Frontend web runtime is not running."
     }
     else {
-        $errorMessage = "Frontend container is running but the dev server is not ready."
+        $errorMessage = "Frontend container is running but the frontend web runtime is not ready."
     }
 }
 

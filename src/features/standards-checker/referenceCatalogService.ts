@@ -1,3 +1,11 @@
+import {
+	FetchRequestError,
+	fetchWithTimeout,
+	parseResponseErrorMessage,
+} from "@/lib/fetchWithTimeout";
+import { logger } from "@/lib/logger";
+import { supabase } from "@/supabase/client";
+
 export interface AutodeskReferenceStandardFamily {
 	id: string;
 	label: string;
@@ -36,7 +44,9 @@ function normalizeStringArray(value: unknown): string[] {
 		: [];
 }
 
-function normalizeFamily(value: unknown): AutodeskReferenceStandardFamily | null {
+function normalizeFamily(
+	value: unknown,
+): AutodeskReferenceStandardFamily | null {
 	if (!value || typeof value !== "object") {
 		return null;
 	}
@@ -63,19 +73,64 @@ function normalizeFamily(value: unknown): AutodeskReferenceStandardFamily | null
 	};
 }
 
+async function buildHeaders(): Promise<Record<string, string>> {
+	const headers: Record<string, string> = {
+		Accept: "application/json",
+	};
+
+	try {
+		const {
+			data: { session },
+			error,
+		} = await supabase.auth.getSession();
+		if (error) {
+			logger.warn(
+				"AutodeskReferenceCatalog",
+				"Unable to resolve Supabase session for standards reference request",
+				{ error: error.message || "Unknown auth error" },
+			);
+		} else if (session?.access_token) {
+			headers.Authorization = `Bearer ${session.access_token}`;
+			return headers;
+		}
+	} catch (error) {
+		logger.warn(
+			"AutodeskReferenceCatalog",
+			"Unexpected auth lookup failure for standards reference request",
+			{ error: error instanceof Error ? error.message : String(error) },
+		);
+	}
+
+	const apiKey = String(import.meta.env.VITE_API_KEY || "").trim();
+	if (apiKey) {
+		headers["X-API-Key"] = apiKey;
+	}
+
+	return headers;
+}
+
 export async function fetchAutodeskStandardsReferenceSummary(): Promise<AutodeskStandardsReferenceSummary> {
-	const response = await fetch("/api/autocad/reference/standards", {
+	const response = await fetchWithTimeout("/api/autocad/reference/standards", {
 		method: "GET",
 		credentials: "include",
-		headers: {
-			Accept: "application/json",
-		},
+		headers: await buildHeaders(),
+		requestName: "Autodesk standards reference request",
 	});
 
 	if (!response.ok) {
-		throw new Error(
-			`Autodesk standards reference request failed with ${response.status}.`,
-		);
+		try {
+			throw new Error(
+				await parseResponseErrorMessage(
+					response,
+					`Autodesk standards reference request failed with ${response.status}.`,
+				),
+			);
+		} catch (error) {
+			if (error instanceof FetchRequestError) {
+				throw new Error(error.message);
+			}
+			throw error;
+		}
 	}
 
 	const payload =
@@ -84,9 +139,7 @@ export async function fetchAutodeskStandardsReferenceSummary(): Promise<Autodesk
 		? payload.standards
 				.map((entry) => normalizeFamily(entry))
 				.filter(
-					(
-						entry,
-					): entry is AutodeskReferenceStandardFamily => entry !== null,
+					(entry): entry is AutodeskReferenceStandardFamily => entry !== null,
 				)
 		: [];
 

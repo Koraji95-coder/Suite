@@ -650,7 +650,20 @@ function Test-SuiteSupabaseFunctionsDirectoryPresent {
 	}
 
 	$functionsPath = Join-Path ([System.IO.Path]::GetFullPath($RepoRoot)) "supabase\functions"
-	return (Test-Path -LiteralPath $functionsPath -PathType Container)
+	if (-not (Test-Path -LiteralPath $functionsPath -PathType Container)) {
+		return $false
+	}
+
+	# Treat placeholder-only folders as "no functions" so Runtime Control does not
+	# report local Supabase as degraded when edge runtime is effectively unused.
+	$functionDirectories = @(
+		Get-ChildItem -LiteralPath $functionsPath -Directory -Force -ErrorAction SilentlyContinue |
+			Where-Object {
+				$_.Name -notmatch '^\.' -and
+				$_.Name -ne "_shared"
+			}
+	)
+	return ($functionDirectories.Count -gt 0)
 }
 
 function Test-SuiteSupabaseEdgeRuntimeExpected {

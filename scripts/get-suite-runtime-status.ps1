@@ -604,16 +604,16 @@ else {
     $frontendResult.OutputTail
 }
 $frontendSummary = if ($frontendHealthy) {
-    "Frontend dev server is ready through runtime-core Docker."
+    "Frontend web runtime is ready through runtime-core Docker."
 }
 elseif ($frontendOwnershipDrift) {
     "Frontend ownership drift needs attention."
 }
 elseif ($frontendRunning -or $frontendListening) {
-    "Frontend process is running and still warming up."
+    "Frontend web runtime is running and still warming up."
 }
 else {
-    "Frontend dev server is not running."
+    "Frontend web runtime is not running."
 }
 $frontendNotes = @()
 if ($frontendStartupMode -eq "docker_compose") {

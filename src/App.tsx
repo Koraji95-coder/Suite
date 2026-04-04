@@ -10,81 +10,70 @@ import {
 } from "./components/fx/useSuiteCursor";
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
+import JamMetadataSync from "./lib/JamMetadataSync";
 import { logger } from "./lib/logger";
 import AudienceRoute from "./routes/AudienceRoute";
-import DraftRoutePage from "./routes/draft/DraftRoutePage";
-import HomeRoutePage from "./routes/home/HomeRoutePage";
-import LandingPage from "./routes/LandingPage";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import ReviewRoutePage from "./routes/review/ReviewRoutePage";
 import RouteLoadingFallback from "./routes/RouteLoadingFallback";
+import {
+	loadArchitectureMapRoutePage,
+	loadAutoDraftStudioRoutePage,
+	loadAutomationStudioRoutePage,
+	loadAutoWireRoutePage,
+	loadBatchFindReplaceRoutePage,
+	loadBlockLibraryRoutePage,
+	loadChangelogRoutePage,
+	loadCommandCenterPage,
+	loadDeveloperDocsRoutePage,
+	loadDeveloperPortalRoutePage,
+	loadDraftRoutePage,
+	loadDrawingListManagerRoutePage,
+	loadGraphRoutePage,
+	loadGroundGridRoutePage,
+	loadHomeRoutePage,
+	loadLandingPage,
+	loadLoginPage,
+	loadMathToolsLibraryPage,
+	loadPrivacyPage,
+	loadProjectsRoutePage,
+	loadReviewRoutePage,
+	loadSettingsPage,
+	loadShell,
+	loadSignupPage,
+	loadStandardsCheckerRoutePage,
+	loadTransmittalBuilderRoutePage,
+	loadWatchdogRoutePage,
+	loadWhiteboardRoutePage,
+} from "./routes/routeModuleLoaders";
 
-const Shell = lazy(() => import("./routes/AppShell"));
-const DrawingListManagerRoutePage = lazy(
-	() =>
-		import("./routes/draft/drawing-list-manager/DrawingListManagerRoutePage"),
-);
-const StandardsCheckerRoutePage = lazy(
-	() => import("./routes/review/standards-checker/StandardsCheckerRoutePage"),
-);
-const TransmittalBuilderRoutePage = lazy(
-	() =>
-		import("./routes/projects/transmittal-builder/TransmittalBuilderRoutePage"),
-);
-const DeveloperDocsRoutePage = lazy(
-	() => import("./routes/developer/control/docs/DeveloperDocsRoutePage"),
-);
-const LoginPage = lazy(() => import("./routes/LoginPage"));
-const MathToolsLibraryPage = lazy(
-	() => import("./routes/review/math-tools/MathToolsLibraryPage"),
-);
-const PrivacyPage = lazy(() => import("./routes/PrivacyPage"));
-const ProjectsRoutePage = lazy(() => import("./routes/projects/ProjectsRoutePage"));
-const SettingsPage = lazy(() => import("./routes/settings/SettingsPage"));
-const SignupPage = lazy(() => import("./routes/SignupPage"));
-const WatchdogRoutePage = lazy(
-	() => import("./routes/developer/control/watchdog/WatchdogRoutePage"),
-);
-const DeveloperPortalRoutePage = lazy(
-	() => import("./routes/developer/DeveloperPortalRoutePage"),
-);
-const AutomationStudioRoutePage = lazy(
-	() =>
-		import("./routes/developer/labs/automation-studio/AutomationStudioRoutePage"),
-);
-const ArchitectureMapRoutePage = lazy(
-	() => import("./routes/developer/architecture/map/ArchitectureMapRoutePage"),
-);
-const ChangelogRoutePage = lazy(() => import("./routes/developer/control/changelog/ChangelogRoutePage"));
-const CommandCenterPage = lazy(() => import("./routes/developer/control/command-center/CommandCenterPage"));
-const GroundGridRoutePage = lazy(
-	() =>
-		import(
-			"./routes/developer/labs/ground-grid-generation/GroundGridGenerationRoutePage"
-		),
-);
-const AutoDraftStudioRoutePage = lazy(
-	() =>
-		import("./routes/developer/labs/autodraft-studio/AutoDraftStudioRoutePage"),
-);
-const GraphRoutePage = lazy(
-	() => import("./routes/developer/architecture/graph/GraphRoutePage"),
-);
-const BatchFindReplaceRoutePage = lazy(
-	() =>
-		import(
-			"./routes/developer/labs/batch-find-replace/BatchFindReplaceRoutePage"
-		),
-);
-const BlockLibraryRoutePage = lazy(
-	() => import("./routes/draft/block-library/BlockLibraryRoutePage"),
-);
-const AutoWireRoutePage = lazy(
-	() => import("./routes/developer/labs/autowire/AutoWireRoutePage"),
-);
-const WhiteboardRoutePage = lazy(
-	() => import("./routes/developer/labs/whiteboard/WhiteboardKnowledgePage"),
-);
+const Shell = lazy(loadShell);
+const LandingPage = lazy(loadLandingPage);
+const HomeRoutePage = lazy(loadHomeRoutePage);
+const DraftRoutePage = lazy(loadDraftRoutePage);
+const ReviewRoutePage = lazy(loadReviewRoutePage);
+const DrawingListManagerRoutePage = lazy(loadDrawingListManagerRoutePage);
+const StandardsCheckerRoutePage = lazy(loadStandardsCheckerRoutePage);
+const TransmittalBuilderRoutePage = lazy(loadTransmittalBuilderRoutePage);
+const DeveloperDocsRoutePage = lazy(loadDeveloperDocsRoutePage);
+const LoginPage = lazy(loadLoginPage);
+const MathToolsLibraryPage = lazy(loadMathToolsLibraryPage);
+const PrivacyPage = lazy(loadPrivacyPage);
+const ProjectsRoutePage = lazy(loadProjectsRoutePage);
+const SettingsPage = lazy(loadSettingsPage);
+const SignupPage = lazy(loadSignupPage);
+const WatchdogRoutePage = lazy(loadWatchdogRoutePage);
+const DeveloperPortalRoutePage = lazy(loadDeveloperPortalRoutePage);
+const AutomationStudioRoutePage = lazy(loadAutomationStudioRoutePage);
+const ArchitectureMapRoutePage = lazy(loadArchitectureMapRoutePage);
+const ChangelogRoutePage = lazy(loadChangelogRoutePage);
+const CommandCenterPage = lazy(loadCommandCenterPage);
+const GroundGridRoutePage = lazy(loadGroundGridRoutePage);
+const AutoDraftStudioRoutePage = lazy(loadAutoDraftStudioRoutePage);
+const GraphRoutePage = lazy(loadGraphRoutePage);
+const BatchFindReplaceRoutePage = lazy(loadBatchFindReplaceRoutePage);
+const BlockLibraryRoutePage = lazy(loadBlockLibraryRoutePage);
+const AutoWireRoutePage = lazy(loadAutoWireRoutePage);
+const WhiteboardRoutePage = lazy(loadWhiteboardRoutePage);
 
 function withRouteSuspense(element: React.ReactNode) {
 	return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
@@ -114,11 +103,12 @@ export default function App() {
 			<ErrorBoundary>
 				<AuthProvider>
 					<NotificationProvider>
+						<JamMetadataSync />
 						<EnvDebug />
 						{cursorEnabled && <Cursor />}
 
 						<Routes>
-							<Route path="/" element={<LandingPage />} />
+							<Route path="/" element={withRouteSuspense(<LandingPage />)} />
 							<Route path="/login" element={withRouteSuspense(<LoginPage />)} />
 							<Route
 								path="/signup"
@@ -259,7 +249,10 @@ export default function App() {
 										path="settings"
 										element={withRouteSuspense(<SettingsPage />)}
 									/>
-									<Route path="*" element={<Navigate to="/app/home" replace />} />
+									<Route
+										path="*"
+										element={<Navigate to="/app/home" replace />}
+									/>
 								</Route>
 							</Route>
 

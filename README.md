@@ -68,11 +68,12 @@ The authenticated shell is organized around five families:
 
 Suite uses a hybrid local/container model:
 
-- Docker runtime core:
-  - frontend
-  - backend
+- runtime-core Docker services:
+  - frontend web runtime
+  - backend API
   - Redis
-  - local Supabase lane
+- local Supabase lane:
+  - Docker-managed, but started separately through the Supabase CLI during workstation bootstrap
 - Runtime Control owns:
   - workstation-local start/stop
   - Docker observability
@@ -123,21 +124,39 @@ Minimum configuration:
 - `API_KEY`
 - any passkey callback settings required by your environment
 
-### Start The Main Stack
+### Startup Modes
 
-Recommended daily flow:
+Use one startup lane at a time:
+
+- `npm run dev:full` is the native coding lane.
+- It starts the frontend and backend locally, ensures docs/architecture artifacts, starts the AutoDraft .NET API locally, and auto-starts the shared runtime-core Redis service when needed.
+- Use `npm run supabase:mode:local` or `npm run supabase:start` separately when your work needs local Supabase.
+- `npm run workstation:bootstrap` is the managed workstation lane.
+- It is the same bootstrap path used by Runtime Control and the Windows sign-in task.
+- It ensures Docker is ready, starts local Supabase through the Supabase CLI, and brings up the runtime-core Docker services for frontend, backend, and Redis.
+- The managed frontend serves a prepared preview build instead of the live Vite HMR dev server, so it is lighter but not intended for active frontend coding.
+- If you are using the managed lane, restart frontend/backend or reset the stack from Runtime Control instead of starting native dev processes on the side.
+- `npm run runtime:core:up` only controls the runtime-core Docker services. It does not start local Supabase by itself.
+- Do not run `npm run dev:full` and `npm run workstation:bootstrap` at the same time on the same machine.
+
+### Start The Native Dev Lane
+
+Recommended daily coding flow:
 
 ```bash
 npm run dev:full
 ```
 
-That starts the frontend, backend, documentation/architecture checks, AutoDraft contract service, and the local runtime-core dependencies required for daily Suite work.
+That starts the frontend and backend locally, ensures documentation/architecture artifacts, starts the AutoDraft contract service, and auto-starts the shared runtime-core Redis service when needed. It does not implicitly start local Supabase.
+When you are in this lane, restart services from the terminal rather than through Runtime Control.
 
 Useful focused commands:
 
 ```bash
 npm run dev
 npm run backend:coords:dev
+npm run supabase:mode:local
+npm run workstation:bootstrap
 npm run runtime:core:up
 npm run runtime:core:ps
 npm run runtime:core:down

@@ -1,0 +1,62 @@
+ARG NODE_VERSION=22
+
+# =============================================================================
+# BUILDER STAGE
+# =============================================================================
+FROM node:${NODE_VERSION}-alpine AS builder
+
+WORKDIR /build
+
+# Copy dependency files (cache layer)
+COPY package.json package-lock.json ./
+
+# Install dependencies (include dev deps for build)
+RUN npm ci --no-fund \
+    && npm verify
+
+# Copy source code
+COPY . .
+
+# Run security audit on dependencies
+RUN npm audit --audit-level=high 2>&1 || npm audit fix --force 2>&1 || true
+
+# Build application
+RUN npm run build 2>&1
+
+# =============================================================================
+# RUNTIME STAGE (minimal)
+# =============================================================================
+FROM node:${NODE_VERSION}-alpine AS runtime
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NPM_CONFIG_LOGLEVEL=warn
+
+# Add non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+
+# Install only production dependencies
+COPY package.json package-lock.json ./
+RUN npm ci --no-fund --only=production \
+    && npm verify \
+    && npm cache clean --force
+
+# Copy built application from builder
+COPY --from=builder --chown=nodejs:nodejs /build/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /build/public ./public
+
+# Install serve for production (Alpine-friendly)
+RUN npm install -g serve --no-fund \
+    && npm cache clean --force
+
+# Switch to non-root user
+USER nodejs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5173/health || exit 1
+
+EXPOSE 5173
+
+CMD ["serve", "-s", "dist", "-l", "5173"]

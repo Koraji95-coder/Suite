@@ -958,7 +958,7 @@ else {
     $frontendStarting = $frontendStart.Result.Ok -and $frontendStart.Payload -and (-not [bool]$frontendStart.Payload.Healthy) -and [bool]$frontendStart.Payload.Running
     $frontendStatusCheck = $null
     if (-not $frontendReady -and $frontendStarting) {
-        Write-BootstrapLog -Tag "INFO" -Message "Frontend did not report healthy immediately; verifying local readiness."
+        Write-BootstrapLog -Tag "INFO" -Message "Frontend did not report healthy immediately; verifying frontend endpoint readiness."
         $frontendStatusCheck = Wait-ForJsonServiceReady `
             -StepId "frontend" `
             -VerificationLabel "frontend" `
@@ -978,7 +978,7 @@ else {
         @($frontendDetailsParts | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     ).Trim()
     $frontendState = if ($frontendReady) { "ready" } else { "failed" }
-    $frontendSummary = if ($frontendReady) { "Frontend dev server is ready." } else { "Frontend dev server is not healthy." }
+    $frontendSummary = if ($frontendReady) { "Frontend web runtime is ready." } else { "Frontend web runtime is not healthy." }
     $frontendStep = New-StepResult `
         -Name "frontend" `
         -State $frontendState `
@@ -992,13 +992,13 @@ else {
         Complete-CurrentBootstrapStep `
             -StepId "frontend" `
             -StepLabel "Suite frontend is ready." `
-            -Summary "Frontend dev server is ready."
+            -Summary "Frontend web runtime is ready."
     }
     else {
         Fail-CurrentBootstrapStep `
             -StepId "frontend" `
             -StepLabel "Suite frontend is not healthy." `
-            -Summary "Frontend dev server is not healthy."
+            -Summary "Frontend web runtime is not healthy."
     }
 }
 

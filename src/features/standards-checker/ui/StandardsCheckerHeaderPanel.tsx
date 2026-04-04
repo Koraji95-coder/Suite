@@ -87,6 +87,7 @@ export function StandardsCheckerHeaderPanel({
 					<span className={styles.headerFieldLabel}>Project</span>
 					<select
 						className={styles.headerSelect}
+						name="standards-project"
 						value={selectedProjectId}
 						onChange={(event) => onProjectChange(event.target.value)}
 						disabled={loadingProjects}
@@ -142,6 +143,7 @@ export function StandardsCheckerHeaderPanel({
 						<span className={styles.headerFieldLabel}>CAD family</span>
 						<select
 							className={styles.headerSelect}
+							name="standards-cad-family"
 							value={selectedCadFamilyId}
 							onChange={(event) => onCadFamilyChange(event.target.value)}
 							disabled={!selectedProjectId || loadingProjectProfile}

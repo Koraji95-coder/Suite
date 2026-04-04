@@ -534,6 +534,7 @@ export function DrawingProgramPanel({
 			<input
 				ref={standardInputRef}
 				type="file"
+				name="drawing-program-standard-workbook"
 				accept=".xlsx"
 				className={styles.hiddenFileInput}
 				onChange={(event) => void handleImportStandard(event)}
@@ -541,6 +542,7 @@ export function DrawingProgramPanel({
 			<input
 				ref={workbookInputRef}
 				type="file"
+				name="drawing-program-reconcile-workbook"
 				accept=".xlsx"
 				className={styles.hiddenFileInput}
 				onChange={(event) => void handleWorkbookReconcile(event)}
@@ -605,6 +607,7 @@ export function DrawingProgramPanel({
 								<span className={styles.fieldLabel}>Electrical family</span>
 								<select
 									className={styles.input}
+									name="drawing-program-standard-row"
 									value={insertStandardRowId}
 									onChange={(event) => setInsertStandardRowId(event.target.value)}
 								>
@@ -629,6 +632,7 @@ export function DrawingProgramPanel({
 								<span className={styles.fieldLabel}>Count</span>
 								<input
 									className={styles.input}
+									name="drawing-program-insert-count"
 									value={insertCount}
 									onChange={(event) => setInsertCount(event.target.value)}
 								/>
@@ -637,6 +641,7 @@ export function DrawingProgramPanel({
 								<span className={styles.fieldLabel}>Insert before</span>
 								<select
 									className={styles.input}
+									name="drawing-program-insert-before"
 									value={insertBeforeRowId}
 									onChange={(event) => setInsertBeforeRowId(event.target.value)}
 								>

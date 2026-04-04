@@ -1,13 +1,13 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-04T05:01:24.280Z",
-	"docCount": 75,
+	"generatedAt": "2026-04-04T09:35:10.072Z",
+	"docCount": 77,
 	"sections": [
 		{
 			"id": "frontend-app",
 			"title": "Frontend",
 			"description": "Browser-owned architecture, feature slices, and UI/runtime flow notes.",
-			"count": 14,
+			"count": 16,
 			"docs": [
 				{
 					"id": "docs-frontend-readme-md",
@@ -25,6 +25,28 @@
 					"title": "Automation Studio Feature Slice",
 					"summary": "src/features/automation-studio is the browser-owned source of truth for Automation Studio workflow state, shared queue models, and cross-specialist plan/receipt summaries.",
 					"relativePath": "docs/frontend/automation-studio-feature-slice.md",
+					"sectionId": "frontend-app",
+					"tags": [
+						"frontend-app"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-frontend-performance-fix-log-md",
+					"title": "Performance Fix Log",
+					"summary": "This is the running log for frontend performance and diagnostics fixes. Append future dates here instead of creating one-off notes.",
+					"relativePath": "docs/frontend/Performance Fix Log.md",
+					"sectionId": "frontend-app",
+					"tags": [
+						"frontend-app"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-frontend-performance-insights-md",
+					"title": "Performance Insights",
+					"summary": "This document now tracks active frontend performance follow-ups only. Items that were fixed move to Performance Fix Log.",
+					"relativePath": "docs/frontend/Performance Insights.md",
 					"sectionId": "frontend-app",
 					"tags": [
 						"frontend-app"
@@ -283,7 +305,7 @@
 				{
 					"id": "docs-runtime-control-local-vs-container-ownership-md",
 					"title": "Local Vs Container Ownership",
-					"summary": "Suite now uses a deliberate hybrid runtime model.",
+					"summary": "Suite now uses a deliberate hybrid runtime model with two supported startup lanes.",
 					"relativePath": "docs/runtime-control/local-vs-container-ownership.md",
 					"sectionId": "runtime-control",
 					"tags": [

@@ -27,6 +27,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { APP_NAME } from "../appMeta";
 import { useAuth } from "../auth/useAuth";
 import { SuiteLogo } from "../components/brand/SuiteLogo";
+import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 import { Badge } from "../components/system/base/Badge";
 // Primitives
 import { Button } from "../components/system/base/Button";
@@ -35,7 +36,6 @@ import { Input } from "../components/system/base/Input";
 import { Panel } from "../components/system/base/Panel";
 import { Stack } from "../components/system/base/Stack";
 import { Text } from "../components/system/base/Text";
-import AdminCrownPixel from "../components/roles/AdminCrownPixel";
 import {
 	PageHeaderProvider,
 	usePageHeader,
@@ -57,6 +57,7 @@ import type { SuiteRuntimeDoctorReport } from "../lib/runtimeDoctor";
 import { cn } from "../lib/utils";
 import styles from "./AppShell.module.css";
 import { resolveShellMeta, type ShellFamilyId } from "./appShellMeta";
+import { scheduleShellWarmup, warmShellFamily } from "./routeWarmup";
 
 type ShellNavItem = {
 	to: string;
@@ -211,10 +212,12 @@ function SidebarNav({
 	activeFamily,
 	pathname,
 	onNavigate,
+	onWarmFamily,
 }: {
 	activeFamily: ShellFamilyId;
 	pathname: string;
 	onNavigate?: () => void;
+	onWarmFamily?: (family: ShellFamilyId) => void;
 }) {
 	const { user } = useAuth();
 	const canAccessCommandCenter = isDevAudience(user);
@@ -270,6 +273,8 @@ function SidebarNav({
 							aria-current={isActive ? "page" : undefined}
 							className={navItemClass(isActive)}
 							onClick={onNavigate}
+							onMouseEnter={() => onWarmFamily?.(item.family)}
+							onFocus={() => onWarmFamily?.(item.family)}
 						>
 							<Icon size={16} />
 							<span className={styles.navItemCopy}>
@@ -288,6 +293,8 @@ function SidebarNav({
 					aria-current={settingsActive ? "page" : undefined}
 					className={navItemClass(settingsActive)}
 					onClick={onNavigate}
+					onMouseEnter={() => onWarmFamily?.("settings")}
+					onFocus={() => onWarmFamily?.("settings")}
 				>
 					<Settings size={16} />
 					<span className={styles.navItemCopy}>
@@ -312,6 +319,8 @@ function SidebarNav({
 								aria-current={isActive ? "page" : undefined}
 								className={navItemClass(isActive)}
 								onClick={onNavigate}
+								onMouseEnter={() => onWarmFamily?.(item.family)}
+								onFocus={() => onWarmFamily?.(item.family)}
 							>
 								<Icon size={16} />
 								<span className={styles.navItemCopy}>
@@ -434,9 +443,11 @@ function SidebarSessionCluster({ compact = false }: { compact?: boolean }) {
 function DesktopSidebar({
 	activeFamily,
 	pathname,
+	onWarmFamily,
 }: {
 	activeFamily: ShellFamilyId;
 	pathname: string;
+	onWarmFamily?: (family: ShellFamilyId) => void;
 }) {
 	return (
 		<aside className={styles.desktopSidebar} aria-label="Workspace navigation">
@@ -444,7 +455,11 @@ function DesktopSidebar({
 				<SidebarBrand />
 			</div>
 			<div className={styles.desktopSidebarContent}>
-				<SidebarNav activeFamily={activeFamily} pathname={pathname} />
+				<SidebarNav
+					activeFamily={activeFamily}
+					pathname={pathname}
+					onWarmFamily={onWarmFamily}
+				/>
 			</div>
 			<div className={styles.desktopSidebarFooter}>
 				<SidebarSessionCluster />
@@ -458,11 +473,13 @@ function MobileDrawer({
 	pathname,
 	open,
 	onClose,
+	onWarmFamily,
 }: {
 	activeFamily: ShellFamilyId;
 	pathname: string;
 	open: boolean;
 	onClose: () => void;
+	onWarmFamily?: (family: ShellFamilyId) => void;
 }) {
 	useEffect(() => {
 		if (!open) return;
@@ -496,6 +513,7 @@ function MobileDrawer({
 						activeFamily={activeFamily}
 						pathname={pathname}
 						onNavigate={onClose}
+						onWarmFamily={onWarmFamily}
 					/>
 				</div>
 				<div className={styles.mobileDrawerFooter}>
@@ -700,6 +718,7 @@ function ShellWorkspace() {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<AppDiagnostic[]>([]);
+	const { user } = useAuth();
 	const {
 		report: runtimeReport,
 		loading: runtimeDoctorLoading,
@@ -713,6 +732,16 @@ function ShellWorkspace() {
 	const ShellMetaIcon = shellMeta.icon;
 
 	const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+	const warmRouteFamily = useCallback((family: ShellFamilyId) => {
+		void warmShellFamily(family);
+	}, []);
+	const routeWarmupFamilies = useMemo(() => {
+		const families: ShellFamilyId[] = ["projects", "settings"];
+		if (isDevAudience(user)) {
+			families.push("developer");
+		}
+		return families;
+	}, [user]);
 
 	useEffect(() => {
 		if (!pathname) return;
@@ -725,6 +754,10 @@ function ShellWorkspace() {
 	}, [pathname]);
 
 	useEffect(() => subscribeAppDiagnostics(setDiagnostics), []);
+
+	useEffect(() => {
+		return scheduleShellWarmup(routeWarmupFamilies);
+	}, [routeWarmupFamilies]);
 
 	const resolvedTitle = header.title || shellMeta.title;
 	const resolvedSubtitle = header.subtitle || shellMeta.subtitle;
@@ -769,6 +802,7 @@ function ShellWorkspace() {
 				pathname={pathname}
 				open={mobileMenuOpen}
 				onClose={closeMobileMenu}
+				onWarmFamily={warmRouteFamily}
 			/>
 			<AppDiagnosticsDrawer
 				open={diagnosticsOpen}
@@ -780,7 +814,11 @@ function ShellWorkspace() {
 			/>
 
 			<div className={styles.shellBody}>
-				<DesktopSidebar activeFamily={shellMeta.family} pathname={pathname} />
+				<DesktopSidebar
+					activeFamily={shellMeta.family}
+					pathname={pathname}
+					onWarmFamily={warmRouteFamily}
+				/>
 				<main ref={scrollRef} className={styles.main}>
 					<div className={styles.commandFrame}>
 						<div className={styles.workspaceSurface}>

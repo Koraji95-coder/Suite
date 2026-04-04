@@ -21,6 +21,7 @@ import { useAuth } from "../../auth/useAuth";
 import { loadDashboardOverviewFromBackend } from "../../features/project-overview/dashboardOverviewService";
 import { logger } from "../../lib/logger";
 import { logAuthMethodTelemetry } from "../../services/securityEventService";
+import { loadHomeRoutePage, loadShell } from "../routeModuleLoaders";
 
 const DASHBOARD_REDIRECT_MIN_MS = 10_000;
 const DASHBOARD_REDIRECT_MIN_PROGRESS = 4;
@@ -173,6 +174,7 @@ export function useLoginController(): LoginController {
 		};
 
 		if (shouldPreloadDashboard) {
+			void Promise.allSettled([loadShell(), loadHomeRoutePage()]);
 			setRedirectMessage("Preparing workspace...");
 			setRedirectProgress(DASHBOARD_REDIRECT_MIN_PROGRESS);
 			const startedAt = performance.now();

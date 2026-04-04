@@ -1,18 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	fetchAutodeskStandardsReferenceSummary,
-} from "./referenceCatalogService";
+import { fetchAutodeskStandardsReferenceSummary } from "./referenceCatalogService";
 
 const mockFetch = vi.hoisted(() => vi.fn());
+const getSessionMock = vi.hoisted(() => vi.fn());
 
 vi.stubGlobal("fetch", mockFetch);
+vi.mock("@/supabase/client", () => ({
+	supabase: {
+		auth: {
+			getSession: getSessionMock,
+		},
+	},
+}));
 
 afterEach(() => {
 	mockFetch.mockReset();
+	getSessionMock.mockReset();
 });
 
 describe("fetchAutodeskStandardsReferenceSummary", () => {
 	it("normalizes standards family payloads from the backend", async () => {
+		getSessionMock.mockResolvedValue({
+			data: { session: { access_token: "token-123" } },
+			error: null,
+		});
 		mockFetch.mockResolvedValue({
 			ok: true,
 			json: async () => ({
@@ -53,12 +64,32 @@ describe("fetchAutodeskStandardsReferenceSummary", () => {
 			"JIC",
 			"NFPA",
 		]);
+		expect(mockFetch).toHaveBeenCalledWith(
+			"/api/autocad/reference/standards",
+			expect.objectContaining({
+				headers: expect.objectContaining({
+					Accept: "application/json",
+					Authorization: "Bearer token-123",
+				}),
+			}),
+		);
 	});
 
 	it("throws on non-ok responses", async () => {
+		getSessionMock.mockResolvedValue({
+			data: { session: { access_token: "token-123" } },
+			error: null,
+		});
 		mockFetch.mockResolvedValue({
 			ok: false,
 			status: 503,
+			headers: {
+				get: () => null,
+			},
+			clone: () => ({
+				json: async () => null,
+				text: async () => "",
+			}),
 		});
 
 		await expect(fetchAutodeskStandardsReferenceSummary()).rejects.toThrow(

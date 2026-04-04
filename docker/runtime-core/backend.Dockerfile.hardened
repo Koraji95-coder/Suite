@@ -1,0 +1,91 @@
+ARG PYTHON_VERSION=3.14
+ARG NODE_VERSION=22
+
+# =============================================================================
+# SECURITY BASELINE IMAGE
+# =============================================================================
+FROM python:${PYTHON_VERSION}-alpine AS python_base
+
+# Install system dependencies in single layer to reduce image bloat
+RUN apk add --no-cache \
+    ca-certificates \
+    git \
+    curl
+
+# Create non-root user
+RUN addgroup -g 1001 -S api && adduser -S api -u 1001
+
+# =============================================================================
+# DEPENDENCIES BUILDER STAGE
+# =============================================================================
+FROM python_base AS deps_builder
+
+RUN apk add --no-cache \
+    build-base \
+    libffi-dev \
+    openssl-dev
+
+WORKDIR /build
+
+# Copy lock file ONLY (cache layer)
+COPY backend/requirements-api.lock.txt ./
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    -r requirements-api.lock.txt
+
+# Optional: scan for vulnerabilities (comment out if pip-audit not available)
+RUN pip install --no-cache-dir pip-audit && pip-audit --desc --skip-editable 2>&1 || echo "⚠ CVEs found in dependencies"
+
+# =============================================================================
+# NODE RUNTIME (minimal, security-focused)
+# =============================================================================
+FROM node:${NODE_VERSION}-alpine AS node_runtime
+
+# Verify node and npm versions
+RUN node --version && npm --version
+
+# Install worktale
+RUN npm install -g worktale@1.3.0 && npm cache clean --force
+
+# =============================================================================
+# FINAL RUNTIME IMAGE
+# =============================================================================
+FROM python_base AS runtime
+
+WORKDIR /workspace
+
+# Environment hardening
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    NODE_ENV=production \
+    NPM_CONFIG_LOGLEVEL=warn \
+    PATH="/usr/local/bin:${PATH}"
+
+# Copy Node and npm from builder (smaller footprint than base image)
+COPY --from=node_runtime --chown=api:api /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node_runtime --chown=api:api /usr/local/bin/node /usr/local/bin/node
+COPY --from=node_runtime --chown=api:api /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node_runtime --chown=api:api /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=node_runtime --chown=api:api /usr/local/bin/worktale /usr/local/bin/worktale
+
+# Symlink for consistency
+RUN ln -s /usr/local/lib/node_modules /usr/local/lib/npm
+
+# Copy pre-built Python packages from deps builder
+COPY --from=deps_builder --chown=api:api /usr/local/lib/python3.14/site-packages \
+    /usr/local/lib/python3.14/site-packages
+
+# Copy application code (LAST for cache efficiency)
+COPY --chown=api:api backend/ ./backend/
+
+# Switch to non-root user (critical security fix)
+USER api
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)" || exit 1
+
+EXPOSE 5000
+
+CMD ["python", "backend/api_server.py"]

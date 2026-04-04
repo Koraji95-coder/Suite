@@ -50,10 +50,10 @@ Optional:
 This bring-up is intentionally hybrid:
 
 - Docker owns the reproducible runtime-core lane:
-  - frontend
-  - backend
+  - frontend web runtime
+  - backend API
   - Redis
-  - local Supabase development services
+- local Supabase development services stay Docker-managed, but bootstrap starts them separately through the Supabase CLI
 - workstation-local ownership stays with:
   - Runtime Control
   - Office companion
@@ -64,6 +64,18 @@ This bring-up is intentionally hybrid:
   - local learning, SQLite, JSONL, and promoted local model artifacts
 
 Workstation switching is still Git + bootstrap + workstation sync + mirror/restore. Docker improves parity and observability, but it is not the full migration mechanism.
+
+## Startup Lanes After Bring-Up
+
+After the machine is set up, use the lane that matches the task:
+
+- Managed workstation lane: sign-in startup or `npm run workstation:bootstrap`
+- This starts local Supabase through the Supabase CLI, then the runtime-core Docker services for frontend, backend, and Redis.
+- The managed frontend uses a prepared preview build. Use this lane for Runtime Control validation, workstation ownership checks, and the normal sign-in experience.
+- Native coding lane: `npm run dev:full`
+- This starts frontend and backend locally, starts the AutoDraft .NET API locally, and auto-starts the shared runtime-core Redis service when needed. Start local Supabase separately when your work needs it.
+- `npm run runtime:core:up` only manages the runtime-core Docker services and does not start local Supabase by itself.
+- Do not run both lanes at the same time on the same workstation.
 
 ## First-Time Bring-Up
 

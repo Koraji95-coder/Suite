@@ -943,6 +943,10 @@ def _get_supabase_user_id(user: Dict[str, Any]) -> Optional[str]:
     return auth_runtime.get_supabase_user_id(user)
 
 
+def _get_supabase_user_email(user: Dict[str, Any]) -> Optional[str]:
+    return auth_runtime.get_supabase_user_email(user)
+
+
 def _get_bearer_token() -> Optional[str]:
     return auth_runtime.get_bearer_token()
 
@@ -1542,7 +1546,6 @@ register_route_groups(
     batch_session_cookie=BATCH_SESSION_COOKIE,
     batch_session_ttl_seconds=BATCH_SESSION_TTL_SECONDS,
     require_supabase_user=require_supabase_user,
-    get_supabase_user_id=_get_supabase_user_id,
     passkey_deps=dependency_bundle_build_passkey_deps_helper(globals()),
     transmittal_render_deps=dependency_bundle_build_transmittal_render_deps_helper(
         globals()

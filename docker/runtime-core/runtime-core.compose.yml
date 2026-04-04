@@ -5,6 +5,8 @@ services:
       - redis-server
       - --appendonly
       - "yes"
+    ports:
+      - "127.0.0.1:${SUITE_RUNTIME_REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - suite_runtime_core_redis_data:/data
     healthcheck:
@@ -21,6 +23,8 @@ services:
     build:
       context: ../..
       dockerfile: docker/runtime-core/backend.Dockerfile
+      # To use hardened Alpine version, change to:
+      # dockerfile: docker/runtime-core/backend.Dockerfile.hardened
     working_dir: /workspace
     env_file:
       - ../../.env
@@ -58,12 +62,13 @@ services:
     build:
       context: ../..
       dockerfile: docker/runtime-core/node.Dockerfile
+      # To use hardened Alpine version, change to:
+      # dockerfile: docker/runtime-core/node.Dockerfile.hardened
     working_dir: /workspace
     env_file:
       - ../../.env
       - ../../.env.local
     environment:
-      CHOKIDAR_USEPOLLING: "1"
       BACKEND_PROXY_TARGET: http://backend:5000
     volumes:
       - ../..:/workspace
@@ -74,7 +79,7 @@ services:
     command:
       - sh
       - -lc
-      - npm run dev -- --host 0.0.0.0 --port 5173 --strictPort 2>&1 | tee /runtime-logs/frontend.log
+      - npm run frontend:managed -- --host 0.0.0.0 --port 5173 --strictPort 2>&1 | tee /runtime-logs/frontend.log
     ports:
       - "5173:5173"
     depends_on:

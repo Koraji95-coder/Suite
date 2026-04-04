@@ -1,8 +1,4 @@
 /* src/theme.css */
-@import url(
-	"https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-);
-
 /* ═══════════════════════════════════════════════════════════════════════════
    CSS CUSTOM PROPERTIES
    These are set by ThemeProvider using the fixed Suite Dark palette.
@@ -11,16 +7,16 @@
 :root {
 	/* Typography */
 	--font-body:
-		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-		sans-serif;
+		"Plus Jakarta Sans Variable", system-ui, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", sans-serif;
 	--font-heading:
-		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-		sans-serif;
+		"Plus Jakarta Sans Variable", system-ui, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", sans-serif;
 	--font-meta:
-		"Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-		sans-serif;
-	--font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
-		monospace;
+		"Plus Jakarta Sans Variable", system-ui, -apple-system, BlinkMacSystemFont,
+		"Segoe UI", sans-serif;
+	--font-mono:
+		"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
 	/* Backgrounds */
 	--bg: #07090d;

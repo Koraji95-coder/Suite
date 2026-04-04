@@ -290,7 +290,7 @@ function Get-PrerequisiteSnapshot {
             ok = ($null -ne $pythonCommand)
             version = if ($pythonCommand) { Get-CommandVersionText -FilePath $pythonCommand.Source -Arguments @("--version") } else { $null }
             location = if ($pythonCommand) { $pythonCommand.Source } else { $null }
-            installHint = "winget install --id Python.Python.3.12 -e --silent"
+            installHint = "winget install --id Python.Python.3.14 -e --silent"
         }
         [pscustomobject]@{
             id = "dotnet"
@@ -379,7 +379,7 @@ function Install-MissingPrerequisite {
             $packageId = switch ([string]$Prerequisite.id) {
                 "git" { "Git.Git" }
                 "node" { "OpenJS.NodeJS.LTS" }
-                "python" { "Python.Python.3.12" }
+                "python" { "Python.Python.3.14" }
                 "dotnet" { "Microsoft.DotNet.SDK.10" }
                 "docker" { "Docker.DockerDesktop" }
                 "webview2" { "Microsoft.EdgeWebView2Runtime" }

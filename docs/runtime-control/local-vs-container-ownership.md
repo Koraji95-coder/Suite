@@ -1,17 +1,27 @@
 # Local Vs Container Ownership
 
-Suite now uses a deliberate hybrid runtime model.
+Suite now uses a deliberate hybrid runtime model with two supported startup lanes.
 
 Docker is important, but it is not the whole workstation portability story.
+
+## Supported Startup Lanes
+
+- Native developer lane: `npm run dev:full`
+- Use this for active coding. Frontend and backend run locally, the shared runtime-core Redis service can auto-start in Docker, and local Supabase remains explicit.
+- Managed workstation lane: `npm run workstation:bootstrap`
+- Use this for Runtime Control, bring-up, and sign-in startup. It starts local Supabase through the Supabase CLI and then the runtime-core Docker services.
+- The managed frontend serves a prepared preview build instead of the live Vite HMR dev server.
+- Do not run both lanes at the same time on the same workstation.
 
 ## Docker-Owned Runtime Core
 
 Use Docker for the shared reproducible lane:
 
-- frontend
-- backend
+- frontend web runtime
+- backend API
 - Redis
-- the local Supabase development lane
+
+Local Supabase development services are still Docker-managed, but they are started separately through the Supabase CLI instead of `npm run runtime:core:up`.
 
 Why this stays in Docker:
 

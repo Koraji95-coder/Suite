@@ -1,0 +1,35 @@
+name: njsscan sarif
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "33 16 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  njsscan:
+    name: njsscan code scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: nodejsscan scan
+        id: njsscan
+        uses: ajinabraham/njsscan-action@7237412fdd36af517e2745077cedbf9d6900d711
+        with:
+          args: '. --sarif --output results.sarif || true'
+
+      - name: Upload njsscan report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

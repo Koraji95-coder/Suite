@@ -50,13 +50,8 @@ const limiterStrictMode =
 	limiterRequireSharedStorage ||
 	limiterMode === "production" ||
 	limiterMode === "prod";
-const redisContainerName =
-	(process.env.SUITE_REDIS_CONTAINER_NAME || "").trim() || "suite-redis-local";
-const redisDataVolume =
-	(process.env.SUITE_REDIS_DATA_VOLUME || "").trim() ||
-	"suite_redis_local_data";
-const redisImage =
-	(process.env.SUITE_REDIS_IMAGE || "").trim() || "redis:7-alpine";
+const runtimeCoreComposePath = "docker/runtime-core/runtime-core.compose.yml";
+const runtimeCoreComposeProjectName = "suite-runtime-core";
 const backendPort = Number.parseInt(
 	(process.env.API_PORT || "").trim() || "5000",
 	10,
@@ -321,15 +316,7 @@ function normalizeDockerPublishHost(host) {
 	return isLoopbackHost(host) ? "127.0.0.1" : String(host || "").trim();
 }
 
-function dockerContainerExists(containerName) {
-	if (!commandExists("docker")) return false;
-	const probe = spawnSync("docker", ["inspect", containerName], {
-		stdio: "ignore",
-	});
-	return probe.status === 0;
-}
-
-function startDockerRedisContainer(endpoint) {
+function ensureRuntimeCoreRedisService(endpoint) {
 	if (!commandExists("docker")) {
 		return {
 			ok: false,
@@ -342,65 +329,45 @@ function startDockerRedisContainer(endpoint) {
 		return {
 			ok: false,
 			reason: "unsupported_non_local_host",
-			detail: `Docker Redis autostart only supports loopback hosts; got ${endpoint.host}`,
-		};
-	}
-
-	if (dockerContainerExists(redisContainerName)) {
-		const startResult = spawnSync("docker", ["start", redisContainerName], {
-			encoding: "utf8",
-		});
-		const startText =
-			`${String(startResult.stdout || "")}\n${String(startResult.stderr || "")}`.trim();
-		if (
-			startResult.status === 0 ||
-			startText.toLowerCase().includes("already running")
-		) {
-			return {
-				ok: true,
-				reason: `docker_container:${redisContainerName}`,
-			};
-		}
-		return {
-			ok: false,
-			reason: "docker_start_failed",
-			detail: startText,
+			detail: `Runtime-core Redis reuse only supports loopback hosts; got ${endpoint.host}`,
 		};
 	}
 
 	const publishHost = normalizeDockerPublishHost(endpoint.host);
-	const createResult = spawnSync(
+	if (publishHost !== "127.0.0.1" || endpoint.port !== 6379) {
+		return {
+			ok: false,
+			reason: "unsupported_runtime_core_endpoint",
+			detail: `Runtime-core Redis is published on 127.0.0.1:6379; requested ${publishHost}:${endpoint.port}`,
+		};
+	}
+
+	const composeResult = spawnSync(
 		"docker",
 		[
-			"run",
-			"-d",
-			"--name",
-			redisContainerName,
-			"--restart",
-			"unless-stopped",
+			"compose",
+			"-f",
+			runtimeCoreComposePath,
 			"-p",
-			`${publishHost}:${endpoint.port}:6379`,
-			"-v",
-			`${redisDataVolume}:/data`,
-			redisImage,
-			"redis-server",
-			"--appendonly",
-			"yes",
+			runtimeCoreComposeProjectName,
+			"up",
+			"-d",
+			"redis",
 		],
 		{ encoding: "utf8" },
 	);
-	const createText =
-		`${String(createResult.stdout || "")}\n${String(createResult.stderr || "")}`.trim();
-	if (createResult.status === 0) {
+	const composeText =
+		`${String(composeResult.stdout || "")}\n${String(composeResult.stderr || "")}`.trim();
+	if (composeResult.status === 0) {
 		return {
 			ok: true,
-			reason: `docker_container:${redisContainerName}`,
+			reason: `runtime_core_compose:${runtimeCoreComposeProjectName}/redis`,
 		};
 	}
 	return {
 		ok: false,
-		reason: "docker_run_failed",
-		detail: createText,
+		reason: "docker_compose_failed",
+		detail: composeText,
 	};
 }
 
@@ -479,12 +446,12 @@ async function ensureRedis() {
 	}
 
 	console.log(
-		`[dev-full] Ensuring Docker Redis container '${redisContainerName}' is running at ${endpointLabel}...`,
+		`[dev-full] Ensuring runtime-core Redis service is running at ${endpointLabel}...`,
 	);
-	const dockerStart = startDockerRedisContainer(endpoint);
-	if (!dockerStart.ok) {
+	const redisStart = ensureRuntimeCoreRedisService(endpoint);
+	if (!redisStart.ok) {
 		return resolveRedisUnavailableStatus(
-			`Unable to autostart Redis via Docker (${dockerStart.detail || dockerStart.reason})`,
+			`Unable to autostart runtime-core Redis (${redisStart.detail || redisStart.reason})`,
 		);
 	}
 
@@ -494,12 +461,12 @@ async function ensureRedis() {
 			mode: "redis",
 			available: true,
 			storageUri: limiterStorageUri,
-			reason: dockerStart.reason,
+			reason: redisStart.reason,
 		};
 	}
 
 	return resolveRedisUnavailableStatus(
-		`Redis Docker container '${redisContainerName}' did not become reachable at ${endpointLabel}`,
+		`Runtime-core Redis did not become reachable at ${endpointLabel}`,
 	);
 }
 

@@ -3,6 +3,7 @@ import {
 	type MutableRefObject,
 	type SetStateAction,
 } from "react";
+import { localId } from "@/lib/localId";
 import { coordinatesGrabberService } from "@/features/cad-runtime/coordinatesGrabberService";
 import {
 	calculatePerformanceMetrics,
@@ -167,7 +168,7 @@ export function useCoordinatesGrabberExecutionController({
 
 			try {
 				addLog("[PROCESSING] Preparing request...");
-				const runId = `cg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+				const runId = localId("cg");
 				activeRunIdRef.current = runId;
 				if (wsConnected) {
 					setProgress(3);

@@ -1,6 +1,7 @@
 import { RefreshCw, Upload, Wand2 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/notification-system/ToastProvider";
+import { localId } from "@/lib/localId";
 import type { TitleBlockSyncProfile } from "@/features/project-setup/types";
 import { logger } from "@/lib/logger";
 import {
@@ -30,10 +31,8 @@ interface DrawingProgramPanelProps {
 	onStageTitleBlockReview?: (relativePaths: string[]) => Promise<void> | void;
 }
 
-function createClientId(prefix = "drawing-program-receipt") {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createClientId() {
+	return localId();
 }
 
 export function DrawingProgramPanel({

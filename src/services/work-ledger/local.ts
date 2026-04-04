@@ -1,4 +1,5 @@
 import { getLocalStorageApi } from "@/lib/browserStorage";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import {
 	normalizeLifecycleState,
@@ -13,10 +14,7 @@ import type {
 
 const LOCAL_STORAGE_KEY = "suite:work-ledger:local";
 
-const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `work-ledger-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const createId = () => localId();
 
 export function readLocalEntries(): WorkLedgerRow[] {
 	const storage = getLocalStorageApi();

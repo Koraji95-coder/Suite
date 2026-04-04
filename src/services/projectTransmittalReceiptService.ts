@@ -4,6 +4,7 @@ import type {
 	TransmittalNativeStandardsReviewSnapshot,
 	TransmittalType,
 } from "@/features/transmittal-builder";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import {
 	loadSetting,
@@ -94,9 +95,7 @@ const transmittalReceiptFetchCache = createProjectScopedFetchCache<{
 }>();
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `transmittal-receipt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

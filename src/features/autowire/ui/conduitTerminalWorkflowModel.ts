@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { DEFAULT_WIRE_FUNCTIONS, WIRE_COLORS } from "./conduitRouteData";
 import { buildTerminalLayout } from "./conduitTerminalEngine";
 import type { CableSystemType } from "./conduitRouteTypes";
@@ -137,7 +138,7 @@ export function makeCadSessionId(): string {
 }
 
 export function makeRouteId(): string {
-	return `troute_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+	return localId("troute");
 }
 
 export function formatLength(length: number): string {
@@ -149,7 +150,7 @@ export function delayMs(ms: number): Promise<void> {
 }
 
 export function makeDiagnosticId(): string {
-	return `cad-diag-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+	return localId("cad-diag");
 }
 
 export function resolveCadProviderPath(meta?: {

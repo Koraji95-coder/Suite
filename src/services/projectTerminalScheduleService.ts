@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { getLocalStorageApi } from "@/lib/browserStorage";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import {
 	deleteSetting,
@@ -68,9 +69,7 @@ const TERMINAL_SCHEDULE_SETTING_KEY = "project_terminal_schedule_v1";
 const LOCAL_STORAGE_PREFIX = "suite:project-terminal-schedule";
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `terminal-schedule-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

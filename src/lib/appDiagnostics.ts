@@ -1,3 +1,5 @@
+import { localId } from "@/lib/localId";
+
 export type AppDiagnosticSeverity = "info" | "warning" | "error";
 export type AppDiagnosticSource = "logger" | "fetch" | "runtime";
 
@@ -33,7 +35,7 @@ function emit() {
 }
 
 function nextDiagnosticId() {
-	return `diag-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+	return localId("diag");
 }
 
 function findRecentDuplicate(

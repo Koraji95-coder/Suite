@@ -1,3 +1,5 @@
+import { localId } from "@/lib/localId";
+
 export type CommandPreset = {
 	id: string;
 	name: string;
@@ -192,7 +194,7 @@ export function createCommandCenterHistoryEntry(
 ): CommandCenterHistoryEntry {
 	const timestamp = Date.now();
 	return {
-		id: `cc-history-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
+		id: localId("cc-history"),
 		timestamp,
 		category: payload.category,
 		action: payload.action,

@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
 import { supabase } from "@/supabase/client";
@@ -57,9 +58,7 @@ const LOCAL_STORAGE_PREFIX = "suite:project-markup-snapshots";
 const DEFAULT_CONTRACT_VERSION = "bluebeam-default.v1";
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `markup-snapshot-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

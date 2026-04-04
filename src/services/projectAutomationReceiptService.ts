@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
 import type { AutomationWorkbenchMode } from "@/features/automation-studio";
@@ -76,9 +77,7 @@ const automationReceiptFetchCache = createProjectScopedFetchCache<{
 }>();
 
 function createId() {
-  return typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `automation-receipt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

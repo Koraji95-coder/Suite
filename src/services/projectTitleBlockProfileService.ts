@@ -1,5 +1,6 @@
 import { projectSetupBackendService } from "@/features/project-setup";
 import { getLocalStorageApi } from "@/lib/browserStorage";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { looksLikeUuid } from "@/lib/uuid";
 import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
@@ -32,10 +33,7 @@ interface FetchProfileDefaults {
 const LOCAL_STORAGE_KEY = "suite:project-title-block-profiles:local";
 export const DEFAULT_PROJECT_TITLE_BLOCK_NAME = "R3P-24x36BORDER&TITLE";
 
-const createId = () =>
-	typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `title-block-profile-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const createId = () => localId();
 
 function normalizeText(value: string | null | undefined) {
 	return String(value || "").trim();

@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import {
 	loadSetting,
@@ -78,9 +79,7 @@ const issueSetFetchCache = createProjectScopedFetchCache<{
 }>();
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `issue-set-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

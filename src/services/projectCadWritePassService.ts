@@ -1,4 +1,5 @@
 import { getLocalStorageApi } from "@/lib/browserStorage";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { getCurrentSupabaseUserId } from "@/services/projectWorkflowClientSupport";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
@@ -50,9 +51,7 @@ const PASS_SETTING_KEY = "project_cad_write_passes_v1";
 const LOCAL_STORAGE_PREFIX = "suite:project-cad-write-passes";
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `cad-write-pass-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

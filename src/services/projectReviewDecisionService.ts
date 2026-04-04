@@ -1,3 +1,4 @@
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import { loadSetting, saveSetting } from "@/settings/userSettings";
 import {
@@ -40,11 +41,7 @@ const reviewDecisionFetchCache = createProjectScopedFetchCache<{
 }>();
 
 function createId() {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `project-review-decision-${Date.now()}-${Math.random()
-				.toString(16)
-				.slice(2)}`;
+	return localId();
 }
 
 function normalizeText(value: unknown) {

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { getLocalStorageApi } from "@/lib/browserStorage";
+import { localId } from "@/lib/localId";
 import { logger } from "@/lib/logger";
 import type { WatchdogCollectorEvent } from "@/services/watchdogService";
 import {
@@ -550,10 +551,8 @@ const BUILTIN_R3P_ELECTRICAL_CATALOG: BuiltinDrawingCatalogSeed[] = [
 	},
 ];
 
-function createId(prefix = "drawing-program") {
-	return typeof crypto !== "undefined" && "randomUUID" in crypto
-		? crypto.randomUUID()
-		: `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createId(prefix?: string) {
+	return localId(prefix);
 }
 
 function nowIso() {

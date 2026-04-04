@@ -20,13 +20,8 @@ vi.mock("@/services/projectAutomationReceiptService", () => ({
   },
 }));
 
-vi.mock("@/features/automation-studio", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/features/automation-studio")
-  >("@/features/automation-studio");
-
+vi.mock("@/features/automation-studio/useAutomationStudioState", () => {
   return {
-    ...actual,
     useAutomationStudioState: () => ({
       projectOptions: [
         {

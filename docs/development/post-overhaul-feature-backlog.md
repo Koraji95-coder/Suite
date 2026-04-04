@@ -21,6 +21,7 @@ This note captures the immediate backlog split after the project-setup/title-blo
 - shared app-library triage / unknown Autodesk links / ProView identification (`mixed`)
 - APS Viewer / hyperlink-review exploration (`web`)
 - Scikit-learn or PyTorch assistive scoring (`hosted core`)
+- Anaconda/Conda sandbox for future ML-heavy experimentation without replacing the repo default CPython + venv workflow (`tooling`)
 
 ## Skip
 

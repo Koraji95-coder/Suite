@@ -117,7 +117,7 @@ pywin32==311 ; sys_platform == "win32"
     #   docx2pdf
 redis==7.3.0
     # via -r backend/requirements-api.in
-requests==2.32.5
+requests==2.33.0
     # via -r backend/requirements-api.in
 scikit-learn==1.8.0
     # via -r backend/requirements-api.in

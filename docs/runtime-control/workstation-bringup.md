@@ -182,7 +182,7 @@ Do not casually toggle workstation identity between machines.
 
 Each physical workstation should keep one permanent workstation id, for example:
 
-- `DUSTIN-HOME`
+- `DEV-WORKSTATION`
 - `DUSTIN-WORK`
 
 You can re-stamp the current workstation identity without a full bootstrap:

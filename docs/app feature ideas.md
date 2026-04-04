@@ -24,7 +24,7 @@
 -https://apps.autodesk.com/ACAD_E/en/Detail/Index?id=7769815567850226931&appLang=en&os=Win64
 
 - We would use our own interface though, again i think ACAD_E handles alot of this database stuff, especially considering both ACADE and ACAD have design centers. 
-G:\Shared drives\R3P RESOURCES\SPECIFICATIONS\DRAFTING we are only using "Electrical" so we would have to talk further this is our drawing list standard 
+G:\Shared drives\Company Resources\SPECIFICATIONS\DRAFTING we are only using "Electrical" so we would have to talk further this is our drawing list standard 
 
 ## Dimension set(s)
 
@@ -48,19 +48,19 @@ G:\Shared drives\R3P RESOURCES\SPECIFICATIONS\DRAFTING we are only using "Electr
 
 ## Batch find and replace
 
-- G:\Shared drives\R3P RESOURCES\APPS\Batch Find & Replace
+- G:\Shared drives\Company Resources\APPS\Batch Find & Replace
 - this was my original batch find and replace tool, i think you accidentally named some stuff inside of our app that and i just never cared to correct you, but i could be wrong, however, i do want a mass batch find and replace tool for text and stuff that can be paired with other stuff that i think ACADE has
 
 ## More Apps that we have at work that might be worth at least looking at? 
 
 - you can decide whats useful here and whats not youll have to tell me whats even in here and see if its useful.
-- G:\Shared drives\R3P RESOURCES\APPS
+- G:\Shared drives\Company Resources\APPS
 
 ## Transmittal Builder 
 
 - This was my original Transmittal builder and it works really well but this is just extra context for you for later. I do have a better version of this here inside of suite now tho I believe.
-- G:\Shared drives\R3P RESOURCES\APPS\Transmittal Builder
--G:\Shared drives\Root 3 Power\07-REFERENCE\01-SOFTWARE
+- G:\Shared drives\Company Resources\APPS\Transmittal Builder
+-G:\Shared drives\Company\07-REFERENCE\01-SOFTWARE
 - possibly digitizer but i think there are better things out there but i would like to be able to generate graphs later for time saved over time with this stuff but we would have to figure that out way later.
 - what is proview?
 

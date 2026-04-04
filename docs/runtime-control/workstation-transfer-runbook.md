@@ -17,10 +17,10 @@ Do not reuse workstation ids across machines.
 
 Recommended pattern:
 
-- Home machine: `DUSTIN-HOME`
+- Home machine: `DEV-WORKSTATION`
 - Work machine: `DUSTIN-WORK`
 
-Each physical machine should keep one permanent id. Do not restore the work PC as `DUSTIN-HOME`.
+Each physical machine should keep one permanent id. Do not restore the work PC as `DEV-WORKSTATION`.
 
 ## Source Machine Before You Leave
 

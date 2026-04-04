@@ -6,7 +6,7 @@ Use the profile sync script to rewrite the local `suite_repo_mcp` block in `%USE
 
 ```powershell
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1
-PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-HOME
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORKSTATION
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DUSTIN-WORK
 ```
 
@@ -25,7 +25,7 @@ Restart Codex after any MCP config change.
 | Workstation ID | Computer names | Label | Role |
 | --- | --- | --- | --- |
 | `DUSTIN-WORK` | `DUSTIN-WORK` | `Dustin Work station` | `work` |
-| `DUSTIN-HOME` | `DUSTIN-HOME` | `Dustin Home station` | `home` |
+| `DEV-WORKSTATION` | `DEV-WORKSTATION` | `Dustin Home station` | `home` |
 
 If a machine is not listed in the matrix, the sync helper falls back to:
 

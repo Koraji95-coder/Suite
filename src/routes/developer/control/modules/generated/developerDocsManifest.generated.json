@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-04T17:56:46.408Z",
+	"generatedAt": "2026-04-04T18:42:25.852Z",
 	"docCount": 78,
 	"sections": [
 		{
@@ -896,7 +896,7 @@
 				{
 					"id": "docs-app-feature-ideas-md",
 					"title": "App Feature Ideas",
-					"summary": "Shared drive resources and specifications — we are only using \"Electrical\" so we would have to talk further this is our drawing list standard",
+					"summary": "G:\\Shared drives\\Company Resources\\SPECIFICATIONS\\DRAFTING we are only using \"Electrical\" so we would have to talk further this is our drawing list standard",
 					"relativePath": "docs/app feature ideas.md",
 					"sectionId": "workspace-docs",
 					"tags": [

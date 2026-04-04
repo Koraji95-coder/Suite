@@ -26,6 +26,11 @@ if (!fs.existsSync(examplePath)) {
 }
 
 if (!fs.existsSync(envPath)) {
+	// In CI there is no .env file — that is expected. Skip the check.
+	if (process.env.CI) {
+		console.log("env-parity: skipped (CI environment, no .env file)");
+		process.exit(0);
+	}
 	console.error(
 		"env-parity: missing .env (copy .env.example and set local values)",
 	);

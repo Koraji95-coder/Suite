@@ -50,6 +50,9 @@ jobs:
       - if: matrix.build-mode == 'manual'
         name: Build C# projects
         shell: bash
+        # Allow build failures: some .NET projects depend on Windows-only
+        # AutoCAD/COM libraries that are unavailable on Linux runners.
+        # CodeQL still analyzes the source even on partial builds.
         run: |
           dotnet build dotnet/ --configuration Release || true
 

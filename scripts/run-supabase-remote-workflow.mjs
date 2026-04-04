@@ -24,27 +24,26 @@ const remoteProjectRef = readSetting(mergedEnv, "SUPABASE_REMOTE_PROJECT_REF");
 const remoteDbPassword = readSetting(mergedEnv, "SUPABASE_DB_PASSWORD");
 const statusPaths = getSupabaseSyncStatusPaths(mergedEnv);
 
+/** Redact sensitive fields before writing to stdout. */
+function redactForLog(payload) {
+	const copy = { ...payload };
+	if (copy.projectRef) {
+		copy.projectRef = `${String(copy.projectRef).slice(0, 8)}…`;
+	}
+	if (copy.preflight?.projectRef) {
+		copy.preflight = {
+			...copy.preflight,
+			projectRef: `${String(copy.preflight.projectRef).slice(0, 8)}…`,
+		};
+	}
+	return copy;
+}
+
 if (!["preflight", "push"].includes(command)) {
 	console.error(
 		"Usage: node scripts/run-supabase-remote-workflow.mjs <preflight|push> [--dry-run] [--notify-on-failure] [--silent-success]",
 	);
 	process.exit(1);
-}
-
-function quotePowerShell(value) {
-	return `'${String(value || "").replace(/'/g, "''")}'`;
-}
-
-function spawnPowerShell(commandText) {
-	return spawnSync(
-		"PowerShell.exe",
-		["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", commandText],
-		{
-			cwd: repoRoot,
-			encoding: "utf8",
-			windowsHide: true,
-		},
-	);
 }
 
 function trimOutput(value) {
@@ -374,7 +373,7 @@ async function runPreflightWorkflow() {
 
 	writeSupabaseSyncStatus("preflight", payload, mergedEnv);
 	if (!silentSuccess || !ok) {
-		console.log(JSON.stringify(payload, null, 2));
+		console.log(JSON.stringify(redactForLog(payload), null, 2));
 	}
 	if (!ok && notifyOnFailure) {
 		showFailureNotification(
@@ -403,7 +402,7 @@ async function runPushWorkflow() {
 			preflight,
 		};
 		writeSupabaseSyncStatus("push", payload, mergedEnv);
-		console.log(JSON.stringify(payload, null, 2));
+		console.log(JSON.stringify(redactForLog(payload), null, 2));
 		process.exit(1);
 	}
 
@@ -420,7 +419,7 @@ async function runPushWorkflow() {
 			preflight,
 		};
 		writeSupabaseSyncStatus("push", payload, mergedEnv);
-		console.log(JSON.stringify(payload, null, 2));
+		console.log(JSON.stringify(redactForLog(payload), null, 2));
 		return;
 	}
 
@@ -438,7 +437,7 @@ async function runPushWorkflow() {
 		output: pushResult.output,
 	};
 	writeSupabaseSyncStatus("push", payload, mergedEnv);
-	console.log(JSON.stringify(payload, null, 2));
+	console.log(JSON.stringify(redactForLog(payload), null, 2));
 	if (!pushResult.ok) {
 		if (notifyOnFailure) {
 			showFailureNotification(

@@ -196,17 +196,13 @@ export function routePath(
 		if (current.x === endCell.x && current.y === endCell.y) {
 			const path: Point2D[] = [];
 			let walkKey = currentKey;
-			let walkX = current.x;
-			let walkY = current.y;
-			path.unshift(fromGridPoint({ x: walkX, y: walkY }, step));
+			path.unshift(fromGridPoint({ x: current.x, y: current.y }, step));
 			while (parents.has(walkKey)) {
 				const parent = parents.get(walkKey);
 				if (!parent) {
 					break;
 				}
 				path.unshift(fromGridPoint({ x: parent.x, y: parent.y }, step));
-				walkX = parent.x;
-				walkY = parent.y;
 				walkKey = gridKey(parent.x, parent.y);
 			}
 			path[0] = start;

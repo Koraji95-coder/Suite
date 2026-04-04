@@ -239,6 +239,14 @@ const STATIC_RESOURCES = [
 		mimeType: "text/markdown",
 		filePath: path.join(REPO_ROOT, "docs", "cad", "autodesk-standards-checker-comparison.md"),
 	},
+	{
+		uri: "repo://docs/security/code-scanning-guide",
+		name: "Code Scanning & Security Quality Guide",
+		description:
+			"Guide for running CodeQL and njsscan locally, understanding alerts, preventing common security-quality issues, and keeping the scanning backlog clean.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "security", "code-scanning-guide.md"),
+	},
 ];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";
 const SUPPORTED_PROTOCOL_VERSIONS = new Set([
@@ -2824,6 +2832,14 @@ Notes: ${notes}
 7. Watchdog backend startup gate:
    - use \`repo.check_watchdog_backend_startup\` before relying on local AutoCAD telemetry, and rerun with \`start_if_missing=true\` when the server is missing
    - keep the backend service running via the standard \`python backend/api_server.py\` command and confirm it responds to \`/health\` before streaming telemetry
+8. Code scanning hygiene (CodeQL / njsscan):
+   - never use \`Math.random()\` for IDs, tokens, or security-adjacent values — use \`crypto.randomUUID()\` or \`crypto.getRandomValues()\`
+   - never pass user-derived data as a console format string — use \`console.log("%s", msg)\`
+   - never log environment variables or secrets to stdout — redact with a \`redactForLog()\` helper
+   - use atomic file writes (write to \`.tmp\`, then \`fs.renameSync()\`) for important data
+   - remove unused variables, dead assignments, and redundant guards — these trigger CodeQL quality alerts
+   - exclude vendored/third-party code from scanning via \`.github/codeql-config.yml\`
+   - see \`CODEX.md\` section 7 and \`docs/security/code-scanning-guide.md\` for full reference
 `,
 	},
 	"repo.workstation_context": {
@@ -2877,6 +2893,13 @@ Review scope: ${scope || "current staged changes"}
 - No silent broad exception swallowing
 - Office/Suite product boundary respected
 - Watchdog startup gates used before relying on local telemetry
+
+### Security & Quality (CodeQL Prevention)
+- No \`Math.random()\` for IDs or tokens — use \`crypto.randomUUID()\`
+- No user-derived format strings — use \`console.log("%s", msg)\`
+- No clear-text logging of env vars — redact before logging
+- No unused variables, dead assignments, or redundant guards
+- Vendored code excluded via \`.github/codeql-config.yml\`
 
 ### Standards
 - Biome lint clean (\`npm run lint\`)
@@ -2998,6 +3021,48 @@ Use this prompt when working on AutoCAD/AutoCAD Electrical integration.
 - Do not copy Autodesk install assets into the Suite repo
 - AutoCAD plugin must preserve error envelope contract
 - Design Automation API work should stay in the "Explore" bucket until a concrete batch use case exists
+`,
+	},
+	"repo.security_quality_review": {
+		description:
+			"Prompt for reviewing code changes against CodeQL security-and-quality rules to prevent scanning alerts.",
+		template: ({ scope = "" }) => `## Security & Quality Review Checklist
+
+Review scope: ${scope || "current staged changes"}
+
+### Why This Matters
+GitHub runs CodeQL (security-and-quality) and njsscan on every push to main and every PR.
+Unchecked alerts accumulate fast — we hit 152 at one point. Fixing proactively keeps real
+vulnerabilities from hiding among quality noise.
+
+### Security Checks
+1. **No \`Math.random()\` for IDs or tokens** — use \`crypto.randomUUID()\` or \`crypto.getRandomValues()\`
+2. **No format-string injection** — use \`console.log("%s", msg)\` instead of \`console.log(msg)\` when msg is user-derived
+3. **No clear-text logging of secrets/env vars** — redact sensitive fields before logging payloads
+4. **Atomic file writes** — write to \`.tmp\` then \`fs.renameSync()\` for important data files
+5. **No unvalidated dynamic method calls** — validate method names from external input before invoking
+
+### Quality Checks
+1. **No unused variables or imports** — remove dead declarations (CodeQL catches more than Biome)
+2. **No dead assignments** — don't assign initial values that are immediately overwritten
+3. **No trivial conditionals** — remove guards that are always true/false after earlier returns
+4. **No unused state** — if you store state you never read/render, remove it or wire it up
+5. **No redundant guards** — after \`if (!x) return\`, don't re-check \`x &&\` downstream
+
+### Vendored Code
+- If adding third-party bundles, add their paths to \`.github/codeql-config.yml\` \`paths-ignore\`
+- Don't fix alerts in vendored code — exclude it from scanning instead
+
+### Validation
+\`\`\`
+npm run check          # lint + typecheck
+npm run test:unit      # unit tests
+\`\`\`
+
+### Reference
+- \`CODEX.md\` section 7 — full CodeQL/security-quality guidance
+- \`docs/security/code-scanning-guide.md\` — detailed scanning guide
+- \`.github/codeql-config.yml\` — scanner exclusion config
 `,
 	},
 };

@@ -10,8 +10,6 @@ const viteBinPath = path.join("node_modules", "vite", "bin", "vite.js");
 const distIndexPath = path.join(repoRoot, "dist", "index.html");
 
 const rawArgs = process.argv.slice(2);
-const showHelp =
-	rawArgs.includes("--help") || rawArgs.includes("-h") || rawArgs.includes("/?");
 const prepareOnly = rawArgs.includes("--prepare-only");
 const forceBuild = rawArgs.includes("--force-build");
 const forwardedArgs = rawArgs.filter(

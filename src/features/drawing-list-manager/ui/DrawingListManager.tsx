@@ -1222,7 +1222,7 @@ export function DrawingListManager({
 									type="button"
 									className={styles.secondaryButton}
 									onClick={() => void saveProfile()}
-									disabled={!selectedProjectId || savingProfile}
+									disabled={savingProfile}
 								>
 									<Save size={14} />
 									{savingProfile ? "Savingâ€¦" : "Save defaults"}

@@ -300,7 +300,7 @@ export async function migrateFromLocalStorage(
 	const raw = storage.getItem(localStorageKey);
 	if (raw == null) return;
 
-	let parsedValue: unknown = raw;
+	let parsedValue: unknown;
 	try {
 		parsedValue = JSON.parse(raw);
 	} catch {

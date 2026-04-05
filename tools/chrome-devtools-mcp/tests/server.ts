@@ -72,7 +72,9 @@ export class TestServer {
 
   #handle(req: IncomingMessage, res: ServerResponse) {
     const url = req.url ?? '';
-    const routeHandler = this.#routes[url];
+    const routeHandler = Object.hasOwn(this.#routes, url)
+      ? this.#routes[url]
+      : undefined;
 
     if (routeHandler) {
       routeHandler(req, res);

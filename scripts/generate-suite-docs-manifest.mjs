@@ -87,11 +87,17 @@ function normalizePath(filePath) {
 }
 
 function stripMarkdownSyntax(value) {
-	return value
+	let result = value
 		.replace(/`([^`]+)`/g, "$1")
 		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-		.replace(/<[^>]+>/g, "")
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+	// Loop HTML tag removal until stable to prevent incomplete multi-character sanitization
+	let previous;
+	do {
+		previous = result;
+		result = result.replace(/<[^>]+>/g, "");
+	} while (result !== previous);
+	return result
 		.replace(/[*_~>#]+/g, "")
 		.replace(/\s+/g, " ")
 		.trim();

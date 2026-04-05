@@ -253,17 +253,39 @@ def create_terminal_authoring_blueprint(
         normalized_root = _normalize_text(project_root)
         if not normalized_root:
             return None
-        root_path = Path(normalized_root)
+        try:
+            root_path = Path(normalized_root).resolve(strict=False)
+        except (OSError, ValueError):
+            return None
         if not root_path.exists() or not root_path.is_dir():
+            return None
+
+        # Guard: reject paths containing traversal components after resolution
+        try:
+            root_str = str(root_path)
+            if ".." in root_str.split(os.sep):
+                return None
+        except (TypeError, ValueError):
             return None
 
         direct_matches = sorted(root_path.glob("*.wdp"))
         if direct_matches:
-            return str(direct_matches[0])
+            matched = direct_matches[0].resolve(strict=False)
+            # Ensure the match is still under the resolved root
+            try:
+                matched.relative_to(root_path)
+            except ValueError:
+                return None
+            return str(matched)
 
         try:
             for candidate in root_path.rglob("*.wdp"):
-                return str(candidate)
+                resolved_candidate = candidate.resolve(strict=False)
+                try:
+                    resolved_candidate.relative_to(root_path)
+                except ValueError:
+                    continue
+                return str(resolved_candidate)
         except Exception:
             return None
         return None

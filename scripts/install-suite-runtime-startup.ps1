@@ -167,23 +167,88 @@ function Get-ExistingScheduledBootstrapTask {
     }
 }
 
-function Test-ScheduledTaskMatchesStartup {
+function Get-ScheduledBootstrapTaskState {
     param(
-        [Parameter(Mandatory = $true)]$Task
+        $Task
     )
 
-    foreach ($candidateAction in @($Task.Actions)) {
-        $execute = [string]$candidateAction.Execute
-        $arguments = [string]$candidateAction.Arguments
-        if (
-            $execute -match "(?i)wscript(?:\.exe)?$" -and
-            $arguments -like "*$startupLauncherScript*"
-        ) {
-            return $true
+    $matchesStartup = $false
+    $runsRuntimeExecutableDirectly = $false
+    $firstAction = $null
+
+    if ($Task) {
+        foreach ($candidateAction in @($Task.Actions)) {
+            $execute = [string]$candidateAction.Execute
+            $arguments = [string]$candidateAction.Arguments
+            $workingDirectory = [string]$candidateAction.WorkingDirectory
+
+            if (
+                -not $firstAction -and
+                (
+                    -not [string]::IsNullOrWhiteSpace($execute) -or
+                    -not [string]::IsNullOrWhiteSpace($arguments) -or
+                    -not [string]::IsNullOrWhiteSpace($workingDirectory)
+                )
+            ) {
+                $firstAction = [pscustomobject]@{
+                    execute = $execute
+                    arguments = $arguments
+                    workingDirectory = $workingDirectory
+                }
+            }
+
+            if (
+                $execute -match "(?i)wscript(?:\.exe)?$" -and
+                $arguments -like "*$startupLauncherScript*"
+            ) {
+                $matchesStartup = $true
+            }
+
+            if ($execute -match "(?i)Suite\.RuntimeControl\.exe$") {
+                $runsRuntimeExecutableDirectly = $true
+            }
         }
     }
 
-    return $false
+    return [pscustomobject]@{
+        present = ($null -ne $Task)
+        matchesStartup = $matchesStartup
+        runsRuntimeExecutableDirectly = $runsRuntimeExecutableDirectly
+        execute = if ($firstAction) { [string]$firstAction.execute } else { $null }
+        arguments = if ($firstAction) { [string]$firstAction.arguments } else { $null }
+        workingDirectory = if ($firstAction) { [string]$firstAction.workingDirectory } else { $null }
+    }
+}
+
+function Remove-StaleScheduledBootstrapTask {
+    param(
+        [Parameter(Mandatory = $true)]$TaskState
+    )
+
+    if (-not $TaskState.present -or $TaskState.matchesStartup) {
+        return $false
+    }
+
+    try {
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Stop
+        $targetDescription = if (-not [string]::IsNullOrWhiteSpace([string]$TaskState.execute)) {
+            [string]$TaskState.execute
+        }
+        else {
+            "an unexpected action"
+        }
+        Write-Host "Removed stale scheduled runtime bootstrap '$TaskName' that pointed to $targetDescription."
+        return $true
+    }
+    catch {
+        Write-Warning "Could not remove stale scheduled runtime bootstrap '$TaskName'. $($_.Exception.Message)"
+        return $false
+    }
+}
+
+$existingTaskState = Get-ScheduledBootstrapTaskState -Task (Get-ExistingScheduledBootstrapTask)
+if ($existingTaskState.present -and -not $existingTaskState.matchesStartup) {
+    $null = Remove-StaleScheduledBootstrapTask -TaskState $existingTaskState
 }
 
 try {
@@ -216,7 +281,8 @@ try {
 }
 catch {
     $existingTask = Get-ExistingScheduledBootstrapTask
-    if ($existingTask -and (Test-ScheduledTaskMatchesStartup -Task $existingTask)) {
+    $existingTaskState = Get-ScheduledBootstrapTaskState -Task $existingTask
+    if ($existingTaskState.present -and $existingTaskState.matchesStartup) {
         Write-Warning "Scheduled task registration failed, but a matching runtime bootstrap task already exists. Skipping HKCU Run fallback. $($_.Exception.Message)"
         Remove-RunKeyFallback
         $secondaryOwnerCleanup = Remove-SecondaryStartupOwners
@@ -231,6 +297,30 @@ catch {
         }
 
         Write-Host "Scheduled runtime bootstrap '$TaskName' is already available for $userId"
+        Write-Host "Status artifacts: $statusRoot"
+        Write-Host "Startup mode: $startupMode"
+    }
+    elseif ($existingTaskState.present) {
+        $taskDetail = if ($existingTaskState.runsRuntimeExecutableDirectly) {
+            "The existing scheduled task still launches Suite.RuntimeControl.exe directly."
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace([string]$existingTaskState.execute)) {
+            "The existing scheduled task still points to '$($existingTaskState.execute)'."
+        }
+        else {
+            "The existing scheduled task still has an unexpected action."
+        }
+
+        Write-Warning "Scheduled task install failed and a conflicting runtime bootstrap task is still present. Removing HKCU Run fallback to avoid duplicate startup owners. $taskDetail $($_.Exception.Message)"
+        Remove-RunKeyFallback
+        $secondaryOwnerCleanup = Remove-SecondaryStartupOwners
+        Write-StartupInstallManifest `
+            -Owner "scheduled_task" `
+            -FallbackReason ("Conflicting scheduled task remains. {0} {1}" -f $taskDetail, $_.Exception.Message) `
+            -UsedExistingTask $true `
+            -SecondaryOwnerCleanup $secondaryOwnerCleanup
+
+        Write-Host "Conflicting scheduled runtime bootstrap '$TaskName' is still present for $userId"
         Write-Host "Status artifacts: $statusRoot"
         Write-Host "Startup mode: $startupMode"
     }

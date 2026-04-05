@@ -340,6 +340,27 @@ function Get-SmartAppControlState {
     }
 }
 
+function Copy-HostBuildOutputToStage {
+    param(
+        [Parameter(Mandatory = $true)][string]$SourceDirectory,
+        [Parameter(Mandatory = $true)][string]$DestinationDirectory
+    )
+
+    foreach ($entry in Get-ChildItem -LiteralPath $SourceDirectory -Force -ErrorAction Stop) {
+        if ($entry.PSIsContainer -and $entry.Name -eq "Suite.RuntimeControl.exe.WebView2") {
+            Write-LauncherLog -Message "Skipping runtime data directory during staged shell copy: $($entry.FullName)." -Tag "WARN"
+            continue
+        }
+
+        if ($entry.PSIsContainer) {
+            Copy-Item -LiteralPath $entry.FullName -Destination $DestinationDirectory -Recurse -Force -ErrorAction Stop
+        }
+        else {
+            Copy-Item -LiteralPath $entry.FullName -Destination $DestinationDirectory -Force -ErrorAction Stop
+        }
+    }
+}
+
 function Resolve-HostLaunchTarget {
     $dotNetExecutable = Get-DotNetExecutable
     $hostOutputExists = Test-Path -LiteralPath $hostOutputPath -PathType Leaf
@@ -389,7 +410,7 @@ function Resolve-HostLaunchTarget {
 
     if (-not (Test-Path -LiteralPath $stageExecutablePath -PathType Leaf)) {
         New-Item -ItemType Directory -Path $stageDirectory -Force | Out-Null
-        Copy-Item -Path (Join-Path $hostBuildOutputDirectory "*") -Destination $stageDirectory -Recurse -Force
+        Copy-HostBuildOutputToStage -SourceDirectory $hostBuildOutputDirectory -DestinationDirectory $stageDirectory
         Get-ChildItem -Path $stageDirectory -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
             Unblock-File -LiteralPath $_.FullName -ErrorAction SilentlyContinue
         }
@@ -736,13 +757,11 @@ function Ensure-DesktopShell {
         [switch]$ForwardAutoBootstrapToExistingShell
     )
 
-    $launchTarget = Resolve-ValidatedHostLaunchTarget
     $existingSummary = Get-DesktopShellSummary
     if ($existingSummary.status -eq "healthy") {
         $activation = Invoke-ExistingDesktopShellActivation `
             -ShellSummary $existingSummary `
-            -ForwardAutoBootstrap:$ForwardAutoBootstrapToExistingShell `
-            -ActivationExecutablePath $launchTarget.ExecutablePath
+            -ForwardAutoBootstrap:$ForwardAutoBootstrapToExistingShell
         if ($activation.Ok) {
             Write-LauncherLog -Message $activation.Summary
             return [pscustomobject]@{
@@ -767,8 +786,7 @@ function Ensure-DesktopShell {
         if ($waitedSummary.status -eq "healthy") {
             $activation = Invoke-ExistingDesktopShellActivation `
                 -ShellSummary $waitedSummary `
-                -ForwardAutoBootstrap:$ForwardAutoBootstrapToExistingShell `
-                -ActivationExecutablePath $launchTarget.ExecutablePath
+                -ForwardAutoBootstrap:$ForwardAutoBootstrapToExistingShell
             if ($activation.Ok) {
                 Write-LauncherLog -Message $activation.Summary
                 return [pscustomobject]@{
@@ -785,6 +803,7 @@ function Ensure-DesktopShell {
         Reset-StaleDesktopShellState -ShellSummary $waitedSummary -Reason "Existing shell was not healthy enough to trust for launch handoff."
     }
 
+    $launchTarget = Resolve-ValidatedHostLaunchTarget
     $launchResult = Start-DesktopControlPanel -ExecutablePath $launchTarget.ExecutablePath -WorkingDirectory $launchTarget.Directory -Arguments @("--repo-root", $resolvedRepoRoot)
     if ($launchResult.Ok) {
         Write-LauncherLog -Message $launchResult.Message

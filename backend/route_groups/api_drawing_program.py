@@ -135,9 +135,61 @@ def create_drawing_program_blueprint(
         if candidate is None:
             raise ValueError(f"Template path resolves outside the project root: {template_path}")
         candidate = _ensure_under_project_root(project_root, candidate, template_path, "Template path")
-        if not candidate.exists() or not candidate.is_file():
+        if not os.path.isfile(str(candidate)):
             raise ValueError(f"Template file does not exist: {candidate}")
         return candidate
+
+    def _read_project_text_if_exists(
+        project_root: Path,
+        candidate_path: Path,
+        *,
+        field_name: str,
+    ) -> str | None:
+        resolved_candidate = _ensure_under_project_root(
+            project_root,
+            str(candidate_path),
+            str(candidate_path),
+            field_name,
+        )
+        resolved_text = str(resolved_candidate)
+        if not os.path.exists(resolved_text):
+            return None
+        if not os.path.isfile(resolved_text):
+            raise ValueError(f"{field_name} does not exist: {resolved_candidate}")
+        with open(resolved_text, "r", encoding="utf-8") as handle:
+            return handle.read()
+
+    def _write_project_text(
+        project_root: Path,
+        candidate_path: Path,
+        content: str,
+        *,
+        field_name: str,
+    ) -> None:
+        resolved_candidate = _ensure_under_project_root(
+            project_root,
+            str(candidate_path),
+            str(candidate_path),
+            field_name,
+        )
+        resolved_candidate.parent.mkdir(parents=True, exist_ok=True)
+        with open(resolved_candidate, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(content)
+
+    def _copy_project_file(project_root: Path, source_path: Path, target_path: Path) -> None:
+        resolved_source = _ensure_under_project_root(
+            project_root,
+            str(source_path),
+            str(source_path),
+            "Template path",
+        )
+        resolved_target = _ensure_under_project_root(
+            project_root,
+            str(target_path),
+            str(target_path),
+            "Relative path",
+        )
+        shutil.copy2(str(resolved_source), str(resolved_target))
 
     def _preflight_file_actions(project_root: Path, file_actions: Sequence[Dict[str, Any]]) -> None:
         for action in file_actions:
@@ -288,7 +340,7 @@ def create_drawing_program_blueprint(
                 source = _resolve_template_path(project_root, _normalize_text(action.get("templatePath")))
                 target = _resolve_relative_under_root(project_root, _normalize_text(action.get("toRelativePath")))
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, target)
+                _copy_project_file(project_root, source, target)
                 created_files.append(_normalize_path(target.relative_to(project_root)))
             elif kind == "rename-dwg":
                 source = _resolve_relative_under_root(project_root, _normalize_text(action.get("fromRelativePath")))
@@ -358,11 +410,16 @@ def create_drawing_program_blueprint(
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
             wdp_path = _resolve_wdp_path(project_root, profile)
-            existing_text = wdp_path.read_text(encoding="utf-8") if wdp_path.exists() else None
-            wdp_path.write_text(
+            existing_text = _read_project_text_if_exists(
+                project_root,
+                wdp_path,
+                field_name="ACADE project file path",
+            )
+            _write_project_text(
+                project_root,
+                wdp_path,
                 _build_wdp_text(existing_text, profile, active_rows),
-                encoding="utf-8",
-                newline="\n",
+                field_name="ACADE project file path",
             )
 
             finalized_program = _finalize_program(dict(updated_program), True)
@@ -439,11 +496,16 @@ def create_drawing_program_blueprint(
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
             wdp_path = _resolve_wdp_path(project_root, profile)
-            existing_text = wdp_path.read_text(encoding="utf-8") if wdp_path.exists() else None
-            wdp_path.write_text(
+            existing_text = _read_project_text_if_exists(
+                project_root,
+                wdp_path,
+                field_name="ACADE project file path",
+            )
+            _write_project_text(
+                project_root,
+                wdp_path,
                 _build_wdp_text(existing_text, profile, active_rows),
-                encoding="utf-8",
-                newline="\n",
+                field_name="ACADE project file path",
             )
 
             finalized_program = _finalize_program(dict(program), True)

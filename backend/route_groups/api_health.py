@@ -19,6 +19,7 @@ _RUNTIME_STATUS_SCRIPT_PATH = _REPO_ROOT / "scripts" / "get-suite-runtime-status
 _RUNTIME_CONTROL_LAUNCHER_PATH = (
     _REPO_ROOT / "scripts" / "launch-suite-runtime-control.ps1"
 )
+_RUNTIME_STATUS_UNAVAILABLE_DETAIL = "Runtime status snapshot is unavailable."
 
 
 def _limiter_health_payload() -> Dict[str, Any]:
@@ -210,9 +211,7 @@ def _extract_json_object(text: str) -> Dict[str, Any] | None:
 
 def _run_runtime_status_script() -> Dict[str, Any]:
     if not _RUNTIME_STATUS_SCRIPT_PATH.exists():
-        return _build_runtime_status_fallback(
-            f"Runtime status script was not found at {_RUNTIME_STATUS_SCRIPT_PATH}."
-        )
+        return _build_runtime_status_fallback(_RUNTIME_STATUS_UNAVAILABLE_DETAIL)
 
     try:
         completed = subprocess.run(
@@ -241,10 +240,8 @@ def _run_runtime_status_script() -> Dict[str, Any]:
         return _build_runtime_status_fallback(
             "Runtime status snapshot timed out while reading the workstation state."
         )
-    except Exception as exc:  # pragma: no cover - defensive process wrapper
-        return _build_runtime_status_fallback(
-            f"Runtime status snapshot failed unexpectedly: {exc}"
-        )
+    except Exception:  # pragma: no cover - defensive process wrapper
+        return _build_runtime_status_fallback(_RUNTIME_STATUS_UNAVAILABLE_DETAIL)
 
     output = "\n".join(
         part.strip()
@@ -253,11 +250,7 @@ def _run_runtime_status_script() -> Dict[str, Any]:
     )
     payload = _extract_json_object(output)
     if payload is None:
-        detail = (
-            "Runtime status script did not return JSON."
-            if not output
-            else f"Runtime status script returned unreadable output: {output[:500]}"
-        )
+        detail = _RUNTIME_STATUS_UNAVAILABLE_DETAIL
         return _build_runtime_status_fallback(detail)
 
     payload.setdefault("source", "script:get-suite-runtime-status.ps1")

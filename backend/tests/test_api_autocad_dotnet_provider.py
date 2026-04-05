@@ -603,6 +603,23 @@ class TestApiAutocadDotnetProvider(unittest.TestCase):
         self.assertFalse(payload.get("success", True))
         self.assertEqual(payload.get("code"), "INVALID_REQUEST")
 
+    def test_selection_count_hides_internal_exception_text(self) -> None:
+        def connect_autocad_failure():
+            raise RuntimeError("secret boom")
+
+        client = self._build_client(
+            provider="com",
+            sender=None,
+            connect_autocad_fn=connect_autocad_failure,
+        )
+        response = client.get("/api/selection-count")
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("code"), "SELECTION_COUNT_FAILED")
+        self.assertNotIn("secret boom", str(payload))
+
     def test_terminal_route_draw_delete_uses_dotnet_action(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []
 

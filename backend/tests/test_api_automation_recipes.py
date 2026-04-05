@@ -658,6 +658,27 @@ class TestApiAutomationRecipes(unittest.TestCase):
         )
         self.assertFalse(body.get("acadeProjectFilePath"))
 
+    def test_preflight_rejects_absolute_selected_drawing_outside_drawing_root(self) -> None:
+        outside_dir = tempfile.mkdtemp(prefix="suite-automation-outside-")
+        self.addCleanup(shutil.rmtree, outside_dir, ignore_errors=True)
+        outside_drawing = os.path.join(outside_dir, "Outside-A-100.dwg")
+        with open(outside_drawing, "w", encoding="utf-8") as handle:
+            handle.write("outside drawing")
+
+        payload = self._build_payload()
+        payload["workPackage"]["selectedDrawingPaths"] = [outside_drawing]
+
+        response = self.client.post(
+            "/api/cad/preflight/project-scope",
+            headers={"X-API-Key": "valid-key"},
+            json=payload,
+        )
+
+        self.assertEqual(response.status_code, 400)
+        body = response.get_json() or {}
+        self.assertFalse(body.get("success", True))
+        self.assertEqual(body.get("error"), "Invalid CAD preflight request.")
+
     def test_preflight_hides_internal_exception_text(self) -> None:
         with patch(
             "backend.route_groups.api_automation_recipes.os.path.commonpath",

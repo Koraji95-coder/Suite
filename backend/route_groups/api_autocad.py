@@ -12,6 +12,7 @@ from flask_limiter import Limiter
 from werkzeug.utils import safe_join, secure_filename
 from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
+    client_exception_message as autocad_client_exception_message,
     derive_request_id as autocad_derive_request_id,
     exception_message as autocad_exception_message,
     log_autocad_exception as autocad_log_exception,
@@ -890,13 +891,13 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="SELECTION_COUNT_FAILED",
-                message=f"Selection count failed: {autocad_exception_message(exc)}",
+                message=f"Selection count failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "selection_count", "providerPath": "com"},
                 extra={
                     "count": 0,
-                    "error": f"COM error: {autocad_exception_message(exc)}",
+                    "error": f"COM error: {autocad_client_exception_message(exc)}",
                 },
             )
         finally:
@@ -1020,13 +1021,13 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="EXECUTE_LAYER_SEARCH_FAILED",
-                message=f"Execution failed: {autocad_exception_message(exc)}",
+                message=f"Execution failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "execute_layer_search", "providerPath": "com"},
                 extra={
                     "points_created": 0,
-                    "error_details": autocad_exception_message(exc),
+                    "error_details": autocad_client_exception_message(exc),
                 },
             )
 
@@ -1094,11 +1095,11 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="GROUND_GRID_PLOT_FAILED",
-                message=f"Ground grid plot failed: {autocad_exception_message(exc)}",
+                message=f"Ground grid plot failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "ground_grid_plot", "providerPath": "com"},
-                extra={"error_details": autocad_exception_message(exc)},
+                extra={"error_details": autocad_client_exception_message(exc)},
             )
 
     @bp.route("/trigger-selection", methods=["POST"])
@@ -1159,11 +1160,11 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="TRIGGER_SELECTION_FAILED",
-                message=f"Error: {autocad_exception_message(exc)}",
+                message=f"Error: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "trigger_selection", "providerPath": "com"},
-                extra={"error": autocad_exception_message(exc)},
+                extra={"error": autocad_client_exception_message(exc)},
             )
         finally:
             try:
@@ -1270,11 +1271,11 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="DOWNLOAD_RESULT_FAILED",
-                message=f"Download failed: {autocad_exception_message(exc)}",
+                message=f"Download failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "download_result"},
-                extra={"error": autocad_exception_message(exc)},
+                extra={"error": autocad_client_exception_message(exc)},
             )
 
     @bp.route("/open-export-folder", methods=["POST"])
@@ -1390,11 +1391,11 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="OPEN_EXPORT_FOLDER_FAILED",
-                message=f"Could not open folder: {autocad_exception_message(exc)}",
+                message=f"Could not open folder: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "open_export_folder"},
-                extra={"error": autocad_exception_message(exc)},
+                extra={"error": autocad_client_exception_message(exc)},
             )
 
     @bp.route("/conduit-route/terminal-scan", methods=["POST"])
@@ -1604,7 +1605,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="TERMINAL_SCAN_FAILED",
-                message=f"Terminal scan failed: {autocad_exception_message(exc)}",
+                message=f"Terminal scan failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "terminal_scan", "providerPath": "com"},
@@ -1952,7 +1953,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="ROUTE_COMPUTE_FAILED",
-                message=f"Conduit route computation failed unexpectedly: {autocad_exception_message(exc)}",
+                message=f"Conduit route computation failed unexpectedly: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "route_compute", "providerConfigured": conduit_provider},
@@ -2435,7 +2436,7 @@ def create_autocad_blueprint(
             except ValueError as exc:
                 return _error_response(
                     code="INVALID_REQUEST",
-                    message=str(exc),
+                    message=autocad_client_exception_message(exc),
                     status_code=400,
                     request_id=request_id,
                     meta={"stage": "terminal_route_draw.validation"},
@@ -2580,7 +2581,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="TERMINAL_ROUTE_DRAW_FAILED",
-                message=f"Terminal route draw failed: {autocad_exception_message(exc)}",
+                message=f"Terminal route draw failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={
@@ -2747,7 +2748,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="DOTNET_BRIDGE_FAILED",
-                message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_exception_message(exc)}",
+                message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_client_exception_message(exc)}",
                 status_code=503,
                 request_id=request_id,
                 meta={
@@ -2911,7 +2912,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_exception_message(exc)}",
+                        message=f".NET terminal label sync via the in-process ACADE host failed: {autocad_client_exception_message(exc)}",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -2982,7 +2983,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="TERMINAL_LABEL_SYNC_FAILED",
-                message=f"Terminal label sync failed: {autocad_exception_message(exc)}",
+                message=f"Terminal label sync failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={
@@ -3212,7 +3213,7 @@ def create_autocad_blueprint(
             )
             return _error_response(
                 code="OBSTACLE_SCAN_FAILED",
-                message=f"Conduit obstacle scan failed: {autocad_exception_message(exc)}",
+                message=f"Conduit obstacle scan failed: {autocad_client_exception_message(exc)}",
                 status_code=500,
                 request_id=request_id,
                 meta={

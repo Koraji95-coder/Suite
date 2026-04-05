@@ -16,6 +16,18 @@ def exception_message(exc: BaseException) -> str:
     return text if text else exc.__class__.__name__
 
 
+def client_exception_message(exc: BaseException) -> str:
+    if isinstance(exc, ValueError):
+        return "Invalid request parameters."
+    if isinstance(exc, TimeoutError):
+        return "Operation timed out."
+    if isinstance(exc, PermissionError):
+        return "Permission denied."
+    if isinstance(exc, FileNotFoundError):
+        return "Required file was not found."
+    return "Unexpected AutoCAD error."
+
+
 def build_error_payload(
     *,
     code: str,
@@ -58,4 +70,3 @@ def log_autocad_exception(
         code,
         provider,
     )
-

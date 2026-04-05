@@ -18,6 +18,8 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from werkzeug.utils import safe_join
 
+from backend.runtime_paths import is_absolute_path_value, resolve_runtime_directory, resolve_runtime_path
+
 MAX_DRAWINGS = 50
 MAX_SCHEDULE_ROWS = 5000
 MAX_APPLY_OPERATIONS = 5000
@@ -250,6 +252,19 @@ def create_terminal_authoring_blueprint(
             )
         return normalized
 
+    def _project_root_realpath(project_root: Path) -> str:
+        return os.path.realpath(str(project_root))
+
+    def _ensure_under_project_root(project_root: Path, candidate_path: str) -> Path:
+        project_root_real = _project_root_realpath(project_root)
+        candidate_real = os.path.realpath(candidate_path)
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError("Path resolves outside the project root.") from exc
+        return Path(candidate_real)
+
     def _find_acade_project_file(project_root: str, configured_path: str) -> str | None:
         normalized_path = _normalize_text(configured_path)
         if not normalized_path:
@@ -257,34 +272,34 @@ def create_terminal_authoring_blueprint(
         normalized_root = _normalize_text(project_root)
         if not normalized_root:
             return None
-        if not os.path.isabs(normalized_root):
+        if not is_absolute_path_value(normalized_root):
+            return None
+        root_path = resolve_runtime_directory(normalized_root)
+        if root_path is None:
             return None
         try:
-            root_path = Path(os.path.realpath(normalized_root))
-        except (OSError, ValueError):
-            return None
-        if not root_path.exists() or not root_path.is_dir():
+            root_path = root_path.resolve()
+        except Exception:
             return None
 
         try:
-            candidate_path = (
-                os.path.realpath(normalized_path)
-                if os.path.isabs(normalized_path)
-                else safe_join(str(root_path), normalized_path.replace("\\", "/"))
-            )
-        except Exception:
-            return None
-        if candidate_path is None:
-            return None
-        resolved_candidate = Path(os.path.realpath(str(candidate_path)))
-        try:
-            if os.path.commonpath([str(root_path), str(resolved_candidate)]) != str(root_path):
-                return None
+            if is_absolute_path_value(normalized_path):
+                runtime_candidate = resolve_runtime_path(normalized_path)
+                if runtime_candidate is None:
+                    return None
+                resolved_candidate = _ensure_under_project_root(root_path, str(runtime_candidate))
+            else:
+                candidate_path = safe_join(str(root_path), normalized_path.replace("\\", "/"))
+                if candidate_path is None:
+                    return None
+                resolved_candidate = _ensure_under_project_root(root_path, candidate_path)
         except ValueError:
             return None
-        if not resolved_candidate.exists() or not resolved_candidate.is_file():
+        except Exception:
             return None
         if resolved_candidate.suffix.lower() != ".wdp":
+            return None
+        if not resolved_candidate.exists() or not resolved_candidate.is_file():
             return None
         return str(resolved_candidate)
 

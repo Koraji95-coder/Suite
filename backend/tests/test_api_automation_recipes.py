@@ -636,6 +636,28 @@ class TestApiAutomationRecipes(unittest.TestCase):
             body.get("warnings") or [],
         )
 
+    def test_preflight_warns_when_acade_project_file_is_outside_project_root(self) -> None:
+        payload = self._build_payload()
+        outside_path = os.path.join(self.temp_dir, "outside.wdp")
+        with open(outside_path, "w", encoding="utf-8") as handle:
+            handle.write("OUTSIDE\n")
+        payload["workPackage"]["acadeProjectFilePath"] = outside_path
+
+        response = self.client.post(
+            "/api/cad/preflight/project-scope",
+            headers={"X-API-Key": "valid-key"},
+            json=payload,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json() or {}
+        self.assertTrue(body.get("success"))
+        self.assertIn(
+            "ACADE project file path is invalid or outside the project root.",
+            body.get("warnings") or [],
+        )
+        self.assertFalse(body.get("acadeProjectFilePath"))
+
     def test_preflight_hides_internal_exception_text(self) -> None:
         with patch(
             "backend.route_groups.api_automation_recipes.os.path.commonpath",

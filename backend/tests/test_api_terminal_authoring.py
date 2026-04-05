@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
 import unittest
 
 from flask import Flask, g
@@ -12,6 +15,16 @@ from backend.route_groups.api_terminal_authoring import (
 
 class TestApiTerminalAuthoring(unittest.TestCase):
     def setUp(self) -> None:
+        self.temp_dir = tempfile.mkdtemp(prefix="suite-terminal-authoring-tests-")
+        self.project_root = os.path.join(self.temp_dir, "project")
+        os.makedirs(self.project_root, exist_ok=True)
+        self.project_file = os.path.join(self.project_root, "demo.wdp")
+        with open(self.project_file, "w", encoding="utf-8") as handle:
+            handle.write("A-100\n")
+        self.outside_project_file = os.path.join(self.temp_dir, "outside-demo.wdp")
+        with open(self.outside_project_file, "w", encoding="utf-8") as handle:
+            handle.write("OUTSIDE\n")
+
         app = Flask(__name__)
         app.config["TESTING"] = True
 
@@ -50,6 +63,9 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         )
 
         self.client = app.test_client()
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _send_autocad_dotnet_command(self, action: str, payload: dict[str, object]):
         self.bridge_actions.append(action)
@@ -334,6 +350,56 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         self.assertEqual(payload.get("drawings")[0]["operationCount"], 2)
         self.assertIn("suite_terminal_authoring_project_preview", self.acade_actions)
         self.assertNotIn("suite_terminal_authoring_project_preview", self.bridge_actions)
+
+    def test_preview_accepts_project_file_under_project_root(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/terminal-authoring/project-preview",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "projectId": "project-1",
+                "issueSetId": "issue-1",
+                "scheduleSnapshotId": "schedule-1",
+                "selectedDrawingPaths": ["A-100.dwg"],
+                "drawingRootPath": r"C:\dwg",
+                "projectRootPath": self.project_root,
+                "acadeProjectFilePath": self.project_file,
+                "stripRows": [{"id": "strip-row-1", "drawingPath": "A-100.dwg"}],
+                "connectionRows": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertNotIn(
+            "No AutoCAD Electrical .wdp project file was provided under the project root. ACAD writes can continue, but ACADE context could not be verified.",
+            payload.get("warnings") or [],
+        )
+
+    def test_preview_warns_when_project_file_is_outside_project_root(self) -> None:
+        response = self.client.post(
+            "/api/conduit-route/terminal-authoring/project-preview",
+            headers={"X-API-Key": "valid-key"},
+            json={
+                "projectId": "project-1",
+                "issueSetId": "issue-1",
+                "scheduleSnapshotId": "schedule-1",
+                "selectedDrawingPaths": ["A-100.dwg"],
+                "drawingRootPath": r"C:\dwg",
+                "projectRootPath": self.project_root,
+                "acadeProjectFilePath": self.outside_project_file,
+                "stripRows": [{"id": "strip-row-1", "drawingPath": "A-100.dwg"}],
+                "connectionRows": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("success"))
+        self.assertIn(
+            "No AutoCAD Electrical .wdp project file was provided under the project root. ACAD writes can continue, but ACADE context could not be verified.",
+            payload.get("warnings") or [],
+        )
 
     def test_apply_rejects_missing_operations(self) -> None:
         response = self.client.post(

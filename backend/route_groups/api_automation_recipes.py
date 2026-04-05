@@ -19,6 +19,12 @@ from flask_limiter import Limiter
 from openpyxl import Workbook
 from werkzeug.utils import safe_join, secure_filename
 
+from backend.runtime_paths import (
+    is_absolute_path_value,
+    resolve_runtime_directory,
+    resolve_runtime_path,
+)
+
 MAX_DRAWINGS = 75
 MAX_RULES = 100
 MAX_OPERATIONS = 8000
@@ -130,25 +136,30 @@ def create_automation_recipe_blueprint(
     def _normalize_drawing_key(value: Any) -> str:
         return re.sub(r"[^A-Z0-9]+", "", _normalize_text(value).upper())
 
-    def _is_absolute_windows_path(path: str) -> bool:
-        normalized = path.strip()
-        return bool(re.match(r"^[A-Za-z]:[\\/]", normalized)) or normalized.startswith("\\\\")
-
-    def _is_absolute_local_path(path: str) -> bool:
-        normalized = _normalize_text(path)
-        return Path(normalized).expanduser().is_absolute() or _is_absolute_windows_path(normalized)
-
     def _resolve_existing_directory(path_value: Any) -> Path | None:
         normalized = _normalize_text(path_value)
-        if not normalized:
+        if not normalized or not is_absolute_path_value(normalized):
+            return None
+        candidate = resolve_runtime_directory(normalized)
+        if candidate is None:
             return None
         try:
-            candidate = Path(normalized).expanduser().resolve()
+            return candidate.resolve()
         except Exception:
             return None
-        if not candidate.exists() or not candidate.is_dir():
-            return None
-        return candidate
+
+    def _project_root_realpath(project_root: Path) -> str:
+        return os.path.realpath(str(project_root))
+
+    def _ensure_under_project_root(project_root: Path, candidate_path: str, *, field_name: str) -> Path:
+        project_root_real = _project_root_realpath(project_root)
+        candidate_real = os.path.realpath(candidate_path)
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError(f"{field_name} resolves outside the project root.") from exc
+        return Path(candidate_real)
 
     def _resolve_project_scoped_file(
         project_root: Path | None,
@@ -162,21 +173,25 @@ def create_automation_recipe_blueprint(
             raise ValueError(f"{field_name} is required.")
         if project_root is None:
             raise ValueError(f"{field_name} requires a valid projectRootPath.")
-        project_root_real = os.path.realpath(str(project_root))
-        candidate_text = (
-            os.path.realpath(normalized)
-            if _is_absolute_local_path(normalized)
-            else safe_join(project_root_real, normalized.replace("\\", "/"))
-        )
-        if candidate_text is None:
-            raise ValueError(f"{field_name} resolves outside the project root.")
-        candidate_real = os.path.realpath(str(candidate_text))
-        try:
-            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
-                raise ValueError
-        except ValueError as exc:
-            raise ValueError(f"{field_name} resolves outside the project root.") from exc
-        candidate = Path(candidate_real)
+        project_root_real = _project_root_realpath(project_root)
+        if is_absolute_path_value(normalized):
+            resolved_candidate = resolve_runtime_path(normalized)
+            if resolved_candidate is None:
+                raise ValueError(f"{field_name} was not found.")
+            candidate = _ensure_under_project_root(
+                project_root,
+                str(resolved_candidate),
+                field_name=field_name,
+            )
+        else:
+            candidate_text = safe_join(project_root_real, normalized.replace("\\", "/"))
+            if candidate_text is None:
+                raise ValueError(f"{field_name} resolves outside the project root.")
+            candidate = _ensure_under_project_root(
+                project_root,
+                candidate_text,
+                field_name=field_name,
+            )
         if candidate.suffix.lower() not in allowed_suffixes:
             raise ValueError(
                 f"{field_name} must use one of the following extensions: {', '.join(allowed_suffixes)}."
@@ -366,7 +381,7 @@ def create_automation_recipe_blueprint(
             raw_path = _normalize_text(entry)
             if not raw_path:
                 continue
-            if _is_absolute_windows_path(raw_path):
+            if is_absolute_path_value(raw_path):
                 absolute_path = os.path.abspath(raw_path)
                 relative_path = os.path.basename(absolute_path) or raw_path
                 if drawing_root:

@@ -254,6 +254,23 @@ const SUPPORTED_PROTOCOL_VERSIONS = new Set([
 	"2025-06-18",
 	"2024-11-05",
 ]);
+const TOOL_ONLY_CLOUD_AGENT_MODE =
+	String(process.env.SUITE_WORKSTATION_ROLE || "")
+		.trim()
+		.toLowerCase() === "ci" ||
+	String(process.env.SUITE_WORKSTATION_ID || "")
+		.trim()
+		.toUpperCase() === "GITHUB-CLOUD";
+const SERVER_CAPABILITIES = TOOL_ONLY_CLOUD_AGENT_MODE
+	? {
+			tools: {},
+		}
+	: {
+			tools: {},
+			prompts: {},
+			resources: {},
+			logging: {},
+		};
 
 const MAX_OUTPUT_CHARS = 200_000;
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -3639,12 +3656,7 @@ async function handleRequest(message) {
 				: LATEST_PROTOCOL_VERSION;
 			return sendResponse(id, {
 				protocolVersion,
-				capabilities: {
-					tools: {},
-					prompts: {},
-					resources: {},
-					logging: {},
-				},
+				capabilities: SERVER_CAPABILITIES,
 				serverInfo: SERVER_INFO,
 			});
 		}
@@ -3667,18 +3679,27 @@ async function handleRequest(message) {
 		}
 
 		if (method === "resources/list") {
+			if (TOOL_ONLY_CLOUD_AGENT_MODE) {
+				return sendError(id, -32601, "Method not found: resources/list");
+			}
 			return sendResponse(id, {
 				resources: resourceList(),
 			});
 		}
 
 		if (method === "resources/templates/list") {
+			if (TOOL_ONLY_CLOUD_AGENT_MODE) {
+				return sendError(id, -32601, "Method not found: resources/templates/list");
+			}
 			return sendResponse(id, {
 				resourceTemplates: [],
 			});
 		}
 
 		if (method === "resources/read") {
+			if (TOOL_ONLY_CLOUD_AGENT_MODE) {
+				return sendError(id, -32601, "Method not found: resources/read");
+			}
 			const uri = params?.uri;
 			if (typeof uri !== "string") {
 				return sendError(id, -32602, "resources/read requires a string uri");
@@ -3729,12 +3750,18 @@ async function handleRequest(message) {
 		}
 
 		if (method === "prompts/list") {
+			if (TOOL_ONLY_CLOUD_AGENT_MODE) {
+				return sendError(id, -32601, "Method not found: prompts/list");
+			}
 			return sendResponse(id, {
 				prompts: promptList(),
 			});
 		}
 
 		if (method === "prompts/get") {
+			if (TOOL_ONLY_CLOUD_AGENT_MODE) {
+				return sendError(id, -32601, "Method not found: prompts/get");
+			}
 			const name = params?.name;
 			const rawArgs = params?.arguments;
 			if (typeof name !== "string") {

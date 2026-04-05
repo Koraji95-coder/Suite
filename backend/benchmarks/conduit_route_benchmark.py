@@ -4,12 +4,11 @@ import argparse
 import json
 import random
 import statistics
-import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from backend.route_groups.api_autocad_terminal_scan import scan_terminal_strips
 from backend.route_groups.api_conduit_route_compute import compute_conduit_route

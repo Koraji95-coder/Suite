@@ -3,7 +3,7 @@ import csv
 import math
 import os
 from datetime import datetime
-from typing import Dict, Iterable, List, Tuple, Set, Any
+from typing import Dict, List, Tuple, Set, Any
 
 import pythoncom
 import win32com.client

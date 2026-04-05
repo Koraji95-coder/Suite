@@ -4,7 +4,7 @@ import argparse
 import glob
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from backend.route_groups.api_autodraft import (
     _REVIEWED_RUN_SCHEMA,

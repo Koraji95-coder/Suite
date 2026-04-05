@@ -118,7 +118,13 @@
 	},
 	"overrides": {
 		"undici": "7.24.7",
-		"picomatch": "4.0.4"
+		"picomatch": "4.0.4",
+		"exceljs": {
+			"archiver": "^7.0.1",
+			"unzipper": "^0.12.3",
+			"fast-csv": "^5.0.5"
+		},
+		"glob": "^12.0.0"
 	},
 	"dependencies": {
 		"@dnd-kit/core": "^6.3.1",

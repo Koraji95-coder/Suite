@@ -8,9 +8,9 @@ Much better than external editor for .exe deployments.
 from __future__ import annotations
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QPlainTextEdit,
-    QLabel, QMessageBox, QSizePolicy
+    QLabel, QMessageBox
 )
-from PyQt6.QtCore import Qt, QRegularExpression
+from PyQt6.QtCore import QRegularExpression
 from PyQt6.QtGui import (
     QSyntaxHighlighter, QTextCharFormat, QColor, QFont,
     QFontDatabase
@@ -224,11 +224,8 @@ class YAMLEditorDialog(QDialog):
             self.status_label.setStyleSheet("color: #4ADE80;")
             return True
         except ImportError:
-            # Fallback: basic validation without PyYAML
+            # Fallback: minimal check without PyYAML (non-empty content only)
             try:
-                import json
-                # Try to parse as JSON (less strict but catches major errors)
-                # This is a very basic check
                 if content.strip():
                     self.status_label.setText("⚠️ PyYAML not installed. Basic validation passed.")
                     self.status_label.setStyleSheet("color: #FFB84D;")

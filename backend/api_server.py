@@ -21,7 +21,7 @@ Requirements:
     pip install flask flask-cors psutil pywin32
 """
 
-from flask import Flask, jsonify, request, send_file, after_this_request, g
+from flask import Flask, jsonify, request, after_this_request, g
 from flask_cors import CORS
 from flask_sock import Sock
 from flask_limiter import Limiter
@@ -42,14 +42,12 @@ import time
 import json
 import os
 import sys
-import tempfile
 import shutil
 import subprocess
 import re
 import traceback
 import logging
 import hmac
-import zipfile
 import secrets
 from functools import wraps
 from datetime import datetime

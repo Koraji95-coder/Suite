@@ -9,7 +9,6 @@ import os
 import re
 from typing import Iterable, Optional
 from PyQt6.QtWidgets import QLineEdit
-from PyQt6.QtCore import Qt
 
 
 class DropLineEdit(QLineEdit):

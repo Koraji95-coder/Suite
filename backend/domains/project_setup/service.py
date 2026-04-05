@@ -4,7 +4,6 @@ import base64
 import hashlib
 import hmac
 import json
-import re
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath

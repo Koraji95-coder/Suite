@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import os
 import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Sequence
 
 from flask import Blueprint, jsonify, request
 from flask_limiter import Limiter

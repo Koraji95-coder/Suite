@@ -4,7 +4,7 @@ import time
 import unittest
 from typing import Any, Dict, Optional
 
-from flask import Flask, g, jsonify
+from flask import Flask, g
 from flask_limiter import Limiter
 
 from backend.route_groups.api_dashboard import create_dashboard_blueprint

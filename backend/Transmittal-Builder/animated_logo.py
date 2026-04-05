@@ -5,7 +5,7 @@ Creates a rotating, glowing 3D logo animation
 
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import QTimer, QPropertyAnimation, QEasingCurve, pyqtProperty, Qt, QPointF
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QRadialGradient, QPainterPath, QTransform
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QLinearGradient, QRadialGradient, QPainterPath
 import math
 
 

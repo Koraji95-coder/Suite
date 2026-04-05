@@ -4,7 +4,7 @@
 from __future__ import annotations
 import html
 from datetime import datetime
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 from .branding import BRAND
 
 def _preheader(text: str) -> str:

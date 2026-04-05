@@ -50,7 +50,6 @@ from utils.validation import (
 
 # Import email system
 from emails.examples import send_bug_report_email, send_suggestion_email
-from emails.templates import build_bug_email, build_suggestion_email
 
 # ============================================================================
 # CORE TRANSMITTAL BUILDER FUNCTIONS (from transmittal_builder_gui.py)

@@ -20,7 +20,7 @@ function createCollector(
 		collectorId: "collector-1",
 		name: "Dev CAD",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		capabilities: ["autocad", "drawing_sessions", "commands"],
 		metadata: {
 			sourceAvailable: true,
@@ -47,7 +47,7 @@ function createSession(
 		sessionId: "session-1",
 		collectorId: "collector-1",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		projectId: "project-1",
 		drawingPath: "C:/Projects/MyProject/Drawing1.dwg",
 		status: "live",
@@ -75,7 +75,7 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-1",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		eventType: "command_executed",
 		sourceType: "autocad",
 		timestamp: 700,
@@ -212,3 +212,4 @@ describe("watchdogRouteViewModel", () => {
 		expect(rollups[0].totalCommands).toBe(3);
 	});
 });
+

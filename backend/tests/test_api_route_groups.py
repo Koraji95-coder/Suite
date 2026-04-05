@@ -2206,7 +2206,7 @@ class TestApiRouteGroups(unittest.TestCase):
                 "collectorId": "collector-a",
                 "name": "Desktop Collector",
                 "collectorType": "filesystem",
-                "workstationId": "DEV-WORKSTATION",
+                "workstationId": "DEV-HOME",
                 "capabilities": ["filesystem", "cad"],
             },
         )
@@ -2396,7 +2396,7 @@ class TestApiRouteGroups(unittest.TestCase):
                 "collectorId": "collector-a",
                 "name": "Desktop Collector",
                 "collectorType": "filesystem",
-                "workstationId": "DEV-WORKSTATION",
+                "workstationId": "DEV-HOME",
             },
         )
         self.assertEqual(register_response.status_code, 200)
@@ -2539,7 +2539,7 @@ class TestApiRouteGroups(unittest.TestCase):
                 "collectorId": "collector-cad",
                 "name": "AutoCAD Collector",
                 "collectorType": "autocad_state",
-                "workstationId": "DEV-WORKSTATION",
+                "workstationId": "DEV-HOME",
             },
         )
         self.assertEqual(register_response.status_code, 200)
@@ -2557,7 +2557,7 @@ class TestApiRouteGroups(unittest.TestCase):
                         "drawingPath": drawing_path,
                         "timestamp": now_ms,
                         "sessionId": "session-1",
-                        "workstationId": "DEV-WORKSTATION",
+                        "workstationId": "DEV-HOME",
                         "metadata": {
                             "drawingName": "sheet-1.dwg",
                             "trackedMs": 240000,
@@ -2621,3 +2621,4 @@ class TestApiRouteGroups(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

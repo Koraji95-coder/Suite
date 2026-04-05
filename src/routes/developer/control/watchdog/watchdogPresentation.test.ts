@@ -16,7 +16,7 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		eventType: "command_executed",
 		sourceType: "autocad",
 		timestamp: Date.now(),
@@ -38,7 +38,7 @@ describe("watchdogPresentation", () => {
 		expect(presentWatchdogOperatorEvent(event, projectNameById)).toMatchObject({
 			label: "Saved drawing",
 			detail: "Drawing-01.dwg",
-			context: "MyProject • DEV-WORKSTATION",
+			context: "MyProject • DEV-HOME",
 			rawCommandName: "QSAVE",
 		});
 	});
@@ -105,3 +105,4 @@ describe("watchdogPresentation", () => {
 		).toBe("Filesystem");
 	});
 });
+

@@ -197,6 +197,7 @@ if (-not (Test-Path -LiteralPath $RepoRoot)) {
 
 $resolvedRepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 $codexRoot = Join-Path $env:USERPROFILE ".codex"
+$vsCodeUserRoot = Join-Path (Get-SuiteRoamingAppDataRoot) "Code\User"
 $mirroredCodexSessionIndexPath = Join-Path $MirrorRoot "codex\session_index.jsonl"
 $destinationCodexSessionIndexPath = Join-Path $codexRoot "session_index.jsonl"
 $mirroredCodexSessionsRoot = Join-Path $MirrorRoot "codex\sessions"
@@ -220,6 +221,36 @@ $mappings = @(
         Type = "file"
         Source = (Join-Path $MirrorRoot "codex\config.toml")
         Destination = (Join-Path $env:USERPROFILE ".codex\config.toml")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-settings"
+        Type = "file"
+        Source = (Join-Path $MirrorRoot "vscode\User\settings.json")
+        Destination = (Join-Path $vsCodeUserRoot "settings.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-keybindings"
+        Type = "file"
+        Source = (Join-Path $MirrorRoot "vscode\User\keybindings.json")
+        Destination = (Join-Path $vsCodeUserRoot "keybindings.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-tasks"
+        Type = "file"
+        Source = (Join-Path $MirrorRoot "vscode\User\tasks.json")
+        Destination = (Join-Path $vsCodeUserRoot "tasks.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-snippets"
+        Type = "directory"
+        Source = (Join-Path $MirrorRoot "vscode\User\snippets")
+        Destination = (Join-Path $vsCodeUserRoot "snippets")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-profiles"
+        Type = "directory"
+        Source = (Join-Path $MirrorRoot "vscode\User\profiles")
+        Destination = (Join-Path $vsCodeUserRoot "profiles")
     },
     [pscustomobject]@{
         Name = "suite-learning"

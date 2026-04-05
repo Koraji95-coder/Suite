@@ -275,6 +275,16 @@ $checkLauncherPath = Write-SuiteHiddenPowerShellLauncher `
         "-StartIfMissing"
     )
 
+$staleLauncherRepairs = Repair-SuiteStaleLauncherTasks `
+    -TaskNamePrefixes @("SuiteWatchdogFilesystemCollector-", "SuiteWatchdogFilesystemCollectorCheck-") `
+    -KeepTaskNames @($TaskName, $CheckTaskName) `
+    -LauncherDirectory $launcherDir `
+    -Comment "Neutralized stale Suite Watchdog filesystem startup task launcher."
+
+foreach ($repair in @($staleLauncherRepairs)) {
+    Write-Warning "Neutralized stale filesystem watchdog startup launcher '$($repair.launcherPath)' still referenced by task '$($repair.taskName)'."
+}
+
 if (-not $ForceRunKey) {
     $userId = if ($env:USERDOMAIN) {
         "$($env:USERDOMAIN)\$($env:USERNAME)"

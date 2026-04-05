@@ -258,7 +258,7 @@ function Write-CodexHandoff {
         "- Codex root: $CodexRoot",
         "",
         "This handoff is meant to reduce machine-switch friction.",
-        "It mirrors Codex config, skills, the session index, and a filtered set of recent small session JSONL files.",
+        "It mirrors Codex config, skills, recent session metadata, and portable VS Code user settings.",
         "It does not mirror Codex auth or the full local SQLite state, so exact live terminal attachment is not guaranteed.",
         ""
     )
@@ -325,10 +325,10 @@ function Write-CodexHandoff {
 
     $lines += "## Destination Machine"
     $lines += ""
-    $lines += '1. Clone Suite and Office into `C:\Users\DustinWard\Documents\GitHub\Suite` and `C:\Users\DustinWard\Documents\GitHub\Office`.'
+    $lines += '1. Clone Suite and Office into `C:\Users\<you>\Documents\GitHub\Suite` and `C:\Users\<you>\Documents\GitHub\Office`.'
     $lines += '2. Run `npm run workstation:bringup:validate` then `npm run workstation:bringup -- -WorkstationId <TARGET_ID>` from the Suite repo.'
     $lines += '3. Run `npm run workstation:restore -- -WorkstationId <TARGET_ID>`.'
-    $lines += '4. Review this handoff file and the mirrored `codex\session_index.jsonl` if you need to locate the last thread quickly.'
+    $lines += '4. Review this handoff file, the mirrored `codex\session_index.jsonl`, and the mirrored `vscode\User` folder if you need to rehydrate local settings quickly.'
 
     Set-Content -LiteralPath $Path -Value $lines -Encoding UTF8
 }
@@ -344,6 +344,7 @@ function Write-MirrorReadme {
         "",
         "This folder is maintained by scripts\sync-suite-local-state.ps1 on $env:COMPUTERNAME.",
         "It is intended for Dropbox/workstation transfer and mirrors selected local-only state.",
+        "VS Code extensions are intentionally excluded; this mirror only carries portable user settings/assets.",
         "",
         "Mirror mappings:"
     )
@@ -353,7 +354,7 @@ function Write-MirrorReadme {
     }
 
     $lines += ""
-    $lines += "Home-PC restore helper:"
+    $lines += "Restore helper:"
     $lines += "- From the repo checkout on the destination machine, run: npm run workstation:restore -- -WorkstationId <TARGET_ID>"
     $lines += "- The restore flow now re-stamps the workstation profile and bootstraps local runtime services automatically."
     $lines += "- Review codex-handoff.md in the mirror root for the latest repo/session handoff summary."
@@ -371,6 +372,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $repoRoot "scripts\lib\suite-workstation-diagnostics.ps1")
 $codexRoot = Join-Path $env:USERPROFILE ".codex"
 $sessionIndexPath = Join-Path $codexRoot "session_index.jsonl"
+$vsCodeUserRoot = Join-Path (Get-SuiteRoamingAppDataRoot) "Code\User"
 $stableDailyRoot = Get-SuiteStableDailyRoot
 $legacyDailyRoot = Join-Path $env:USERPROFILE "OneDrive\Desktop\Daily"
 $dailyRepoRoot = if (Test-Path -LiteralPath (Join-Path $stableDailyRoot ".git")) {
@@ -401,6 +403,36 @@ $mappings = @(
         Type = "file"
         Source = $sessionIndexPath
         Destination = (Join-Path $MirrorRoot "codex\session_index.jsonl")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-settings"
+        Type = "file"
+        Source = (Join-Path $vsCodeUserRoot "settings.json")
+        Destination = (Join-Path $MirrorRoot "vscode\User\settings.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-keybindings"
+        Type = "file"
+        Source = (Join-Path $vsCodeUserRoot "keybindings.json")
+        Destination = (Join-Path $MirrorRoot "vscode\User\keybindings.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-tasks"
+        Type = "file"
+        Source = (Join-Path $vsCodeUserRoot "tasks.json")
+        Destination = (Join-Path $MirrorRoot "vscode\User\tasks.json")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-snippets"
+        Type = "directory"
+        Source = (Join-Path $vsCodeUserRoot "snippets")
+        Destination = (Join-Path $MirrorRoot "vscode\User\snippets")
+    },
+    [pscustomobject]@{
+        Name = "vscode-user-profiles"
+        Type = "directory"
+        Source = (Join-Path $vsCodeUserRoot "profiles")
+        Destination = (Join-Path $MirrorRoot "vscode\User\profiles")
     },
     [pscustomobject]@{
         Name = "suite-learning"

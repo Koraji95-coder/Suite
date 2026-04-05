@@ -77,7 +77,7 @@ function createCollector(
 		collectorId: "collector-cad",
 		name: "AutoCAD Collector",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		capabilities: ["autocad", "drawing_sessions", "commands"],
 		metadata: {
 			sourceAvailable: true,
@@ -106,7 +106,7 @@ function createEvent(
 		eventId: 1,
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		eventType: "drawing_opened",
 		sourceType: "autocad",
 		timestamp: Date.now(),
@@ -127,7 +127,7 @@ function createSession(
 		sessionId: "session-1",
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		projectId: "project-1",
 		drawingPath:
 			"C:/Projects/MyProject/PROJ-00001-E0-0006 - BESS DRAWING INDEX.dwg",
@@ -482,3 +482,4 @@ describe("WatchdogRoutePage", () => {
 		});
 	});
 });
+

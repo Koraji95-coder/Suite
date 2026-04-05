@@ -12,6 +12,7 @@ This section is the canonical home for workstation-local companion behavior, bri
 - [Local Vs Container Ownership](./local-vs-container-ownership.md)
 - [Windows Workstation Bring-Up](./workstation-bringup.md)
 - [Workstation Transfer Runbook](./workstation-transfer-runbook.md)
+- [Workstation Settings Parity](./workstation-settings-parity.md)
 - [MCP Workstation Matrix](./mcp-workstation-matrix.md)
 - [Project Standards Native Review Flow](./project-standards-native-review.md)
 - [Frontend Project Setup Runtime Flow](../frontend/project-setup-title-block-runtime-flow.md)

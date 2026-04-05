@@ -52,7 +52,7 @@ def make_config(temp_dir: str, root: Path) -> FilesystemCollectorConfig:
         backend_url="http://127.0.0.1:5000",
         api_key="valid-key",
         collector_id="collector-a",
-        workstation_id="DEV-WORKSTATION",
+        workstation_id="DEV-HOME",
         roots=[str(root)],
         buffer_dir=Path(temp_dir) / "collector-state",
         scan_interval_ms=1_000,
@@ -72,7 +72,7 @@ class TestFilesystemCollector(unittest.TestCase):
                         "backendUrl": "http://127.0.0.1:5000",
                         "apiKey": "valid-key",
                         "collectorId": "collector-a",
-                        "workstationId": "DEV-WORKSTATION",
+                        "workstationId": "DEV-HOME",
                         "roots": [str(root)],
                     },
                     indent=2,
@@ -83,7 +83,7 @@ class TestFilesystemCollector(unittest.TestCase):
             config = load_collector_config(config_path=config_path)
 
             self.assertEqual(config.collector_id, "collector-a")
-            self.assertEqual(config.workstation_id, "DEV-WORKSTATION")
+            self.assertEqual(config.workstation_id, "DEV-HOME")
             self.assertEqual(config.roots, [str(root.resolve())])
 
     def test_initial_scan_establishes_baseline_without_file_events(self) -> None:
@@ -212,3 +212,4 @@ class TestFilesystemCollector(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import subprocess
@@ -41,7 +42,7 @@ def safe_pdf_float(value: Any) -> Optional[float]:
         numeric = float(value)
     except Exception:
         return None
-    if not (numeric == numeric) or numeric in {float("inf"), float("-inf")}:
+    if math.isnan(numeric) or numeric in {float("inf"), float("-inf")}:
         return None
     return numeric
 

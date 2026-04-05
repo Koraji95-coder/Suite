@@ -1304,7 +1304,6 @@ class AutoCADManager:
                     exc=regen_exc,
                 )
 
-            units_value = "Unknown"
             try:
                 units_code = int(doc.GetVariable("INSUNITS"))
             except Exception:
@@ -1450,7 +1449,6 @@ class AutoCADManager:
                     exc=regen_exc,
                 )
 
-            units_value = "Unknown"
             try:
                 units_code = int(doc.GetVariable("INSUNITS"))
             except Exception:

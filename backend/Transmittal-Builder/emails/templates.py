@@ -86,7 +86,7 @@ def build_bug_email(data: Dict) -> Tuple[str, str, str]:
     if isinstance(submitted_dt, str):
         try:
             submitted_dt = datetime.strptime(submitted_dt, "%Y-%m-%d %H:%M:%S")
-        except:
+        except Exception:
             submitted_dt = datetime.now()
 
     submitted_date = submitted_dt.strftime("%B %d, %Y")  # e.g., "October 02, 2025"
@@ -152,7 +152,7 @@ def build_suggestion_email(data: Dict) -> Tuple[str, str, str]:
     if isinstance(submitted_dt, str):
         try:
             submitted_dt = datetime.strptime(submitted_dt, "%Y-%m-%d %H:%M:%S")
-        except:
+        except Exception:
             submitted_dt = datetime.now()
 
     submitted_date = submitted_dt.strftime("%B %d, %Y")  # e.g., "October 02, 2025"

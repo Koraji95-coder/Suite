@@ -64,7 +64,7 @@ def ensure_block_exists(
             if xref_obj is not None:
                 dyn_fn(xref_obj).Delete()
         except Exception:
-            pass
+            pass  # Best-effort xref cleanup; entity may already be purged
 
         try:
             doc.Blocks.Item(block_name)
@@ -137,7 +137,7 @@ def insert_reference_block(
     try:
         br.Layer = layer_name
     except Exception:
-        pass
+        pass  # COM layer assignment may fail; block ref is still inserted
     return br
 
 
@@ -165,9 +165,9 @@ def add_point_label(
     try:
         txt.Layer = layer_name
     except Exception:
-        pass
+        pass  # COM layer assignment may fail; text entity is still created
     try:
         txt.Alignment = 0
     except Exception:
-        pass
+        pass  # COM object may not support Alignment property
     return txt

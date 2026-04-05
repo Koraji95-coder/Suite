@@ -1648,7 +1648,7 @@ def _write_terminal_labels_to_entity(
             try:
                 attr.Update()
             except Exception:
-                pass
+                pass  # Attribute visual refresh is best-effort; value is already set
             updated += 1
         except Exception:
             failed += 1
@@ -1657,7 +1657,7 @@ def _write_terminal_labels_to_entity(
         try:
             entity.Update()
         except Exception:
-            pass
+            pass  # Entity visual refresh is best-effort; attribute values are already committed
 
     return {
         "updated": updated,

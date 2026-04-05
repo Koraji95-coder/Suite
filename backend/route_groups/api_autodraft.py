@@ -19,11 +19,6 @@ from flask import Blueprint, jsonify, request
 from flask_limiter import Limiter
 
 try:
-    import redis  # type: ignore[import-not-found]
-except Exception:
-    redis = None
-
-try:
     from pypdf import PdfReader as _PdfReader
 
     _PYPDF_AVAILABLE = True
@@ -308,15 +303,6 @@ _ANNOT_TEXT_SUBTYPES = {
     "/Underline",
     "/StrikeOut",
 }
-_ANNOT_NOTE_TEXT_SUBTYPES = {
-    "/Text",
-    "/FreeText",
-}
-_ANNOT_HIGHLIGHT_SUBTYPES = {
-    "/Highlight",
-    "/Underline",
-    "/StrikeOut",
-}
 _ANNOT_LINE_SUBTYPES = {
     "/Line",
 }
@@ -328,10 +314,6 @@ _ANNOT_GEOMETRIC_SUBTYPES = {
     "/Polygon",
     "/PolyLine",
     "/Ink",
-}
-_ANNOT_CLOUD_SUBTYPES = {
-    *_ANNOT_RECTANGLE_SUBTYPES,
-    *_ANNOT_GEOMETRIC_SUBTYPES,
 }
 _ANNOT_NOTE_ANCHOR_SUBTYPES = {
     *_ANNOT_RECTANGLE_SUBTYPES,
@@ -386,7 +368,7 @@ def _read_json_error(response: requests.Response) -> str:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
     except Exception:
-        pass
+        pass  # Response body may not be valid JSON; fall through to generic message
     return f"Upstream request failed ({response.status_code})"
 
 
@@ -2938,7 +2920,7 @@ def _extract_measurement_seed(page_obj: Any) -> Dict[str, Any]:
             try:
                 seed["scale_hint"] = abs(ratio_numbers[1] / ratio_numbers[0])
             except Exception:
-                pass
+                pass  # Division or conversion may fail for malformed PDF ratio metadata
 
     if seed["scale_hint"] is None:
         raw_x = first.get("/X")
@@ -3708,7 +3690,7 @@ def _extract_prepare_text_fallback_markups(
         if hasattr(pdf_stream, "seek"):
             pdf_stream.seek(0)
     except Exception:
-        pass
+        pass  # Stream may not be seekable; proceed with current position
 
     with tempfile.TemporaryDirectory(prefix="autodraft_prepare_") as temp_dir:
         pdf_path = os.path.join(temp_dir, "prepare.pdf")
@@ -7406,7 +7388,7 @@ def create_autodraft_blueprint(
             if hasattr(uploaded_pdf, "stream") and hasattr(uploaded_pdf.stream, "seek"):
                 uploaded_pdf.stream.seek(0)
         except Exception:
-            pass
+            pass  # Stream may not be seekable; proceed with current position
 
         prepared_payload, error, status_code = _extract_pdf_compare_markups(
             pdf_stream=getattr(uploaded_pdf, "stream", uploaded_pdf),
@@ -7503,16 +7485,7 @@ def create_autodraft_blueprint(
         pdf_points = _normalize_point_pair_list(payload.get("pdf_points"))
         cad_points = _normalize_point_pair_list(payload.get("cad_points"))
         transform: Optional[Dict[str, Any]] = None
-        auto_calibration = _build_auto_calibration_payload(
-            available=True,
-            used=False,
-            status="needs_manual",
-            confidence=0.0,
-            method="none",
-            quality_notes=[],
-            suggested_pdf_points=pdf_points or [],
-            suggested_cad_points=cad_points or [],
-        )
+        auto_calibration: Dict[str, Any]
         manual_points_available = pdf_points is not None and cad_points is not None
         manual_transform_requested = calibration_mode == _COMPARE_CALIBRATION_MODE_MANUAL
         if manual_transform_requested:

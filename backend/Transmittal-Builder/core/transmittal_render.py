@@ -476,7 +476,7 @@ def render_transmittal(
         if reference_docs:
             fill_reference_table(doc, reference_docs)
     except Exception:
-        pass
+        pass  # Reference documents table is optional; continue without it
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     doc.save(out_path)

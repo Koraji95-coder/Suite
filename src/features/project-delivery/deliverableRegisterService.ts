@@ -214,7 +214,7 @@ function normalizeCellDate(value: CellValue | undefined): string | null {
 		return null;
 	}
 	const resolved =
-		typeof value === "object" && value && "result" in value
+		typeof value === "object" && "result" in value
 			? (value.result as CellValue)
 			: value;
 	if (resolved instanceof Date) {

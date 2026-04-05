@@ -163,7 +163,7 @@ def create_terminal_authoring_blueprint(
                         if not candidate_relative.startswith(".."):
                             relative_path = candidate_relative
                     except ValueError:
-                        pass
+                        pass  # Paths on different drives (Windows); keep original path
             else:
                 if not drawing_root:
                     raise ValueError(

@@ -214,7 +214,7 @@ def websocket_status_bridge(
             try:
                 ws.close()
             except Exception:
-                pass
+                pass  # Connection may already be closed
         logger.warning(
             "Unauthorized websocket from %s (reason=%s, request_id=%s, connection_id=%s)",
             remote_addr,
@@ -299,9 +299,9 @@ def websocket_status_bridge(
                 if incoming is None:
                     pass
             except TypeError:
-                pass
+                pass  # ws.receive() may not accept timeout kwarg
             except Exception:
-                pass
+                pass  # Non-critical receive error during polling loop
 
             iterations += 1
             if max_iterations is not None and iterations >= max_iterations:

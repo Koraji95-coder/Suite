@@ -554,7 +554,7 @@ class WatchdogMonitorService:
                 session_id.strip().lower(),
             ]
         )
-        digest = hashlib.sha1(source_seed.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(source_seed.encode("utf-8")).hexdigest()
         return f"watchdog:drawing-segment:{digest}"
 
     def _build_drawing_segment_row(
@@ -1025,9 +1025,6 @@ class WatchdogMonitorService:
 
         collectors = self.ledger.list_collectors(user_key)
         rules = self.ledger.list_project_rules(user_key)
-        collector_map = {
-            str(item.get("collectorId") or ""): item for item in collectors
-        }
 
         raw_events = self.ledger.list_window_events(
             user_key,

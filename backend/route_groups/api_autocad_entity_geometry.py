@@ -49,7 +49,7 @@ def poly_centroid(
             try:
                 elev = float(ent.Elevation)
             except Exception:
-                pass
+                pass  # Entity may lack Elevation property; default to 0.0
             for i in range(0, len(raw), 2):
                 if i + 1 < len(raw):
                     coords.append((float(raw[i]), float(raw[i + 1]), elev))
@@ -60,7 +60,7 @@ def poly_centroid(
             try:
                 elev = float(ent.Elevation)
             except Exception:
-                pass
+                pass  # Entity may lack Elevation property; default to 0.0
             for i in range(n):
                 p = ent.Coordinate(i)
                 z = float(p[2]) if len(p) > 2 else elev

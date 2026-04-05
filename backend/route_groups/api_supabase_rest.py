@@ -37,7 +37,7 @@ def extract_supabase_error_message(response: Any) -> str:
                 if value:
                     return value
     except Exception:
-        pass
+        pass  # Response may not be valid JSON; fall through to raw text
 
     body = str(getattr(response, "text", "") or "").strip()
     if body:

@@ -190,8 +190,7 @@ def set_checkbox_by_label(doc, label: str, checked: bool):
         return runs
 
     def _scan_table(tbl, t_idx, level=0):
-        indent = "  " * level
-        for r_idx, row in enumerate(tbl.rows):
+        for _r_idx, row in enumerate(tbl.rows):
             label_col = None
             box_cols = []
 
@@ -1194,15 +1193,6 @@ class IconManager:
             return QIcon()
 
         # Read SVG content
-        with open(icon_path, 'r', encoding='utf-8') as f:
-            svg_content = f.read()
-
-        # Apply color if specified
-        if color:
-            # Replace stroke color in SVG
-            svg_content = svg_content.replace('stroke="currentColor"', f'stroke="{color}"')
-            svg_content = svg_content.replace('fill="none"', f'fill="none"')
-
         # Create QIcon from SVG
         icon = QIcon(icon_path)
 
@@ -3192,7 +3182,7 @@ class TransmittalBuilderPyQt6(QMainWindow):
             if hasattr(self, 'main_scroll'):
                 self.main_scroll.ensureWidgetVisible(widget, 50, 50)
         except Exception:
-            pass
+            pass  # Best-effort UI focus; validation message is already shown
 
     def auto_save(self):
         """Auto-save project data to JSON."""
@@ -3225,8 +3215,7 @@ class TransmittalBuilderPyQt6(QMainWindow):
             # self.log_message("Project auto-saved", "info")
 
         except Exception:
-            # Silently fail - don't spam the log
-            pass
+            pass  # Auto-save is best-effort; silently fail to avoid log spam
 
     def load_autosave(self):
         """Load auto-saved project data."""
@@ -3427,7 +3416,7 @@ class TransmittalBuilderPyQt6(QMainWindow):
                 if os.path.exists(save_path):
                     os.remove(save_path)
             except Exception:
-                pass
+                pass  # Best-effort cleanup of stale autosave file
 
             self.log_message("New session started", "success")
 

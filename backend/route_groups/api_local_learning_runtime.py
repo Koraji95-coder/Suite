@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import threading
 from contextlib import contextmanager
@@ -106,7 +107,7 @@ def _coerce_numeric_feature(value: Any) -> float:
         numeric = float(value)
     except Exception:
         return 0.0
-    if not (numeric == numeric) or numeric in {float("inf"), float("-inf")}:
+    if math.isnan(numeric) or numeric in {float("inf"), float("-inf")}:
         return 0.0
     return numeric
 

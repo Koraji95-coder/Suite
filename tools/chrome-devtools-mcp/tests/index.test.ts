@@ -59,11 +59,11 @@ describe('e2e', () => {
 
   it('calls a tool multiple times', async t => {
     await withClient(async client => {
-      let result = await client.callTool({
+      await client.callTool({
         name: 'list_pages',
         arguments: {},
       });
-      result = await client.callTool({
+      const result = await client.callTool({
         name: 'list_pages',
         arguments: {},
       });

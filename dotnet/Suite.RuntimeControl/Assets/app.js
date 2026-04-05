@@ -2111,7 +2111,6 @@ function renderWorkspaceContent() {
 }
 
 function buildContextUtilityHtml() {
-  const office = getOfficeSnapshot();
   const broker = getOfficeBroker();
   const provider = getOfficeProviderState();
   const library = getOfficeLibraryState();

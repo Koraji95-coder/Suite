@@ -2235,10 +2235,10 @@ class CoordinatesGrabberWindow(QMainWindow):
                         z=r.elev,
                         scale=cfg.refblock.scale,
                     )
-                except BaseException as label_exc:
+                except Exception as label_exc:
                     self._append_log(f"[PlaceRefPoints] Label failed at {r.point_name}: {format_com_error(label_exc)}")
                 placed += 1
-            except BaseException as exc:
+            except Exception as exc:
                 self._append_log(f"[PlaceRefPoints] Failed at {r.point_name}: {format_com_error(exc)}")
 
         try:
@@ -2279,7 +2279,7 @@ class CoordinatesGrabberWindow(QMainWindow):
                 self.cmb_layers.setCurrentIndex(0)
             self._set_status(f"Loaded {len(layers)} layers from current drawing.")
             self._append_log(f"[Layers] Loaded {len(layers)} layers.")
-        except BaseException as exc:
+        except Exception as exc:
             self._append_log(format_exception_text(exc, "refresh_layers"))
             self._set_status("Failed to load layers (see activity log).")
 
@@ -2387,7 +2387,7 @@ class CoordinatesGrabberWindow(QMainWindow):
 
             self._set_status(f"Exported + opened: {out_path}")
 
-        except BaseException as exc:
+        except Exception as exc:
             self._append_log(format_exception_text(exc, "Export pipeline (build rows -> place blocks -> export excel)"))
             self._set_status("Export failed. See activity log for full error.")
             self._message_box("Export failed", "Export failed. Check the Activity log for details.")
@@ -2429,7 +2429,7 @@ class CoordinatesGrabberWindow(QMainWindow):
                         blockrefs.append(ent)
             else:
                 blockrefs = _blockrefs_in_modelspace(self.doc)
-        except BaseException as exc:
+        except Exception as exc:
             self._append_log(f"[LayerSearch] ERROR collecting block references: {format_com_error(exc)}")
             blockrefs = []
 
@@ -2445,7 +2445,7 @@ class CoordinatesGrabberWindow(QMainWindow):
                     handles=sel_handles,
                     log_cb=self._append_log,
                 )
-            except BaseException as exc:
+            except Exception as exc:
                 self._append_log(f"[LayerSearch] ERROR scanning ModelSpace entities: {format_com_error(exc)}")
                 ms_ents = []
 
@@ -2528,7 +2528,7 @@ class CoordinatesGrabberWindow(QMainWindow):
                 log_ignored_exception("open exported layer-search excel", ignored_exc)
 
             self.lbl_status.setText(f"Layer Search done → Exported: {out_path}")
-        except BaseException as exc:
+        except Exception as exc:
             self._append_log(exc, "Layer search pipeline")
             self._append_log("[LayerSearch] FAILED (see traceback above).")
             self.lbl_status.setText("Layer search failed. See Activity log / terminal for details.")

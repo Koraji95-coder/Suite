@@ -32,7 +32,7 @@ def normalize_runtime_path(path_value: str) -> str:
                 normalized = str(direct_candidate.resolve(strict=False))
                 return ntpath.normcase(ntpath.normpath(normalized))
         except Exception:
-            pass
+            pass  # Fall through to simpler normpath if resolve() fails
         normalized = ntpath.normpath(text.replace("/", "\\"))
         return ntpath.normcase(normalized)
     if is_posix_absolute_path(text):
@@ -41,7 +41,7 @@ def normalize_runtime_path(path_value: str) -> str:
             if direct_candidate.is_absolute():
                 return posixpath.normpath(str(direct_candidate.resolve(strict=False)))
         except Exception:
-            pass
+            pass  # Fall through to simpler normpath if resolve() fails
         return posixpath.normpath(text.replace("\\", "/"))
     return text.replace("\\", "/")
 
@@ -81,7 +81,7 @@ def resolve_runtime_path(
         if direct_candidate.is_absolute() and direct_candidate.exists():
             return direct_candidate.resolve()
     except Exception:
-        pass
+        pass  # Path inaccessible (e.g. permission error); try suffix-based fallback
 
     runtime_repo_root = _runtime_repo_root(repo_root)
     suffix_parts = _host_path_suffix_parts(text)

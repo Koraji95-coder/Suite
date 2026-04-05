@@ -411,6 +411,9 @@ def _normalize_text(value: Any) -> str:
     return str(value or "").strip().lower()
 
 
+_MAX_RAW_DISPLAY_INPUT = 10_000
+
+
 def _normalize_display_text(value: Any, max_length: int = 500) -> Optional[str]:
     if value is None:
         return None
@@ -420,6 +423,9 @@ def _normalize_display_text(value: Any, max_length: int = 500) -> Optional[str]:
         return None
     if not text:
         return None
+    # Truncate before regex to bound backtracking on uncontrolled input
+    if len(text) > _MAX_RAW_DISPLAY_INPUT:
+        text = text[:_MAX_RAW_DISPLAY_INPUT]
     text = html.unescape(text)
     text = _HTML_BREAK_PATTERN.sub(" ", text)
     text = _HTML_TAG_PATTERN.sub(" ", text)

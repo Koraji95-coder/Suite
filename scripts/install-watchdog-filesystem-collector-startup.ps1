@@ -279,10 +279,16 @@ $staleLauncherRepairs = Repair-SuiteStaleLauncherTasks `
     -TaskNamePrefixes @("SuiteWatchdogFilesystemCollector-", "SuiteWatchdogFilesystemCollectorCheck-") `
     -KeepTaskNames @($TaskName, $CheckTaskName) `
     -LauncherDirectory $launcherDir `
-    -Comment "Neutralized stale Suite Watchdog filesystem startup task launcher."
+    -Comment "Neutralized stale Suite Watchdog filesystem startup task launcher." `
+    -DisableTasks
 
 foreach ($repair in @($staleLauncherRepairs)) {
-    Write-Warning "Neutralized stale filesystem watchdog startup launcher '$($repair.launcherPath)' still referenced by task '$($repair.taskName)'."
+    if ($repair.taskDisabled) {
+        Write-Warning "Neutralized stale filesystem watchdog startup launcher '$($repair.launcherPath)' and disabled task '$($repair.taskName)'."
+    }
+    else {
+        Write-Warning "Neutralized stale filesystem watchdog startup launcher '$($repair.launcherPath)' still referenced by task '$($repair.taskName)'."
+    }
 }
 
 if (-not $ForceRunKey) {

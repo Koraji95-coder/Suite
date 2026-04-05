@@ -109,10 +109,20 @@ function Write-SuiteNoOpLauncher {
         New-Item -ItemType Directory -Path $launcherDirectory -Force | Out-Null
     }
 
+    $commentLines = @()
+    foreach ($commentLine in @(([string]$Comment) -split "\r?\n")) {
+        if ([string]::IsNullOrWhiteSpace($commentLine)) {
+            $commentLines += "'"
+            continue
+        }
+
+        $commentLines += "' " + ([string]$commentLine).Trim()
+    }
+
     $launcherLines = @(
         "Option Explicit",
-        "",
-        "' " + $Comment,
+        ""
+    ) + @($commentLines) + @(
         "WScript.Quit 0"
     )
 
@@ -140,12 +150,20 @@ function Repair-SuiteStaleLauncherTasks {
         [string[]]$TaskNamePrefixes,
         [string[]]$KeepTaskNames,
         [Parameter(Mandatory = $true)][string]$LauncherDirectory,
-        [string]$Comment = "Neutralized stale Suite startup task launcher."
+        [string]$Comment = "Neutralized stale Suite startup task launcher.",
+        [switch]$DisableTasks
     )
 
     $getScheduledTaskCommand = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
     if (-not $getScheduledTaskCommand) {
         return @()
+    }
+
+    $disableScheduledTaskCommand = if ($DisableTasks) {
+        Get-Command Disable-ScheduledTask -ErrorAction SilentlyContinue
+    }
+    else {
+        $null
     }
 
     $normalizedLauncherDirectory = [System.IO.Path]::GetFullPath($LauncherDirectory).TrimEnd('\')
@@ -205,10 +223,21 @@ function Repair-SuiteStaleLauncherTasks {
             }
 
             Write-SuiteNoOpLauncher -LauncherPath $normalizedLauncherPath -Comment $Comment | Out-Null
+            $taskDisabled = $false
+            if ($DisableTasks -and $disableScheduledTaskCommand) {
+                try {
+                    Disable-ScheduledTask -TaskName $taskName -ErrorAction Stop | Out-Null
+                    $taskDisabled = $true
+                }
+                catch {
+                    $taskDisabled = $false
+                }
+            }
             $results += [pscustomobject]@{
                 taskName = $taskName
                 launcherPath = $normalizedLauncherPath
                 disabledLauncherPath = $disabledLauncherPath
+                taskDisabled = $taskDisabled
             }
         }
     }

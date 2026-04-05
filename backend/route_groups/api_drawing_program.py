@@ -18,7 +18,11 @@ from backend.domains.project_setup import (
     DEFAULT_WDP_CONFIG_LINES,
     PANEL_DRAWING_TITLE_HINTS,
 )
-from backend.runtime_paths import is_absolute_path_value, resolve_runtime_directory
+from backend.runtime_paths import (
+    is_absolute_path_value,
+    resolve_runtime_directory,
+    resolve_runtime_path,
+)
 
 
 def create_drawing_program_blueprint(
@@ -131,65 +135,27 @@ def create_drawing_program_blueprint(
         raw = _normalize_text(template_path)
         if not raw:
             raise ValueError("Template path is required.")
-        candidate = raw if is_absolute_path_value(raw) else safe_join(_project_root_realpath(project_root), raw)
-        if candidate is None:
-            raise ValueError(f"Template path resolves outside the project root: {template_path}")
-        candidate = _ensure_under_project_root(project_root, candidate, template_path, "Template path")
-        if not os.path.isfile(str(candidate)):
-            raise ValueError(f"Template file does not exist: {candidate}")
-        return candidate
-
-    def _read_project_text_if_exists(
-        project_root: Path,
-        candidate_path: Path,
-        *,
-        field_name: str,
-    ) -> str | None:
-        resolved_candidate = _ensure_under_project_root(
-            project_root,
-            str(candidate_path),
-            str(candidate_path),
-            field_name,
-        )
-        resolved_text = str(resolved_candidate)
-        if not os.path.exists(resolved_text):
-            return None
-        if not os.path.isfile(resolved_text):
-            raise ValueError(f"{field_name} does not exist: {resolved_candidate}")
-        with open(resolved_text, "r", encoding="utf-8") as handle:
-            return handle.read()
-
-    def _write_project_text(
-        project_root: Path,
-        candidate_path: Path,
-        content: str,
-        *,
-        field_name: str,
-    ) -> None:
-        resolved_candidate = _ensure_under_project_root(
-            project_root,
-            str(candidate_path),
-            str(candidate_path),
-            field_name,
-        )
-        resolved_candidate.parent.mkdir(parents=True, exist_ok=True)
-        with open(resolved_candidate, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(content)
-
-    def _copy_project_file(project_root: Path, source_path: Path, target_path: Path) -> None:
-        resolved_source = _ensure_under_project_root(
-            project_root,
-            str(source_path),
-            str(source_path),
-            "Template path",
-        )
-        resolved_target = _ensure_under_project_root(
-            project_root,
-            str(target_path),
-            str(target_path),
-            "Relative path",
-        )
-        shutil.copy2(str(resolved_source), str(resolved_target))
+        project_root_real = _project_root_realpath(project_root)
+        if is_absolute_path_value(raw):
+            runtime_candidate = resolve_runtime_path(raw)
+            if runtime_candidate is None:
+                raise ValueError(f"Template file does not exist: {template_path}")
+            candidate_real = os.path.realpath(str(runtime_candidate))
+        else:
+            candidate = safe_join(project_root_real, raw.replace("\\", "/"))
+            if candidate is None:
+                raise ValueError(f"Template path resolves outside the project root: {template_path}")
+            candidate_real = os.path.realpath(candidate)
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError(
+                f"Template path resolves outside the project root: {template_path}"
+            ) from exc
+        if not os.path.isfile(candidate_real):
+            raise ValueError(f"Template file does not exist: {candidate_real}")
+        return Path(candidate_real)
 
     def _preflight_file_actions(project_root: Path, file_actions: Sequence[Dict[str, Any]]) -> None:
         for action in file_actions:
@@ -329,6 +295,7 @@ def create_drawing_program_blueprint(
         return "\n".join(lines) + "\n"
 
     def _apply_program_files(project_root: Path, file_actions: Sequence[Dict[str, Any]]) -> Dict[str, List[str]]:
+        project_root_real = _project_root_realpath(project_root)
         created_files: List[str] = []
         renamed_from: List[str] = []
         renamed_to: List[str] = []
@@ -339,9 +306,20 @@ def create_drawing_program_blueprint(
             if kind == "copy-template":
                 source = _resolve_template_path(project_root, _normalize_text(action.get("templatePath")))
                 target = _resolve_relative_under_root(project_root, _normalize_text(action.get("toRelativePath")))
-                target.parent.mkdir(parents=True, exist_ok=True)
-                _copy_project_file(project_root, source, target)
-                created_files.append(_normalize_path(target.relative_to(project_root)))
+                source_real = os.path.realpath(str(source))
+                target_real = os.path.realpath(str(target))
+                try:
+                    if os.path.commonpath([project_root_real, source_real]) != project_root_real:
+                        raise ValueError
+                    if os.path.commonpath([project_root_real, target_real]) != project_root_real:
+                        raise ValueError
+                except ValueError as exc:
+                    raise ValueError(
+                        "Drawing program file operation resolves outside the project root."
+                    ) from exc
+                os.makedirs(os.path.dirname(target_real), exist_ok=True)
+                shutil.copy2(source_real, target_real)
+                created_files.append(_normalize_path(Path(target_real).relative_to(project_root)))
             elif kind == "rename-dwg":
                 source = _resolve_relative_under_root(project_root, _normalize_text(action.get("fromRelativePath")))
                 target = _resolve_relative_under_root(project_root, _normalize_text(action.get("toRelativePath")))
@@ -410,17 +388,25 @@ def create_drawing_program_blueprint(
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
             wdp_path = _resolve_wdp_path(project_root, profile)
-            existing_text = _read_project_text_if_exists(
-                project_root,
-                wdp_path,
-                field_name="ACADE project file path",
-            )
-            _write_project_text(
-                project_root,
-                wdp_path,
-                _build_wdp_text(existing_text, profile, active_rows),
-                field_name="ACADE project file path",
-            )
+            project_root_real = _project_root_realpath(project_root)
+            wdp_real = os.path.realpath(str(wdp_path))
+            try:
+                if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:
+                    raise ValueError
+            except ValueError as exc:
+                raise ValueError(
+                    "ACADE project file path resolves outside the project root."
+                ) from exc
+            if os.path.exists(wdp_real):
+                if not os.path.isfile(wdp_real):
+                    raise ValueError(f"ACADE project file path does not exist: {wdp_real}")
+                with open(wdp_real, "r", encoding="utf-8") as handle:
+                    existing_text = handle.read()
+            else:
+                existing_text = None
+            os.makedirs(os.path.dirname(wdp_real), exist_ok=True)
+            with open(wdp_real, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(_build_wdp_text(existing_text, profile, active_rows))
 
             finalized_program = _finalize_program(dict(updated_program), True)
             return (
@@ -496,17 +482,25 @@ def create_drawing_program_blueprint(
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
             wdp_path = _resolve_wdp_path(project_root, profile)
-            existing_text = _read_project_text_if_exists(
-                project_root,
-                wdp_path,
-                field_name="ACADE project file path",
-            )
-            _write_project_text(
-                project_root,
-                wdp_path,
-                _build_wdp_text(existing_text, profile, active_rows),
-                field_name="ACADE project file path",
-            )
+            project_root_real = _project_root_realpath(project_root)
+            wdp_real = os.path.realpath(str(wdp_path))
+            try:
+                if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:
+                    raise ValueError
+            except ValueError as exc:
+                raise ValueError(
+                    "ACADE project file path resolves outside the project root."
+                ) from exc
+            if os.path.exists(wdp_real):
+                if not os.path.isfile(wdp_real):
+                    raise ValueError(f"ACADE project file path does not exist: {wdp_real}")
+                with open(wdp_real, "r", encoding="utf-8") as handle:
+                    existing_text = handle.read()
+            else:
+                existing_text = None
+            os.makedirs(os.path.dirname(wdp_real), exist_ok=True)
+            with open(wdp_real, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(_build_wdp_text(existing_text, profile, active_rows))
 
             finalized_program = _finalize_program(dict(program), True)
             return (

@@ -220,21 +220,21 @@ def create_automation_recipe_blueprint(
 
         source_root = _resolve_existing_directory(drawing.get("sourceRootPath"))
         if source_root is not None:
-            resolved_source = _ensure_under_project_root(
-                source_root,
-                drawing_path,
-                field_name="selectedDrawingPaths",
-            )
-        else:
-            resolved_runtime_path = resolve_runtime_path(drawing_path)
-            if resolved_runtime_path is None:
-                raise ValueError("Selected drawing is not available.")
-            resolved_source = Path(os.path.realpath(str(resolved_runtime_path)))
+            source_root_real = _project_root_realpath(source_root)
+            resolved_text = os.path.realpath(drawing_path)
+            try:
+                if os.path.commonpath([source_root_real, resolved_text]) != source_root_real:
+                    raise ValueError
+            except ValueError as exc:
+                raise ValueError("selectedDrawingPaths resolves outside the drawing root.") from exc
+            if not os.path.isfile(resolved_text):
+                raise ValueError(f"Selected drawing '{resolved_text}' does not exist.")
+            return resolved_text
 
-        resolved_text = str(resolved_source)
-        if not os.path.isfile(resolved_text):
-            raise ValueError(f"Selected drawing '{resolved_text}' does not exist.")
-        return resolved_text
+        resolved_runtime_path = resolve_runtime_path(drawing_path)
+        if resolved_runtime_path is None:
+            raise ValueError("Selected drawing is not available.")
+        return str(resolved_runtime_path)
 
     def _request_id() -> str:
         raw = (
@@ -404,36 +404,41 @@ def create_automation_recipe_blueprint(
             raw_path = _normalize_text(entry)
             if not raw_path:
                 continue
-            if is_absolute_path_value(raw_path):
-                absolute_candidate = os.path.abspath(raw_path)
-                if drawing_root_path is not None:
-                    absolute_resolved = _ensure_under_project_root(
-                        drawing_root_path,
-                        absolute_candidate,
-                        field_name="selectedDrawingPaths",
-                    )
-                    relative_path = os.path.relpath(str(absolute_resolved), drawing_root)
+            if drawing_root_path is not None and drawing_root:
+                if is_absolute_path_value(raw_path):
+                    candidate_text = os.path.abspath(raw_path)
+                    relative_path = None
                 else:
-                    absolute_resolved = Path(os.path.realpath(absolute_candidate))
-                    relative_path = os.path.basename(str(absolute_resolved)) or raw_path
+                    candidate_text = safe_join(drawing_root, raw_path.replace("\\", "/"))
+                    if candidate_text is None:
+                        raise ValueError(
+                            f"Drawing path '{raw_path}' resolves outside the drawing root."
+                        )
+                    relative_path = raw_path
+
+                absolute_path = os.path.realpath(candidate_text)
+                try:
+                    if os.path.commonpath([drawing_root, absolute_path]) != drawing_root:
+                        raise ValueError
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Drawing path '{raw_path}' resolves outside the drawing root."
+                    ) from exc
+                if relative_path is None:
+                    relative_path = os.path.relpath(absolute_path, drawing_root)
+                exists_value = "true" if os.path.isfile(absolute_path) else ""
             else:
-                if not drawing_root_path or not drawing_root:
+                if not is_absolute_path_value(raw_path):
                     raise ValueError(
                         "drawingRootPath is required when selectedDrawingPaths are relative."
                     )
-                candidate_text = safe_join(drawing_root, raw_path.replace("\\", "/"))
-                if candidate_text is None:
-                    raise ValueError(
-                        f"Drawing path '{raw_path}' resolves outside the drawing root."
-                    )
-                absolute_resolved = _ensure_under_project_root(
-                    drawing_root_path,
-                    candidate_text,
-                    field_name="selectedDrawingPaths",
-                )
-                relative_path = raw_path
+                resolved_runtime_path = resolve_runtime_path(raw_path)
+                if resolved_runtime_path is None:
+                    raise ValueError(f"Selected drawing '{raw_path}' is not available.")
+                absolute_path = str(resolved_runtime_path)
+                relative_path = os.path.basename(absolute_path) or raw_path
+                exists_value = "true"
 
-            absolute_path = str(absolute_resolved)
             normalized_key = absolute_path.lower()
             if normalized_key in seen_paths:
                 continue
@@ -446,7 +451,7 @@ def create_automation_recipe_blueprint(
                     "drawingNumber": Path(relative_path).stem,
                     "drawingKey": _normalize_drawing_key(Path(relative_path).stem),
                     "sourceRootPath": drawing_root,
-                    "exists": "true" if os.path.isfile(absolute_path) else "",
+                    "exists": exists_value,
                 }
             )
 

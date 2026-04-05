@@ -218,23 +218,20 @@ def create_automation_recipe_blueprint(
         if not drawing_path:
             raise ValueError("Selected drawing path is missing.")
 
+        resolved_runtime_path = resolve_runtime_path(drawing_path)
+        if resolved_runtime_path is None:
+            raise ValueError("Selected drawing is not available.")
+        resolved_text = str(resolved_runtime_path)
+
         source_root = _resolve_existing_directory(drawing.get("sourceRootPath"))
         if source_root is not None:
             source_root_real = _project_root_realpath(source_root)
-            resolved_text = os.path.realpath(drawing_path)
             try:
                 if os.path.commonpath([source_root_real, resolved_text]) != source_root_real:
                     raise ValueError
             except ValueError as exc:
                 raise ValueError("selectedDrawingPaths resolves outside the drawing root.") from exc
-            if not os.path.isfile(resolved_text):
-                raise ValueError(f"Selected drawing '{resolved_text}' does not exist.")
-            return resolved_text
-
-        resolved_runtime_path = resolve_runtime_path(drawing_path)
-        if resolved_runtime_path is None:
-            raise ValueError("Selected drawing is not available.")
-        return str(resolved_runtime_path)
+        return resolved_text
 
     def _request_id() -> str:
         raw = (
@@ -426,7 +423,12 @@ def create_automation_recipe_blueprint(
                     ) from exc
                 if relative_path is None:
                     relative_path = os.path.relpath(absolute_path, drawing_root)
-                exists_value = "true" if os.path.isfile(absolute_path) else ""
+                resolved_runtime_path = resolve_runtime_path(absolute_path)
+                if resolved_runtime_path is not None:
+                    absolute_path = str(resolved_runtime_path)
+                    exists_value = "true"
+                else:
+                    exists_value = ""
             else:
                 if not is_absolute_path_value(raw_path):
                     raise ValueError(

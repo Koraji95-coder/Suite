@@ -252,14 +252,6 @@ def create_drawing_program_blueprint(
         workbook_path.parent.mkdir(parents=True, exist_ok=True)
         workbook.save(workbook_path)
 
-    def _resolve_wdp_path(project_root: Path, profile: Dict[str, str]) -> Path:
-        configured = _normalize_text(profile.get("acadeProjectFilePath"))
-        raw_value = configured or f"{project_root.name}.wdp"
-        candidate = raw_value if is_absolute_path_value(raw_value) else safe_join(_project_root_realpath(project_root), raw_value)
-        if candidate is None:
-            raise ValueError(f"ACADE project file path resolves outside the project root: {raw_value}")
-        return _ensure_under_project_root(project_root, candidate, raw_value, "ACADE project file path")
-
     def _build_wdp_text(existing_text: str | None, profile: Dict[str, str], rows: Sequence[Dict[str, Any]]) -> str:
         owner = _normalize_text(profile.get("acadeLine1")) or "Suite Project"
         desc = _normalize_text(profile.get("acadeLine2")) or owner
@@ -387,9 +379,19 @@ def create_drawing_program_blueprint(
                 for row in (updated_program.get("rows") or [])
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
-            wdp_path = _resolve_wdp_path(project_root, profile)
+            configured_wdp_path = _normalize_text(profile.get("acadeProjectFilePath"))
+            raw_wdp_path = configured_wdp_path or f"{project_root.name}.wdp"
             project_root_real = _project_root_realpath(project_root)
-            wdp_real = os.path.realpath(str(wdp_path))
+            if is_absolute_path_value(raw_wdp_path):
+                runtime_wdp_path = resolve_runtime_path(raw_wdp_path)
+                wdp_candidate = str(runtime_wdp_path) if runtime_wdp_path is not None else raw_wdp_path
+            else:
+                wdp_candidate = safe_join(project_root_real, raw_wdp_path.replace("\\", "/"))
+                if wdp_candidate is None:
+                    raise ValueError(
+                        "ACADE project file path resolves outside the project root."
+                    )
+            wdp_real = os.path.realpath(str(wdp_candidate))
             try:
                 if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:
                     raise ValueError
@@ -397,6 +399,7 @@ def create_drawing_program_blueprint(
                 raise ValueError(
                     "ACADE project file path resolves outside the project root."
                 ) from exc
+            wdp_path = Path(wdp_real)
             if os.path.exists(wdp_real):
                 if not os.path.isfile(wdp_real):
                     raise ValueError(f"ACADE project file path does not exist: {wdp_real}")
@@ -481,9 +484,19 @@ def create_drawing_program_blueprint(
                 for row in (program.get("rows") or [])
                 if isinstance(row, dict) and _normalize_text(row.get("status")).lower() != "inactive"
             ]
-            wdp_path = _resolve_wdp_path(project_root, profile)
+            configured_wdp_path = _normalize_text(profile.get("acadeProjectFilePath"))
+            raw_wdp_path = configured_wdp_path or f"{project_root.name}.wdp"
             project_root_real = _project_root_realpath(project_root)
-            wdp_real = os.path.realpath(str(wdp_path))
+            if is_absolute_path_value(raw_wdp_path):
+                runtime_wdp_path = resolve_runtime_path(raw_wdp_path)
+                wdp_candidate = str(runtime_wdp_path) if runtime_wdp_path is not None else raw_wdp_path
+            else:
+                wdp_candidate = safe_join(project_root_real, raw_wdp_path.replace("\\", "/"))
+                if wdp_candidate is None:
+                    raise ValueError(
+                        "ACADE project file path resolves outside the project root."
+                    )
+            wdp_real = os.path.realpath(str(wdp_candidate))
             try:
                 if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:
                     raise ValueError
@@ -491,6 +504,7 @@ def create_drawing_program_blueprint(
                 raise ValueError(
                     "ACADE project file path resolves outside the project root."
                 ) from exc
+            wdp_path = Path(wdp_real)
             if os.path.exists(wdp_real):
                 if not os.path.isfile(wdp_real):
                     raise ValueError(f"ACADE project file path does not exist: {wdp_real}")

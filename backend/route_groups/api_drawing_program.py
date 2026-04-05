@@ -21,7 +21,6 @@ from backend.domains.project_setup import (
 from backend.runtime_paths import (
     is_absolute_path_value,
     resolve_runtime_directory,
-    resolve_runtime_path,
 )
 
 
@@ -383,14 +382,22 @@ def create_drawing_program_blueprint(
             raw_wdp_path = configured_wdp_path or f"{project_root.name}.wdp"
             project_root_real = _project_root_realpath(project_root)
             if is_absolute_path_value(raw_wdp_path):
-                runtime_wdp_path = resolve_runtime_path(raw_wdp_path)
-                wdp_candidate = str(runtime_wdp_path) if runtime_wdp_path is not None else raw_wdp_path
-            else:
-                wdp_candidate = safe_join(project_root_real, raw_wdp_path.replace("\\", "/"))
-                if wdp_candidate is None:
+                absolute_wdp_path = os.path.realpath(raw_wdp_path)
+                try:
+                    if os.path.commonpath([project_root_real, absolute_wdp_path]) != project_root_real:
+                        raise ValueError
+                except ValueError as exc:
                     raise ValueError(
                         "ACADE project file path resolves outside the project root."
-                    )
+                    ) from exc
+                wdp_relative = os.path.relpath(absolute_wdp_path, project_root_real)
+            else:
+                wdp_relative = raw_wdp_path.replace("\\", "/")
+            wdp_candidate = safe_join(project_root_real, wdp_relative.replace("\\", "/"))
+            if wdp_candidate is None:
+                raise ValueError(
+                    "ACADE project file path resolves outside the project root."
+                )
             wdp_real = os.path.realpath(str(wdp_candidate))
             try:
                 if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:
@@ -488,14 +495,22 @@ def create_drawing_program_blueprint(
             raw_wdp_path = configured_wdp_path or f"{project_root.name}.wdp"
             project_root_real = _project_root_realpath(project_root)
             if is_absolute_path_value(raw_wdp_path):
-                runtime_wdp_path = resolve_runtime_path(raw_wdp_path)
-                wdp_candidate = str(runtime_wdp_path) if runtime_wdp_path is not None else raw_wdp_path
-            else:
-                wdp_candidate = safe_join(project_root_real, raw_wdp_path.replace("\\", "/"))
-                if wdp_candidate is None:
+                absolute_wdp_path = os.path.realpath(raw_wdp_path)
+                try:
+                    if os.path.commonpath([project_root_real, absolute_wdp_path]) != project_root_real:
+                        raise ValueError
+                except ValueError as exc:
                     raise ValueError(
                         "ACADE project file path resolves outside the project root."
-                    )
+                    ) from exc
+                wdp_relative = os.path.relpath(absolute_wdp_path, project_root_real)
+            else:
+                wdp_relative = raw_wdp_path.replace("\\", "/")
+            wdp_candidate = safe_join(project_root_real, wdp_relative.replace("\\", "/"))
+            if wdp_candidate is None:
+                raise ValueError(
+                    "ACADE project file path resolves outside the project root."
+                )
             wdp_real = os.path.realpath(str(wdp_candidate))
             try:
                 if os.path.commonpath([project_root_real, wdp_real]) != project_root_real:

@@ -337,6 +337,50 @@ def create_batch_find_replace_blueprint(
             status_code,
         )
 
+    def _batch_error_response(*, message: str, status_code: int):
+        return jsonify({"success": False, "error": message}), status_code
+
+    def _safe_batch_validation_message(exc: ValueError, fallback: str) -> str:
+        message = str(exc or "").strip()
+        canonical_messages = {
+            "Missing rules payload": "Rules payload is required.",
+            "Rules payload is not valid JSON": "Rules payload is not valid JSON.",
+            "Rules payload must be an array": "Rules payload must be an array.",
+            "At least one rule is required": "At least one rule is required.",
+            "No valid rules provided": "No valid rules were provided.",
+            "Binary files are not supported": "Binary files are not supported.",
+            "Unable to decode file as text": "Unable to decode file as text.",
+            "No files uploaded": "At least one file is required.",
+            "rules must be an array": "rules must be an array.",
+            "selectedDrawingPaths must contain at least one drawing path.": (
+                "selectedDrawingPaths must contain at least one drawing path."
+            ),
+            "No valid project drawings were resolved from the issue set.": (
+                "No valid project drawings were resolved from the issue set."
+            ),
+            "matches must contain at least one preview row.": (
+                "matches must contain at least one preview row."
+            ),
+            "matches must contain at least one project preview row.": (
+                "matches must contain at least one project preview row."
+            ),
+        }
+        if message in canonical_messages:
+            return canonical_messages[message]
+        if message.startswith("Invalid regex for rule "):
+            return "Invalid regex rule."
+        if message.startswith("Too many rules."):
+            return "Too many rules were provided."
+        if message.startswith("Too many files."):
+            return "Too many files were provided."
+        if message.startswith("Too many selected drawings."):
+            return "Too many selected drawings were provided."
+        if message.startswith("matches must contain at least one preview row."):
+            return "matches must contain at least one preview row."
+        if message.startswith("matches must contain at least one project preview row."):
+            return "matches must contain at least one project preview row."
+        return fallback
+
     def _normalize_cleanup_host_result(
         result: Dict[str, Any], request_id: str
     ) -> Dict[str, Any]:
@@ -758,10 +802,19 @@ def create_batch_find_replace_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid batch preview request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Batch preview failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="Batch preview failed.",
+                status_code=500,
+            )
 
     @bp.route("/apply", methods=["POST"])
     @require_batch_session_or_api_key
@@ -785,10 +838,19 @@ def create_batch_find_replace_blueprint(
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid batch apply request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Batch apply failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="Batch apply failed.",
+                status_code=500,
+            )
 
     @bp.route("/cad/preview", methods=["POST"])
     @require_batch_session_or_api_key
@@ -822,10 +884,19 @@ def create_batch_find_replace_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid CAD batch preview request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("CAD batch preview failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="CAD batch preview failed.",
+                status_code=500,
+            )
 
     @bp.route("/cad/apply", methods=["POST"])
     @require_batch_session_or_api_key
@@ -866,10 +937,19 @@ def create_batch_find_replace_blueprint(
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid CAD batch apply request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("CAD batch apply failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="CAD batch apply failed.",
+                status_code=500,
+            )
 
     @bp.route("/cad/cleanup-preview", methods=["POST"])
     @require_batch_session_or_api_key
@@ -912,11 +992,11 @@ def create_batch_find_replace_blueprint(
             )
             status_code = 200 if host_result.get("success") else _cleanup_status_code_for_host_result(host_result)
             return jsonify(host_result), status_code
-        except Exception as exc:
+        except Exception:
             logger.exception("CAD drawing cleanup preview failed")
             return _cleanup_error_response(
                 code="ACADE_HOST_FAILED",
-                message=f"Drawing cleanup preview failed: {str(exc)}",
+                message="Drawing cleanup preview failed.",
                 request_id=request_id,
                 status_code=503,
                 meta={"stage": "drawing_cleanup.preview.host"},
@@ -965,11 +1045,11 @@ def create_batch_find_replace_blueprint(
             )
             status_code = 200 if host_result.get("success") else _cleanup_status_code_for_host_result(host_result)
             return jsonify(host_result), status_code
-        except Exception as exc:
+        except Exception:
             logger.exception("CAD drawing cleanup apply failed")
             return _cleanup_error_response(
                 code="ACADE_HOST_FAILED",
-                message=f"Drawing cleanup apply failed: {str(exc)}",
+                message="Drawing cleanup apply failed.",
                 request_id=request_id,
                 status_code=503,
                 meta={"stage": "drawing_cleanup.apply.host"},
@@ -1017,10 +1097,19 @@ def create_batch_find_replace_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid project CAD preview request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Project CAD batch preview failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="Project CAD batch preview failed.",
+                status_code=500,
+            )
 
     @bp.route("/cad/project-apply", methods=["POST"])
     @require_batch_session_or_api_key
@@ -1072,10 +1161,19 @@ def create_batch_find_replace_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-        except Exception as exc:
+            return _batch_error_response(
+                message=_safe_batch_validation_message(
+                    exc,
+                    "Invalid project CAD apply request.",
+                ),
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Project CAD batch apply failed")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return _batch_error_response(
+                message="Project CAD batch apply failed.",
+                status_code=500,
+            )
 
     @bp.route("/reports/<report_id>", methods=["GET"])
     @require_batch_session_or_api_key

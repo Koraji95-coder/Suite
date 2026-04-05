@@ -9,6 +9,7 @@ import os
 
 from flask import Blueprint, g, jsonify, request, send_file
 from flask_limiter import Limiter
+from werkzeug.utils import safe_join, secure_filename
 from .api_autocad_error_helpers import (
     build_error_payload as autocad_build_error_payload,
     derive_request_id as autocad_derive_request_id,
@@ -64,6 +65,27 @@ def create_autocad_blueprint(
                     exc=manager_scope_exc,
                 )
         return _is_under_dir(path_value, backend_exports_dir)
+
+    def _resolve_requested_export_path(raw_path: str, manager: Any) -> Path | None:
+        requested_name = secure_filename(Path(str(raw_path or "")).name)
+        if not requested_name:
+            return None
+        manager_path: str | None = None
+        if manager is not None and hasattr(manager, "resolve_allowed_export_path_by_name"):
+            try:
+                manager_path = manager.resolve_allowed_export_path_by_name(requested_name)
+            except Exception as manager_scope_exc:
+                _log_ignored_exception(
+                    stage="export_path_resolution",
+                    reason="Manager export-path name lookup failed",
+                    exc=manager_scope_exc,
+                )
+        if manager_path:
+            return Path(manager_path)
+        fallback_path = safe_join(str(backend_exports_dir), requested_name)
+        if fallback_path is None:
+            return None
+        return Path(fallback_path)
 
     def _normalize_conduit_provider(raw_value: str) -> str:
         normalized = str(raw_value or "").strip().lower().replace("-", "_")
@@ -1173,7 +1195,18 @@ def create_autocad_blueprint(
                     meta={"stage": "download_result"},
                 )
 
-            resolved = Path(raw_path).expanduser()
+            resolved = _resolve_requested_export_path(raw_path, manager)
+            if resolved is None:
+                return _error_response(
+                    code="FORBIDDEN",
+                    message=(
+                        "File path is outside allowed export scope. "
+                        "Only generated coordinates export files are allowed."
+                    ),
+                    status_code=403,
+                    request_id=request_id,
+                    meta={"stage": "download_result"},
+                )
             try:
                 resolved = resolved.resolve(strict=True)
             except FileNotFoundError:
@@ -1265,7 +1298,18 @@ def create_autocad_blueprint(
                     meta={"stage": "open_export_folder"},
                 )
 
-            resolved = Path(raw_path).expanduser()
+            resolved = _resolve_requested_export_path(raw_path, manager)
+            if resolved is None:
+                return _error_response(
+                    code="FORBIDDEN",
+                    message=(
+                        "File path is outside allowed export scope. "
+                        "Only generated coordinates export files are allowed."
+                    ),
+                    status_code=403,
+                    request_id=request_id,
+                    meta={"stage": "open_export_folder"},
+                )
             try:
                 resolved = resolved.resolve(strict=True)
             except FileNotFoundError:
@@ -1445,7 +1489,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET terminal scan via the in-process ACADE host failed: {str(exc)}",
+                        message=".NET terminal scan via the in-process ACADE host failed.",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -1723,7 +1767,7 @@ def create_autocad_blueprint(
                     if not conduit_allow_com_fallback:
                         return _error_response(
                             code="DOTNET_BRIDGE_FAILED",
-                            message=f".NET obstacle scan via the in-process ACADE host failed: {str(exc)}",
+                            message=".NET obstacle scan via the in-process ACADE host failed.",
                             status_code=503,
                             request_id=request_id,
                             meta={
@@ -2456,7 +2500,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET terminal route draw via the in-process ACADE host failed: {str(exc)}",
+                        message=".NET terminal route draw via the in-process ACADE host failed.",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -3054,7 +3098,7 @@ def create_autocad_blueprint(
                 if not conduit_allow_com_fallback:
                     return _error_response(
                         code="DOTNET_BRIDGE_FAILED",
-                        message=f".NET obstacle scan via the in-process ACADE host failed: {str(exc)}",
+                        message=".NET obstacle scan via the in-process ACADE host failed.",
                         status_code=503,
                         request_id=request_id,
                         meta={
@@ -3205,11 +3249,11 @@ def create_autocad_blueprint(
                 remote_addr=remote_addr,
             )
             return jsonify({"ok": True, **ticket_payload}), 200
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to issue websocket ticket (remote=%s)", remote_addr)
             return _error_response(
                 code="WS_TICKET_ISSUE_FAILED",
-                message=str(exc),
+                message="Failed to issue websocket ticket.",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "ws_ticket.issue"},

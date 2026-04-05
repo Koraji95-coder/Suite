@@ -158,7 +158,6 @@ _HTML_BREAK_PATTERN = re.compile(
     r"<\s*(?:br|/p|/div|/li|/tr|/td|/h[1-6])\b[^>]*>",
     re.IGNORECASE,
 )
-_HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 
 _BACKCHECK_PASS = "pass"
 _BACKCHECK_WARN = "warn"
@@ -391,8 +390,8 @@ def _proxy_json(
             json=payload,
             timeout=timeout_seconds,
         )
-    except Exception as exc:
-        return None, str(exc), 503
+    except Exception:
+        return None, "Upstream request failed.", 503
 
     if not response.ok:
         return None, _read_json_error(response), response.status_code
@@ -414,6 +413,24 @@ def _normalize_text(value: Any) -> str:
 _MAX_RAW_DISPLAY_INPUT = 10_000
 
 
+def _strip_html_tags_linear(text: str) -> str:
+    output: List[str] = []
+    inside_tag = False
+    for character in text:
+        if character == "<":
+            inside_tag = True
+            output.append(" ")
+            continue
+        if character == ">":
+            if inside_tag:
+                output.append(" ")
+            inside_tag = False
+            continue
+        if not inside_tag:
+            output.append(character)
+    return "".join(output)
+
+
 def _normalize_display_text(value: Any, max_length: int = 500) -> Optional[str]:
     if value is None:
         return None
@@ -428,7 +445,7 @@ def _normalize_display_text(value: Any, max_length: int = 500) -> Optional[str]:
         text = text[:_MAX_RAW_DISPLAY_INPUT]
     text = html.unescape(text)
     text = _HTML_BREAK_PATTERN.sub(" ", text)
-    text = _HTML_TAG_PATTERN.sub(" ", text)
+    text = _strip_html_tags_linear(text)
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return None
@@ -2977,8 +2994,8 @@ def _extract_pdf_compare_markups(
 
     try:
         reader = _PdfReader(pdf_stream)
-    except Exception as exc:
-        return None, f"Failed to read PDF: {str(exc)}", 400
+    except Exception:
+        return None, "Failed to read PDF.", 400
 
     total_pages = len(reader.pages)
     if total_pages <= 0:
@@ -8169,10 +8186,10 @@ def create_autodraft_blueprint(
             )
         try:
             results = _LOCAL_LEARNING_RUNTIME.train_domains(domains=domains)
-        except Exception as exc:
+        except Exception:
             return _autodraft_error_response(
                 code="AUTODRAFT_LEARNING_TRAIN_FAILED",
-                message=f"Local learning train failed: {str(exc)}",
+                message="Local learning train failed.",
                 request_id=request_id,
                 status_code=500,
                 meta={"endpoint": "/api/autodraft/learning/train"},
@@ -8198,10 +8215,10 @@ def create_autodraft_blueprint(
         domain = str(request.args.get("domain") or "").strip() or None
         try:
             models = _LOCAL_LEARNING_RUNTIME.list_models(domain=domain)
-        except Exception as exc:
+        except Exception:
             return _autodraft_error_response(
                 code="AUTODRAFT_LEARNING_MODELS_FAILED",
-                message=f"Failed to list local learning models: {str(exc)}",
+                message="Failed to list local learning models.",
                 request_id=request_id,
                 status_code=500,
                 meta={"endpoint": "/api/autodraft/learning/models"},
@@ -8235,10 +8252,10 @@ def create_autodraft_blueprint(
                 domain=domain,
                 limit=limit,
             )
-        except Exception as exc:
+        except Exception:
             return _autodraft_error_response(
                 code="AUTODRAFT_LEARNING_EVALUATIONS_FAILED",
-                message=f"Failed to list local learning evaluations: {str(exc)}",
+                message="Failed to list local learning evaluations.",
                 request_id=request_id,
                 status_code=500,
                 meta={"endpoint": "/api/autodraft/learning/evaluations"},
@@ -8400,7 +8417,7 @@ def create_autodraft_blueprint(
                 if not execute_api_fallback_enabled:
                     return _autodraft_error_response(
                         code="AUTODRAFT_UPSTREAM_ERROR",
-                        message=str(bridge_exc),
+                        message="AutoDraft bridge execute failed.",
                         request_id=request_id,
                         status_code=502,
                         meta={

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from datetime import UTC, datetime
@@ -11,6 +12,7 @@ from flask_limiter import Limiter
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from werkzeug.utils import safe_join
 
 from backend.domains.project_setup import (
     DEFAULT_WDP_CONFIG_LINES,
@@ -101,25 +103,38 @@ def create_drawing_program_blueprint(
             raise ValueError("plan.fileActions must be an array.")
         return raw_plan
 
+    def _project_root_realpath(project_root: Path) -> str:
+        return os.path.realpath(str(project_root))
+
+    def _ensure_under_project_root(project_root: Path, candidate_path: str, original_value: str, field_name: str) -> Path:
+        project_root_real = _project_root_realpath(project_root)
+        candidate_real = os.path.realpath(candidate_path)
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError(f"{field_name} resolves outside the project root: {original_value}") from exc
+        return Path(candidate_real)
+
     def _resolve_relative_under_root(project_root: Path, relative_path: str) -> Path:
         normalized = _normalize_path(relative_path)
         if not normalized:
             raise ValueError("Relative path is required.")
-        absolute = (project_root / Path(normalized)).resolve()
-        try:
-            absolute.relative_to(project_root)
-        except ValueError as exc:
-            raise ValueError(f"Path resolves outside the project root: {relative_path}") from exc
-        return absolute
+        if is_absolute_path_value(normalized):
+            raise ValueError("Relative path must not be absolute.")
+        absolute = safe_join(_project_root_realpath(project_root), normalized)
+        if absolute is None:
+            raise ValueError(f"Relative path resolves outside the project root: {relative_path}")
+        return _ensure_under_project_root(project_root, absolute, relative_path, "Relative path")
 
     def _resolve_template_path(project_root: Path, template_path: str) -> Path:
         raw = _normalize_text(template_path)
         if not raw:
             raise ValueError("Template path is required.")
-        candidate = Path(raw).expanduser()
-        if not candidate.is_absolute():
-            candidate = project_root / candidate
-        candidate = candidate.resolve()
+        candidate = raw if is_absolute_path_value(raw) else safe_join(_project_root_realpath(project_root), raw)
+        if candidate is None:
+            raise ValueError(f"Template path resolves outside the project root: {template_path}")
+        candidate = _ensure_under_project_root(project_root, candidate, template_path, "Template path")
         if not candidate.exists() or not candidate.is_file():
             raise ValueError(f"Template file does not exist: {candidate}")
         return candidate
@@ -221,12 +236,11 @@ def create_drawing_program_blueprint(
 
     def _resolve_wdp_path(project_root: Path, profile: Dict[str, str]) -> Path:
         configured = _normalize_text(profile.get("acadeProjectFilePath"))
-        if configured:
-            candidate = Path(configured).expanduser()
-            if not candidate.is_absolute():
-                candidate = project_root / candidate
-            return candidate.resolve()
-        return (project_root / f"{project_root.name}.wdp").resolve()
+        raw_value = configured or f"{project_root.name}.wdp"
+        candidate = raw_value if is_absolute_path_value(raw_value) else safe_join(_project_root_realpath(project_root), raw_value)
+        if candidate is None:
+            raise ValueError(f"ACADE project file path resolves outside the project root: {raw_value}")
+        return _ensure_under_project_root(project_root, candidate, raw_value, "ACADE project file path")
 
     def _build_wdp_text(existing_text: str | None, profile: Dict[str, str], rows: Sequence[Dict[str, Any]]) -> str:
         owner = _normalize_text(profile.get("acadeLine1")) or "Suite Project"

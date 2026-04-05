@@ -215,3 +215,70 @@ class TestApiDrawingProgram(unittest.TestCase):
         wdp_text = (self.project_root / "SyncOnly.wdp").read_text(encoding="utf-8")
         self.assertIn("PROJ-00001-E3-0001 - Existing.dwg", wdp_text)
 
+    def test_apply_plan_rejects_file_actions_outside_project_root(self) -> None:
+        response = self.client.post(
+            "/api/drawing-program/apply-plan",
+            json={
+                "projectId": "project-1",
+                "projectRootPath": str(self.project_root),
+                "profile": {
+                    "acadeProjectFilePath": str(self.project_root / "Test.wdp"),
+                },
+                "program": {"rows": []},
+                "plan": {
+                    "updatedProgram": {
+                        "id": "program-1",
+                        "projectId": "project-1",
+                        "workbookMirror": {
+                            "workbookRelativePath": "Drawing Index.xlsx",
+                        },
+                        "rows": [],
+                    },
+                    "fileActions": [
+                        {
+                            "kind": "copy-template",
+                            "rowId": "row-new",
+                            "toRelativePath": "../escape.dwg",
+                            "templatePath": "Templates/sheet-template.dwg",
+                            "blocked": False,
+                        }
+                    ],
+                    "workbookRows": [],
+                    "warnings": [],
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success"))
+        self.assertEqual(payload.get("error"), "Invalid request parameters.")
+        self.assertFalse((self.project_root.parent / "escape.dwg").exists())
+
+    def test_sync_acade_rejects_project_file_outside_project_root(self) -> None:
+        with tempfile.TemporaryDirectory() as other_dir:
+            outside_wdp = Path(other_dir) / "Outside.wdp"
+            outside_wdp.write_text("outside", encoding="utf-8")
+            response = self.client.post(
+                "/api/drawing-program/sync-acade",
+                json={
+                    "projectId": "project-1",
+                    "projectRootPath": str(self.project_root),
+                    "profile": {
+                        "acadeProjectFilePath": str(outside_wdp),
+                    },
+                    "program": {
+                        "id": "program-1",
+                        "projectId": "project-1",
+                        "workbookMirror": {
+                            "workbookRelativePath": "Drawing Index.xlsx",
+                        },
+                        "rows": [],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success"))
+        self.assertEqual(payload.get("error"), "Invalid request parameters.")

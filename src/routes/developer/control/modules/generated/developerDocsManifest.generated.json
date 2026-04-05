@@ -1,7 +1,7 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-05T08:40:49.136Z",
-	"docCount": 81,
+	"generatedAt": "2026-04-05T20:48:36.078Z",
+	"docCount": 83,
 	"sections": [
 		{
 			"id": "frontend-app",
@@ -289,7 +289,7 @@
 			"id": "runtime-control",
 			"title": "Runtime Control",
 			"description": "Workstation-local companion, bring-up, transfer, and local action guidance.",
-			"count": 6,
+			"count": 7,
 			"docs": [
 				{
 					"id": "docs-runtime-control-readme-md",
@@ -340,6 +340,17 @@
 					"title": "Windows Workstation Bring-Up",
 					"summary": "Use this when setting up Suite on a new Windows workstation or when standardizing an existing machine onto the cross-workstation layout.",
 					"relativePath": "docs/runtime-control/workstation-bringup.md",
+					"sectionId": "runtime-control",
+					"tags": [
+						"runtime-control"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-runtime-control-workstation-settings-parity-md",
+					"title": "Workstation Settings Parity",
+					"summary": "Use this to keep DEV-HOME and DEV-WORK functionally identical without trying to copy machine-only state that should stay local.",
+					"relativePath": "docs/runtime-control/workstation-settings-parity.md",
 					"sectionId": "runtime-control",
 					"tags": [
 						"runtime-control"
@@ -441,7 +452,7 @@
 			"id": "developer-workshop",
 			"title": "Developer Workshop",
 			"description": "Runbooks, rollout notes, policies, and workstation guidance for building Suite locally.",
-			"count": 22,
+			"count": 23,
 			"docs": [
 				{
 					"id": "docs-development-readme-md",
@@ -538,6 +549,17 @@
 					"title": "block library reference",
 					"summary": "Right now your data flow is: Supabase metadata → React UI. You'd want to move to: DWG files on disk → .NET AutoCAD backend extracts real data → API serves it → React renders it.",
 					"relativePath": "docs/development/block-library-reference.md",
+					"sectionId": "developer-workshop",
+					"tags": [
+						"developer-workshop"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-development-codex-session-memory-md",
+					"title": "Codex Session Memory Digest",
+					"summary": "This file is the portable replacement for machine-local Codex rollout history from C:\\Users\\koraj\\.codex\\sessions.",
+					"relativePath": "docs/development/codex-session-memory.md",
 					"sectionId": "developer-workshop",
 					"tags": [
 						"developer-workshop"

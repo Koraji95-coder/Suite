@@ -50,6 +50,10 @@ def _is_relative_to(path: Path, root: Path) -> bool:
         return False
 
 
+def _work_ledger_error_response(*, message: str, code: str, status_code: int):
+    return jsonify({"ok": False, "error": message, "code": code}), status_code
+
+
 def create_work_ledger_blueprint(
     *,
     limiter: Limiter,
@@ -131,29 +135,18 @@ def create_work_ledger_blueprint(
                 limit=limit,
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_SUGGESTIONS_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _work_ledger_error_response(
+                message="Invalid work ledger suggestions query.",
+                code="WORK_LEDGER_SUGGESTIONS_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to build work ledger draft suggestions")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to build work ledger draft suggestions.",
-                        "code": "WORK_LEDGER_SUGGESTIONS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _work_ledger_error_response(
+                message="Failed to build work ledger draft suggestions.",
+                code="WORK_LEDGER_SUGGESTIONS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/publishers/worktale/bootstrap", methods=["POST"])
@@ -164,29 +157,18 @@ def create_work_ledger_blueprint(
         try:
             payload = publisher.bootstrap(workstation_id=workstation_id)
             return jsonify({"ok": True, **payload}), 200
-        except RuntimeError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED",
-                    }
-                ),
-                400,
+        except RuntimeError:
+            return _work_ledger_error_response(
+                message="Failed to bootstrap Worktale on this workstation.",
+                code="WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Unexpected Worktale bootstrap failure")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to bootstrap Worktale on this workstation.",
-                        "code": "WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _work_ledger_error_response(
+                message="Failed to bootstrap Worktale on this workstation.",
+                code="WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED",
+                status_code=500,
             )
 
     @bp.route("/entries/<entry_id>/publish/worktale", methods=["POST"])
@@ -208,51 +190,30 @@ def create_work_ledger_blueprint(
                 bearer_token=bearer_token,
             )
             return jsonify({"ok": True, **payload}), 200
-        except LookupError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_ENTRY_NOT_FOUND",
-                    }
-                ),
-                404,
+        except LookupError:
+            return _work_ledger_error_response(
+                message="Work ledger entry was not found.",
+                code="WORK_LEDGER_ENTRY_NOT_FOUND",
+                status_code=404,
             )
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_ENTRY_INVALID_STATE",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _work_ledger_error_response(
+                message="Work ledger entry is not ready to publish.",
+                code="WORK_LEDGER_ENTRY_INVALID_STATE",
+                status_code=400,
             )
-        except RuntimeError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_WORKTALE_PUBLISH_FAILED",
-                    }
-                ),
-                503,
+        except RuntimeError:
+            return _work_ledger_error_response(
+                message="Failed to publish work ledger entry.",
+                code="WORK_LEDGER_WORKTALE_PUBLISH_FAILED",
+                status_code=503,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Unexpected Work Ledger publish failure")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to publish work ledger entry.",
-                        "code": "WORK_LEDGER_WORKTALE_PUBLISH_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _work_ledger_error_response(
+                message="Failed to publish work ledger entry.",
+                code="WORK_LEDGER_WORKTALE_PUBLISH_FAILED",
+                status_code=500,
             )
 
     @bp.route("/entries/<entry_id>/publish-jobs", methods=["GET"])
@@ -274,40 +235,24 @@ def create_work_ledger_blueprint(
                 limit=limit,
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _work_ledger_error_response(
+                message="Invalid work ledger publish jobs query.",
+                code="WORK_LEDGER_INVALID_QUERY",
+                status_code=400,
             )
-        except LookupError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WORK_LEDGER_ENTRY_NOT_FOUND",
-                    }
-                ),
-                404,
+        except LookupError:
+            return _work_ledger_error_response(
+                message="Work ledger entry was not found.",
+                code="WORK_LEDGER_ENTRY_NOT_FOUND",
+                status_code=404,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to list work ledger publish jobs")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to load work ledger publish jobs.",
-                        "code": "WORK_LEDGER_PUBLISH_JOBS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _work_ledger_error_response(
+                message="Failed to load work ledger publish jobs.",
+                code="WORK_LEDGER_PUBLISH_JOBS_FAILED",
+                status_code=500,
             )
 
     @bp.route(
@@ -422,18 +367,12 @@ def create_work_ledger_blueprint(
                 ),
                 200,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to open work ledger artifact folder")
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to open artifact folder.",
-                        "code": "WORK_LEDGER_ARTIFACT_FOLDER_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _work_ledger_error_response(
+                message="Failed to open artifact folder.",
+                code="WORK_LEDGER_ARTIFACT_FOLDER_FAILED",
+                status_code=500,
             )
 
     return bp

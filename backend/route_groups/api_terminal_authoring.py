@@ -16,6 +16,9 @@ from flask_limiter import Limiter
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from werkzeug.utils import safe_join
+
+from backend.runtime_paths import is_absolute_path_value, resolve_runtime_directory, resolve_runtime_path
 
 MAX_DRAWINGS = 50
 MAX_SCHEDULE_ROWS = 5000
@@ -249,41 +252,56 @@ def create_terminal_authoring_blueprint(
             )
         return normalized
 
-    def _find_acade_project_file(project_root: str) -> str | None:
+    def _project_root_realpath(project_root: Path) -> str:
+        return os.path.realpath(str(project_root))
+
+    def _ensure_under_project_root(project_root: Path, candidate_path: str) -> Path:
+        project_root_real = _project_root_realpath(project_root)
+        candidate_real = os.path.realpath(candidate_path)
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError("Path resolves outside the project root.") from exc
+        return Path(candidate_real)
+
+    def _find_acade_project_file(project_root: str, configured_path: str) -> str | None:
+        normalized_path = _normalize_text(configured_path)
+        if not normalized_path:
+            return None
         normalized_root = _normalize_text(project_root)
         if not normalized_root:
             return None
-        # Require absolute paths to prevent relative path traversal
-        if not os.path.isabs(normalized_root):
+        if not is_absolute_path_value(normalized_root):
+            return None
+        root_path = resolve_runtime_directory(normalized_root)
+        if root_path is None:
             return None
         try:
-            root_path = Path(os.path.realpath(normalized_root))
-        except (OSError, ValueError):
-            return None
-        if not root_path.exists() or not root_path.is_dir():
-            return None
-
-        direct_matches = sorted(root_path.glob("*.wdp"))
-        if direct_matches:
-            matched = Path(os.path.realpath(str(direct_matches[0])))
-            # Ensure the match is still under the resolved root
-            try:
-                matched.relative_to(root_path)
-            except ValueError:
-                return None
-            return str(matched)
-
-        try:
-            for candidate in root_path.rglob("*.wdp"):
-                resolved_candidate = Path(os.path.realpath(str(candidate)))
-                try:
-                    resolved_candidate.relative_to(root_path)
-                except ValueError:
-                    continue
-                return str(resolved_candidate)
+            root_path = root_path.resolve()
         except Exception:
             return None
-        return None
+
+        try:
+            if is_absolute_path_value(normalized_path):
+                runtime_candidate = resolve_runtime_path(normalized_path)
+                if runtime_candidate is None:
+                    return None
+                resolved_candidate = _ensure_under_project_root(root_path, str(runtime_candidate))
+            else:
+                candidate_path = safe_join(str(root_path), normalized_path.replace("\\", "/"))
+                if candidate_path is None:
+                    return None
+                resolved_candidate = _ensure_under_project_root(root_path, candidate_path)
+        except ValueError:
+            return None
+        except Exception:
+            return None
+        if resolved_candidate.suffix.lower() != ".wdp":
+            return None
+        if not resolved_candidate.exists() or not resolved_candidate.is_file():
+            return None
+        return str(resolved_candidate)
 
     def _build_preview_drawings(drawings: List[Any]) -> List[Dict[str, Any]]:
         output: List[Dict[str, Any]] = []
@@ -466,10 +484,13 @@ def create_terminal_authoring_blueprint(
             drawings, strip_rows, connection_rows = _validate_preview_payload(payload)
             warnings: List[str] = []
 
-            acade_project_file = _find_acade_project_file(_normalize_text(payload.get("projectRootPath")))
+            acade_project_file = _find_acade_project_file(
+                _normalize_text(payload.get("projectRootPath")),
+                _normalize_text(payload.get("acadeProjectFilePath")),
+            )
             if not acade_project_file:
                 warnings.append(
-                    "No AutoCAD Electrical .wdp project file was found under the project root. ACAD writes can continue, but ACADE context could not be verified."
+                    "No AutoCAD Electrical .wdp project file was provided under the project root. ACAD writes can continue, but ACADE context could not be verified."
                 )
 
             host_result = _call_acade_host_action(
@@ -530,10 +551,13 @@ def create_terminal_authoring_blueprint(
             operations = _validate_apply_payload(payload)
             warnings: List[str] = []
 
-            acade_project_file = _find_acade_project_file(_normalize_text(payload.get("projectRootPath")))
+            acade_project_file = _find_acade_project_file(
+                _normalize_text(payload.get("projectRootPath")),
+                _normalize_text(payload.get("acadeProjectFilePath")),
+            )
             if not acade_project_file:
                 warnings.append(
-                    "No AutoCAD Electrical .wdp project file was found under the project root. ACAD writes can continue, but ACADE context could not be verified."
+                    "No AutoCAD Electrical .wdp project file was provided under the project root. ACAD writes can continue, but ACADE context could not be verified."
                 )
 
             host_result = _call_acade_host_action(

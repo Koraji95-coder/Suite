@@ -105,6 +105,9 @@ def create_watchdog_blueprint(
             return False
         raise ValueError(f"Query parameter '{name}' must be a boolean")
 
+    def _watchdog_error_response(*, message: str, code: str, status_code: int):
+        return jsonify({"ok": False, "error": message, "code": code}), status_code
+
     @bp.route("/config", methods=["PUT"])
     @require_autocad_auth
     @limiter.limit("240 per hour")
@@ -127,29 +130,18 @@ def create_watchdog_blueprint(
         try:
             result = service.configure(user_key, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_CONFIG_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog configuration.",
+                code="WATCHDOG_CONFIG_INVALID",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to configure watchdog service (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to configure watchdog service",
-                        "code": "WATCHDOG_CONFIG_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to configure watchdog service",
+                code="WATCHDOG_CONFIG_FAILED",
+                status_code=500,
             )
 
     @bp.route("/status", methods=["GET"])
@@ -179,18 +171,12 @@ def create_watchdog_blueprint(
                 ),
                 400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to run watchdog heartbeat (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Watchdog heartbeat failed",
-                        "code": "WATCHDOG_HEARTBEAT_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Watchdog heartbeat failed",
+                code="WATCHDOG_HEARTBEAT_FAILED",
+                status_code=500,
             )
 
     @bp.route("/collectors/register", methods=["POST"])
@@ -214,29 +200,18 @@ def create_watchdog_blueprint(
         try:
             result = service.register_collector(user_key, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_COLLECTOR_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog collector registration.",
+                code="WATCHDOG_COLLECTOR_INVALID",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to register watchdog collector (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to register watchdog collector",
-                        "code": "WATCHDOG_COLLECTOR_REGISTER_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to register watchdog collector",
+                code="WATCHDOG_COLLECTOR_REGISTER_FAILED",
+                status_code=500,
             )
 
     @bp.route("/collectors/heartbeat", methods=["POST"])
@@ -260,16 +235,11 @@ def create_watchdog_blueprint(
         try:
             result = service.collector_heartbeat(user_key, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_COLLECTOR_HEARTBEAT_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog collector heartbeat.",
+                code="WATCHDOG_COLLECTOR_HEARTBEAT_INVALID",
+                status_code=400,
             )
         except KeyError:
             return (
@@ -282,18 +252,12 @@ def create_watchdog_blueprint(
                 ),
                 404,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed collector heartbeat (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Collector heartbeat failed",
-                        "code": "WATCHDOG_COLLECTOR_HEARTBEAT_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Collector heartbeat failed",
+                code="WATCHDOG_COLLECTOR_HEARTBEAT_FAILED",
+                status_code=500,
             )
 
     @bp.route("/collectors/events", methods=["POST"])
@@ -317,16 +281,11 @@ def create_watchdog_blueprint(
         try:
             result = service.ingest_collector_events(user_key, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_COLLECTOR_EVENTS_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog collector event payload.",
+                code="WATCHDOG_COLLECTOR_EVENTS_INVALID",
+                status_code=400,
             )
         except KeyError:
             return (
@@ -339,18 +298,12 @@ def create_watchdog_blueprint(
                 ),
                 404,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to ingest collector events (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Collector event ingest failed",
-                        "code": "WATCHDOG_COLLECTOR_EVENTS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Collector event ingest failed",
+                code="WATCHDOG_COLLECTOR_EVENTS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/collectors", methods=["GET"])
@@ -378,29 +331,18 @@ def create_watchdog_blueprint(
                 until_ms=_parse_query_int("untilMs", None),
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_EVENTS_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog event query parameters.",
+                code="WATCHDOG_EVENTS_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to list watchdog events (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to list watchdog events",
-                        "code": "WATCHDOG_EVENTS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to list watchdog events",
+                code="WATCHDOG_EVENTS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/overview", methods=["GET"])
@@ -416,29 +358,18 @@ def create_watchdog_blueprint(
                 or 24 * 60 * 60 * 1000,
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_OVERVIEW_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog overview query.",
+                code="WATCHDOG_OVERVIEW_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to build watchdog overview (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to build watchdog overview",
-                        "code": "WATCHDOG_OVERVIEW_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to build watchdog overview",
+                code="WATCHDOG_OVERVIEW_FAILED",
+                status_code=500,
             )
 
     @bp.route("/dashboard", methods=["GET"])
@@ -457,29 +388,18 @@ def create_watchdog_blueprint(
                 sessions_limit=_parse_query_int("sessionsLimit", 8) or 8,
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_DASHBOARD_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog dashboard query.",
+                code="WATCHDOG_DASHBOARD_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to build watchdog dashboard snapshot (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to build watchdog dashboard snapshot",
-                        "code": "WATCHDOG_DASHBOARD_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to build watchdog dashboard snapshot",
+                code="WATCHDOG_DASHBOARD_FAILED",
+                status_code=500,
             )
 
     @bp.route("/sessions", methods=["GET"])
@@ -498,29 +418,18 @@ def create_watchdog_blueprint(
                 active_only=_parse_query_bool("activeOnly", False),
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_SESSIONS_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog session query.",
+                code="WATCHDOG_SESSIONS_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to list watchdog sessions (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to list watchdog sessions",
-                        "code": "WATCHDOG_SESSIONS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to list watchdog sessions",
+                code="WATCHDOG_SESSIONS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/projects/<project_id>/overview", methods=["GET"])
@@ -548,22 +457,16 @@ def create_watchdog_blueprint(
                 or 24 * 60 * 60 * 1000,
             )
             return jsonify({"ok": True, **payload}), 200
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Failed to build project watchdog overview (user=%s, project=%s)",
                 user_key,
                 normalized_project_id,
             )
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to build project watchdog overview",
-                        "code": "WATCHDOG_PROJECT_OVERVIEW_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to build project watchdog overview",
+                code="WATCHDOG_PROJECT_OVERVIEW_FAILED",
+                status_code=500,
             )
 
     @bp.route("/projects/<project_id>/events", methods=["GET"])
@@ -595,33 +498,22 @@ def create_watchdog_blueprint(
                 until_ms=_parse_query_int("untilMs", None),
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_EVENTS_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog event query parameters.",
+                code="WATCHDOG_EVENTS_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Failed to list project watchdog events (user=%s, project=%s)",
                 user_key,
                 normalized_project_id,
             )
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to list project watchdog events",
-                        "code": "WATCHDOG_PROJECT_EVENTS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to list project watchdog events",
+                code="WATCHDOG_PROJECT_EVENTS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/projects/<project_id>/sessions", methods=["GET"])
@@ -652,33 +544,22 @@ def create_watchdog_blueprint(
                 active_only=_parse_query_bool("activeOnly", False),
             )
             return jsonify({"ok": True, **payload}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_SESSIONS_INVALID_QUERY",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog session query.",
+                code="WATCHDOG_SESSIONS_INVALID_QUERY",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Failed to list project watchdog sessions (user=%s, project=%s)",
                 user_key,
                 normalized_project_id,
             )
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to list project watchdog sessions",
-                        "code": "WATCHDOG_PROJECT_SESSIONS_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to list project watchdog sessions",
+                code="WATCHDOG_PROJECT_SESSIONS_FAILED",
+                status_code=500,
             )
 
     @bp.route("/projects/<project_id>/rules", methods=["GET", "PUT", "DELETE"])
@@ -703,66 +584,44 @@ def create_watchdog_blueprint(
             try:
                 payload = service.get_project_rules(user_key, normalized_project_id)
                 return jsonify({"ok": True, **payload}), 200
-            except ValueError as exc:
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "error": str(exc),
-                            "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                        }
-                    ),
-                    400,
+            except ValueError:
+                return _watchdog_error_response(
+                    message="Invalid watchdog project rules request.",
+                    code="WATCHDOG_PROJECT_RULES_INVALID",
+                    status_code=400,
                 )
-            except Exception as exc:
+            except Exception:
                 logger.exception(
                     "Failed to load project watchdog rules (user=%s, project=%s)",
                     user_key,
                     normalized_project_id,
                 )
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "error": "Failed to load project watchdog rules",
-                            "code": "WATCHDOG_PROJECT_RULES_FAILED",
-                            "message": str(exc),
-                        }
-                    ),
-                    500,
+                return _watchdog_error_response(
+                    message="Failed to load project watchdog rules",
+                    code="WATCHDOG_PROJECT_RULES_FAILED",
+                    status_code=500,
                 )
 
         if request.method == "DELETE":
             try:
                 result = service.delete_project_rule(user_key, normalized_project_id)
                 return jsonify({"ok": True, **result}), 200
-            except ValueError as exc:
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "error": str(exc),
-                            "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                        }
-                    ),
-                    400,
+            except ValueError:
+                return _watchdog_error_response(
+                    message="Invalid watchdog project rules request.",
+                    code="WATCHDOG_PROJECT_RULES_INVALID",
+                    status_code=400,
                 )
-            except Exception as exc:
+            except Exception:
                 logger.exception(
                     "Failed to delete project watchdog rules (user=%s, project=%s)",
                     user_key,
                     normalized_project_id,
                 )
-                return (
-                    jsonify(
-                        {
-                            "ok": False,
-                            "error": "Failed to delete project watchdog rules",
-                            "code": "WATCHDOG_PROJECT_RULES_FAILED",
-                            "message": str(exc),
-                        }
-                    ),
-                    500,
+                return _watchdog_error_response(
+                    message="Failed to delete project watchdog rules",
+                    code="WATCHDOG_PROJECT_RULES_FAILED",
+                    status_code=500,
                 )
 
         if not request.is_json:
@@ -781,33 +640,22 @@ def create_watchdog_blueprint(
         try:
             result = service.upsert_project_rules(user_key, normalized_project_id, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog project rules request.",
+                code="WATCHDOG_PROJECT_RULES_INVALID",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Failed to save project watchdog rules (user=%s, project=%s)",
                 user_key,
                 normalized_project_id,
             )
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to save project watchdog rules",
-                        "code": "WATCHDOG_PROJECT_RULES_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to save project watchdog rules",
+                code="WATCHDOG_PROJECT_RULES_FAILED",
+                status_code=500,
             )
 
     @bp.route("/project-rules/sync", methods=["POST"])
@@ -831,29 +679,18 @@ def create_watchdog_blueprint(
         try:
             result = service.sync_project_rules(user_key, payload)
             return jsonify({"ok": True, **result}), 200
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid watchdog project rules request.",
+                code="WATCHDOG_PROJECT_RULES_INVALID",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to sync watchdog project rules (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to sync watchdog project rules",
-                        "code": "WATCHDOG_PROJECT_RULES_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to sync watchdog project rules",
+                code="WATCHDOG_PROJECT_RULES_FAILED",
+                status_code=500,
             )
 
     @bp.route("/drawing-activity/sync", methods=["POST"])
@@ -894,29 +731,18 @@ def create_watchdog_blueprint(
                 user_key,
                 limit=int(payload.get("limit") or 100),
             )
-        except ValueError as exc:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": str(exc),
-                        "code": "WATCHDOG_DRAWING_SYNC_INVALID",
-                    }
-                ),
-                400,
+        except ValueError:
+            return _watchdog_error_response(
+                message="Invalid drawing activity sync request.",
+                code="WATCHDOG_DRAWING_SYNC_INVALID",
+                status_code=400,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to prepare drawing activity sync batch (user=%s)", user_key)
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Failed to prepare drawing activity sync batch",
-                        "code": "WATCHDOG_DRAWING_SYNC_PREPARE_FAILED",
-                        "message": str(exc),
-                    }
-                ),
-                500,
+            return _watchdog_error_response(
+                message="Failed to prepare drawing activity sync batch",
+                code="WATCHDOG_DRAWING_SYNC_PREPARE_FAILED",
+                status_code=500,
             )
 
         rows = [dict(row, user_id=user_id) for row in (prepared.get("rows") or [])]

@@ -752,7 +752,7 @@ class LocalLearningRuntime:
                     {
                         "ok": False,
                         "domain": domain,
-                        "message": str(exc),
+                        "message": "Training failed for this domain.",
                     }
                 )
         return results

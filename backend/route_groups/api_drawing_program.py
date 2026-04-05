@@ -377,10 +377,10 @@ def create_drawing_program_blueprint(
                 200,
             )
         except ValueError as exc:
-            return _error(str(exc), 400, request_id)
+            return _error("Invalid request parameters.", 400, request_id)
         except Exception as exc:
             logger.exception("Drawing program apply failed: %s", exc)
-            return _error(f"Unable to apply the drawing program: {exc}", 500, request_id)
+            return _error("Unable to apply the drawing program.", 500, request_id)
 
     @bp.route("/sync-acade", methods=["POST"])
     @require_supabase_user
@@ -449,9 +449,9 @@ def create_drawing_program_blueprint(
                 200,
             )
         except ValueError as exc:
-            return _error(str(exc), 400, request_id)
+            return _error("Invalid request parameters.", 400, request_id)
         except Exception as exc:
             logger.exception("Drawing program ACADE sync failed: %s", exc)
-            return _error(f"Unable to sync the ACADE project stack: {exc}", 500, request_id)
+            return _error("Unable to sync the ACADE project stack.", 500, request_id)
 
     return bp

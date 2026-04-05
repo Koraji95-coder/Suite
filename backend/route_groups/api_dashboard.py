@@ -425,7 +425,7 @@ def _run_dashboard_load_job(
             status="error",
             stage="error",
             message="Dashboard load failed.",
-            error=str(exc),
+            error="An unexpected error occurred.",
         )
 
 

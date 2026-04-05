@@ -1685,7 +1685,7 @@ def sync_terminal_strip_labels(
         return {
             "success": False,
             "code": "INVALID_REQUEST",
-            "message": str(exc),
+            "message": "Invalid terminal scan request.",
             "data": {
                 "updatedStrips": 0,
                 "matchedStrips": 0,

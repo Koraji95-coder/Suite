@@ -330,6 +330,6 @@ def create_transmittal_render_blueprint(
 
         except Exception as exc:
             traceback_module.print_exc()
-            return jsonify({"success": False, "message": str(exc)}), 500
+            return jsonify({"success": False, "message": "Transmittal render failed."}), 500
 
     return bp

@@ -97,7 +97,7 @@ def create_backup_blueprint(
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
+            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
 
         try:
             file_path.write_text(content, encoding="utf-8")
@@ -111,7 +111,7 @@ def create_backup_blueprint(
             )
         except Exception as exc:
             logger.exception("Failed to save backup file")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return jsonify({"success": False, "error": "Failed to save backup file."}), 500
 
     @bp.route("/list", methods=["GET"])
     @require_api_key
@@ -131,7 +131,7 @@ def create_backup_blueprint(
             return jsonify(entries[:backup_max_files])
         except Exception as exc:
             logger.exception("Failed to list backup files")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return jsonify({"success": False, "error": "Failed to list backup files."}), 500
 
     @bp.route("/read", methods=["GET"])
     @require_api_key
@@ -144,7 +144,7 @@ def create_backup_blueprint(
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
+            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
 
         if not file_path.exists() or not file_path.is_file():
             return jsonify({"success": False, "error": "Backup file not found"}), 404
@@ -154,7 +154,7 @@ def create_backup_blueprint(
             return Response(content, mimetype="text/yaml; charset=utf-8")
         except Exception as exc:
             logger.exception("Failed to read backup file")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return jsonify({"success": False, "error": "Failed to read backup file."}), 500
 
     @bp.route("/delete", methods=["DELETE"])
     @require_api_key
@@ -167,7 +167,7 @@ def create_backup_blueprint(
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
+            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
 
         if not file_path.exists() or not file_path.is_file():
             return jsonify({"success": False, "error": "Backup file not found"}), 404
@@ -177,6 +177,6 @@ def create_backup_blueprint(
             return jsonify({"success": True, "filename": file_path.name})
         except Exception as exc:
             logger.exception("Failed to delete backup file")
-            return jsonify({"success": False, "error": str(exc)}), 500
+            return jsonify({"success": False, "error": "Failed to delete backup file."}), 500
 
     return bp

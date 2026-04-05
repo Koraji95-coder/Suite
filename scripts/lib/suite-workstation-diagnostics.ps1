@@ -235,13 +235,35 @@ function Get-SuiteStartupOwnerSummary {
 	}
 
 	$scheduledTaskMatches = $false
+	$scheduledTaskRunsRuntimeExecutableDirectly = $false
+	$scheduledTaskExecute = $null
+	$scheduledTaskArguments = $null
+	$scheduledTaskWorkingDirectory = $null
 	if ($scheduledTask) {
 		foreach ($action in @($scheduledTask.Actions)) {
 			$execute = [string]$action.Execute
 			$arguments = [string]$action.Arguments
+			$workingDirectory = [string]$action.WorkingDirectory
+			if (
+				[string]::IsNullOrWhiteSpace($scheduledTaskExecute) -and
+				(
+					-not [string]::IsNullOrWhiteSpace($execute) -or
+					-not [string]::IsNullOrWhiteSpace($arguments) -or
+					-not [string]::IsNullOrWhiteSpace($workingDirectory)
+				)
+			) {
+				$scheduledTaskExecute = $execute
+				$scheduledTaskArguments = $arguments
+				$scheduledTaskWorkingDirectory = $workingDirectory
+			}
+
 			if ($execute -match "(?i)wscript(?:\.exe)?$" -and $arguments -like "*$launcherScript*") {
 				$scheduledTaskMatches = $true
 				break
+			}
+
+			if ($execute -match "(?i)Suite\.RuntimeControl\.exe$") {
+				$scheduledTaskRunsRuntimeExecutableDirectly = $true
 			}
 		}
 	}
@@ -254,11 +276,24 @@ function Get-SuiteStartupOwnerSummary {
 	elseif ($runKeyMatches) {
 		"hkcu_run"
 	}
+	elseif ($scheduledTaskRunsRuntimeExecutableDirectly) {
+		"scheduled_task_direct_exe"
+	}
+	elseif ($scheduledTask) {
+		"scheduled_task_unexpected"
+	}
 	else {
 		"none"
 	}
 
 	$secondaryOwners = @()
+	if ($scheduledTask -and -not $scheduledTaskMatches -and $runKeyMatches) {
+		$secondaryOwners += [pscustomobject]@{
+			name = $taskName
+			owner = if ($scheduledTaskRunsRuntimeExecutableDirectly) { "scheduled_task_direct_exe" } else { "scheduled_task_unexpected" }
+		}
+	}
+
 	if ($preflightScheduledTask) {
 		$secondaryOwners += [pscustomobject]@{
 			name = $preflightTaskName
@@ -275,6 +310,9 @@ function Get-SuiteStartupOwnerSummary {
 	$status = if ($owner -eq "none") {
 		if ($secondaryOwners.Count -gt 0) { "drift" } else { "missing" }
 	}
+	elseif ($owner -in @("scheduled_task_direct_exe", "scheduled_task_unexpected")) {
+		"drift"
+	}
 	elseif ($secondaryOwners.Count -gt 0) {
 		"drift"
 	}
@@ -285,11 +323,13 @@ function Get-SuiteStartupOwnerSummary {
 	$detail = switch ($owner) {
 		"scheduled_task" { "Windows logon startup is owned by the Suite runtime scheduled task login orchestrator." }
 		"hkcu_run" { "Windows logon startup is using the hidden HKCU Run login orchestrator fallback." }
+		"scheduled_task_direct_exe" { "Windows logon startup is owned by a scheduled task that launches Suite.RuntimeControl.exe directly instead of the login orchestrator." }
+		"scheduled_task_unexpected" { "Windows logon startup is owned by a scheduled task that does not match the expected Suite launcher." }
 		default { "No Suite runtime startup owner is registered for Windows sign-in." }
 	}
 
 	if ($secondaryOwners.Count -gt 0) {
-		$detail = "{0} Extra startup owners still exist: {1}." -f $detail.TrimEnd('.'), ([string]::Join(", ", @($secondaryOwners | ForEach-Object { "{0} ({1})" -f $_.name, $_.owner })))
+		$detail = "{0}. Extra startup owners still exist: {1}." -f $detail.TrimEnd('.'), ([string]::Join(", ", @($secondaryOwners | ForEach-Object { "{0} ({1})" -f $_.name, $_.owner })))
 	}
 
 	return [pscustomobject]@{
@@ -299,6 +339,10 @@ function Get-SuiteStartupOwnerSummary {
 		scheduledTaskName = $taskName
 		scheduledTaskPresent = ($null -ne $scheduledTask)
 		scheduledTaskMatches = $scheduledTaskMatches
+		scheduledTaskRunsRuntimeExecutableDirectly = $scheduledTaskRunsRuntimeExecutableDirectly
+		scheduledTaskExecute = $scheduledTaskExecute
+		scheduledTaskArguments = $scheduledTaskArguments
+		scheduledTaskWorkingDirectory = $scheduledTaskWorkingDirectory
 		runKeyPresent = (-not [string]::IsNullOrWhiteSpace([string]$runValue))
 		runKeyMatches = $runKeyMatches
 		launcherPath = $launcherScript

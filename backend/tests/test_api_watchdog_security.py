@@ -89,6 +89,53 @@ class TestApiWatchdogSecurity(unittest.TestCase):
         self.assertEqual(payload.get("code"), "WATCHDOG_PROJECT_RULES_FAILED")
         self.assertNotIn("secret boom", str(payload))
 
+    def test_drawing_activity_sync_hides_upstream_error_text(self) -> None:
+        prepared_payload = {
+            "rows": [{"sync_key": "segment-1", "project_id": "project-1"}],
+            "lastScannedEventId": 42,
+            "skippedCount": 0,
+        }
+        with patch(
+            "backend.route_groups.api_watchdog.WatchdogMonitorService.prepare_drawing_activity_sync",
+            return_value=prepared_payload,
+        ), patch(
+            "backend.route_groups.api_watchdog.supabase_service_rest_request_helper",
+            return_value=(None, "secret boom", 500),
+        ):
+            response = self.client.post("/api/watchdog/drawing-activity/sync", json={"limit": 1})
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertEqual(payload.get("error"), "Failed to sync drawing activity segments.")
+        self.assertEqual(payload.get("code"), "WATCHDOG_DRAWING_SYNC_FAILED")
+        self.assertNotIn("secret boom", str(payload))
+
+    def test_drawing_activity_sync_does_not_echo_raw_supabase_rows(self) -> None:
+        prepared_payload = {
+            "rows": [{"sync_key": "segment-1", "project_id": "project-1"}],
+            "lastScannedEventId": 42,
+            "skippedCount": 1,
+        }
+        with patch(
+            "backend.route_groups.api_watchdog.WatchdogMonitorService.prepare_drawing_activity_sync",
+            return_value=prepared_payload,
+        ), patch(
+            "backend.route_groups.api_watchdog.WatchdogMonitorService.mark_drawing_activity_synced",
+            return_value={"lastEventId": 42},
+        ), patch(
+            "backend.route_groups.api_watchdog.supabase_service_rest_request_helper",
+            return_value=([{"sync_key": "segment-1", "debug": "secret"}], None, 201),
+        ):
+            response = self.client.post("/api/watchdog/drawing-activity/sync", json={"limit": 1})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertTrue(payload.get("ok"))
+        self.assertEqual(payload.get("synced"), 1)
+        self.assertEqual(payload.get("syncedRows"), 1)
+        self.assertNotIn("rows", payload)
+        self.assertNotIn("secret", str(payload))
+
 
 if __name__ == "__main__":
     unittest.main()

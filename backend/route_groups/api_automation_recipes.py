@@ -213,6 +213,26 @@ def create_automation_recipe_blueprint(
             raise ValueError(f"Drawing path '{relative_path}' resolves outside the workspace.")
         return destination
 
+    def _resolve_workspace_source_path(drawing: Dict[str, str]) -> str:
+        drawing_path = _normalize_text(drawing.get("path"))
+        if not drawing_path:
+            raise ValueError("Selected drawing path is missing.")
+
+        resolved_runtime_path = resolve_runtime_path(drawing_path)
+        if resolved_runtime_path is None:
+            raise ValueError("Selected drawing is not available.")
+        resolved_text = str(resolved_runtime_path)
+
+        source_root = _resolve_existing_directory(drawing.get("sourceRootPath"))
+        if source_root is not None:
+            source_root_real = _project_root_realpath(source_root)
+            try:
+                if os.path.commonpath([source_root_real, resolved_text]) != source_root_real:
+                    raise ValueError
+            except ValueError as exc:
+                raise ValueError("selectedDrawingPaths resolves outside the drawing root.") from exc
+        return resolved_text
+
     def _request_id() -> str:
         raw = (
             request.headers.get("X-Request-ID")
@@ -372,8 +392,8 @@ def create_automation_recipe_blueprint(
         if len(raw_selected) > MAX_DRAWINGS:
             raise ValueError(f"Too many selected drawings. Maximum is {MAX_DRAWINGS}.")
 
-        drawing_root_raw = _normalize_text(work_package.get("drawingRootPath"))
-        drawing_root = os.path.abspath(drawing_root_raw) if drawing_root_raw else ""
+        drawing_root_path = _resolve_existing_directory(work_package.get("drawingRootPath"))
+        drawing_root = _project_root_realpath(drawing_root_path) if drawing_root_path else ""
         resolved: List[Dict[str, str]] = []
         seen_paths: set[str] = set()
 
@@ -381,32 +401,45 @@ def create_automation_recipe_blueprint(
             raw_path = _normalize_text(entry)
             if not raw_path:
                 continue
-            if is_absolute_path_value(raw_path):
-                absolute_path = os.path.abspath(raw_path)
-                relative_path = os.path.basename(absolute_path) or raw_path
-                if drawing_root:
-                    try:
-                        candidate_relative = os.path.relpath(absolute_path, drawing_root)
-                        if not candidate_relative.startswith(".."):
-                            relative_path = candidate_relative
-                    except ValueError:
-                        pass  # Paths on different drives (Windows); keep original path
-            else:
-                if not drawing_root:
-                    raise ValueError(
-                        "drawingRootPath is required when selectedDrawingPaths are relative."
-                    )
-                absolute_path = os.path.abspath(os.path.join(drawing_root, raw_path))
-                try:
-                    if os.path.commonpath([drawing_root, absolute_path]) != drawing_root:
+            if drawing_root_path is not None and drawing_root:
+                if is_absolute_path_value(raw_path):
+                    candidate_text = os.path.abspath(raw_path)
+                    relative_path = None
+                else:
+                    candidate_text = safe_join(drawing_root, raw_path.replace("\\", "/"))
+                    if candidate_text is None:
                         raise ValueError(
                             f"Drawing path '{raw_path}' resolves outside the drawing root."
                         )
-                except ValueError:
+                    relative_path = raw_path
+
+                absolute_path = os.path.realpath(candidate_text)
+                try:
+                    if os.path.commonpath([drawing_root, absolute_path]) != drawing_root:
+                        raise ValueError
+                except ValueError as exc:
                     raise ValueError(
-                        f"Drawing path '{raw_path}' could not be resolved under the drawing root."
+                        f"Drawing path '{raw_path}' resolves outside the drawing root."
+                    ) from exc
+                if relative_path is None:
+                    relative_path = os.path.relpath(absolute_path, drawing_root)
+                resolved_runtime_path = resolve_runtime_path(absolute_path)
+                if resolved_runtime_path is not None:
+                    absolute_path = str(resolved_runtime_path)
+                    exists_value = "true"
+                else:
+                    exists_value = ""
+            else:
+                if not is_absolute_path_value(raw_path):
+                    raise ValueError(
+                        "drawingRootPath is required when selectedDrawingPaths are relative."
                     )
-                relative_path = raw_path
+                resolved_runtime_path = resolve_runtime_path(raw_path)
+                if resolved_runtime_path is None:
+                    raise ValueError(f"Selected drawing '{raw_path}' is not available.")
+                absolute_path = str(resolved_runtime_path)
+                relative_path = os.path.basename(absolute_path) or raw_path
+                exists_value = "true"
 
             normalized_key = absolute_path.lower()
             if normalized_key in seen_paths:
@@ -419,6 +452,8 @@ def create_automation_recipe_blueprint(
                     "drawingName": os.path.basename(absolute_path) or absolute_path,
                     "drawingNumber": Path(relative_path).stem,
                     "drawingKey": _normalize_drawing_key(Path(relative_path).stem),
+                    "sourceRootPath": drawing_root,
+                    "exists": exists_value,
                 }
             )
 
@@ -588,7 +623,7 @@ def create_automation_recipe_blueprint(
 
         for drawing in drawings:
             drawing_path = drawing["path"]
-            if not os.path.exists(drawing_path):
+            if not drawing.get("exists"):
                 blockers.append(f"Selected drawing '{drawing_path}' does not exist.")
                 issues.append(
                     {
@@ -934,7 +969,7 @@ def create_automation_recipe_blueprint(
         workspace_root = tempfile.mkdtemp(prefix="suite-automation-workspace-")
         path_map: Dict[str, str] = {}
         for drawing in drawings:
-            source_path = drawing["path"]
+            source_path = _resolve_workspace_source_path(drawing)
             relative_path = drawing["relativePath"] or drawing["drawingName"]
             destination_path = _workspace_destination_path(
                 workspace_root,
@@ -1686,9 +1721,21 @@ def create_automation_recipe_blueprint(
             warnings = list(preflight["warnings"])
 
             project_file = _normalize_text(acade_support.get("projectFile"))
-            if project_file and os.path.exists(project_file):
+            project_root = _resolve_existing_directory(work_package.get("projectRootPath"))
+            if project_file and project_root is not None:
                 try:
-                    with open(project_file, "r", encoding="utf-8", errors="ignore") as handle:
+                    resolved_project_file = _resolve_project_scoped_file(
+                        project_root,
+                        project_file,
+                        field_name="acadeProjectFilePath",
+                        allowed_suffixes=(".wdp",),
+                    )
+                    with open(
+                        str(resolved_project_file),
+                        "r",
+                        encoding="utf-8",
+                        errors="ignore",
+                    ) as handle:
                         content = handle.read().upper()
                     missing_drawings = [
                         drawing["relativePath"]

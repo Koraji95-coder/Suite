@@ -134,6 +134,25 @@ class TestApiHealth(unittest.TestCase):
         self.assertEqual(len(services), 1)
         self.assertEqual((services[0] or {}).get("id"), "supabase")
 
+    def test_runtime_status_script_failure_hides_exception_text(self) -> None:
+        with patch(
+            "backend.route_groups.api_health._runtime_status_cache_payload",
+            None,
+        ), patch(
+            "backend.route_groups.api_health._runtime_status_cache_checked_at",
+            0.0,
+        ), patch(
+            "backend.route_groups.api_health.subprocess.run",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = self.client.get("/api/runtime/status")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json() or {}
+        self.assertFalse(bool(payload.get("ok")))
+        self.assertEqual(payload.get("warnings"), ["Runtime status snapshot is unavailable."])
+        self.assertNotIn("secret boom", str(payload))
+
     @patch("backend.route_groups.api_health._launch_runtime_control")
     def test_runtime_control_launcher_endpoint(self, mock_launch) -> None:
         mock_launch.return_value = (True, "Suite Runtime Control is starting.")

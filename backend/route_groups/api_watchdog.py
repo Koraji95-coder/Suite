@@ -778,19 +778,13 @@ def create_watchdog_blueprint(
             extra_headers={"Prefer": "resolution=merge-duplicates,return=representation"},
         )
         if response_error:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": response_error,
-                        "code": "WATCHDOG_DRAWING_SYNC_FAILED",
-                        "status": response_status,
-                    }
-                ),
-                500 if response_status < 400 else response_status,
+            return _watchdog_error_response(
+                message="Failed to sync drawing activity segments.",
+                code="WATCHDOG_DRAWING_SYNC_FAILED",
+                status_code=500 if response_status < 400 else response_status,
             )
 
-        synced_rows = response_payload if isinstance(response_payload, list) else rows
+        synced_count = len(response_payload) if isinstance(response_payload, list) else len(rows)
         cursor = service.mark_drawing_activity_synced(
             user_key,
             last_event_id=last_scanned_event_id,
@@ -806,7 +800,7 @@ def create_watchdog_blueprint(
                     "ok": True,
                     "synced": len(rows),
                     "skipped": int(prepared.get("skippedCount") or 0),
-                    "rows": synced_rows,
+                    "syncedRows": synced_count,
                     "cursor": cursor,
                 }
             ),

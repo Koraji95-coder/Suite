@@ -367,6 +367,16 @@ $checkLauncherPath = Write-SuiteHiddenPowerShellLauncher `
         "-StartIfMissing"
     )
 
+$staleLauncherRepairs = Repair-SuiteStaleLauncherTasks `
+    -TaskNamePrefixes @("SuiteWatchdogAutoCADCollector-", "SuiteWatchdogAutoCADCollectorCheck-") `
+    -KeepTaskNames @($TaskName, $CheckTaskName) `
+    -LauncherDirectory $launcherDir `
+    -Comment "Neutralized stale Suite Watchdog AutoCAD startup task launcher."
+
+foreach ($repair in @($staleLauncherRepairs)) {
+    Write-Warning "Neutralized stale AutoCAD watchdog startup launcher '$($repair.launcherPath)' still referenced by task '$($repair.taskName)'."
+}
+
 if (-not $ForceRunKey) {
     $userId = if ($env:USERDOMAIN) {
         "$($env:USERDOMAIN)\$($env:USERNAME)"

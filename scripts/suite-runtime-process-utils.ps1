@@ -98,6 +98,124 @@ function Write-SuiteHiddenPowerShellLauncher {
     return $LauncherPath
 }
 
+function Write-SuiteNoOpLauncher {
+    param(
+        [Parameter(Mandatory = $true)][string]$LauncherPath,
+        [string]$Comment = "Neutralized stale Suite startup task launcher."
+    )
+
+    $launcherDirectory = Split-Path -Parent $LauncherPath
+    if (-not [string]::IsNullOrWhiteSpace($launcherDirectory)) {
+        New-Item -ItemType Directory -Path $launcherDirectory -Force | Out-Null
+    }
+
+    $launcherLines = @(
+        "Option Explicit",
+        "",
+        "' " + $Comment,
+        "WScript.Quit 0"
+    )
+
+    Set-Content -LiteralPath $LauncherPath -Value $launcherLines -Encoding ASCII
+    return $LauncherPath
+}
+
+function Get-SuiteLauncherPathFromTaskArguments {
+    param([AllowNull()][string]$Arguments)
+
+    if ([string]::IsNullOrWhiteSpace($Arguments)) {
+        return $null
+    }
+
+    $match = [Regex]::Match($Arguments, '(?i)(?:"|^)([A-Z]:\\[^"]+?\.vbs)(?:"|$)')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    return [System.IO.Path]::GetFullPath($match.Groups[1].Value)
+}
+
+function Repair-SuiteStaleLauncherTasks {
+    param(
+        [string[]]$TaskNamePrefixes,
+        [string[]]$KeepTaskNames,
+        [Parameter(Mandatory = $true)][string]$LauncherDirectory,
+        [string]$Comment = "Neutralized stale Suite startup task launcher."
+    )
+
+    $getScheduledTaskCommand = Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue
+    if (-not $getScheduledTaskCommand) {
+        return @()
+    }
+
+    $normalizedLauncherDirectory = [System.IO.Path]::GetFullPath($LauncherDirectory).TrimEnd('\')
+    try {
+        $scheduledTasks = @(Get-ScheduledTask -ErrorAction Stop)
+    }
+    catch {
+        return @()
+    }
+
+    $results = @()
+    foreach ($task in $scheduledTasks) {
+        $taskName = [string]$task.TaskName
+        if ([string]::IsNullOrWhiteSpace($taskName)) {
+            continue
+        }
+
+        if (@($KeepTaskNames) -contains $taskName) {
+            continue
+        }
+
+        $matchesPrefix = $false
+        foreach ($prefix in @($TaskNamePrefixes)) {
+            if (-not [string]::IsNullOrWhiteSpace($prefix) -and $taskName.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $matchesPrefix = $true
+                break
+            }
+        }
+
+        if (-not $matchesPrefix) {
+            continue
+        }
+
+        foreach ($action in @($task.Actions)) {
+            $execute = [string]$action.Execute
+            if ($execute -notmatch '(?i)\\wscript(?:\.exe)?$') {
+                continue
+            }
+
+            $launcherPath = Get-SuiteLauncherPathFromTaskArguments -Arguments ([string]$action.Arguments)
+            if ([string]::IsNullOrWhiteSpace($launcherPath)) {
+                continue
+            }
+
+            $normalizedLauncherPath = [System.IO.Path]::GetFullPath($launcherPath)
+            if (-not $normalizedLauncherPath.StartsWith($normalizedLauncherDirectory, [System.StringComparison]::OrdinalIgnoreCase)) {
+                continue
+            }
+
+            if (Test-Path -LiteralPath $normalizedLauncherPath) {
+                continue
+            }
+
+            $disabledLauncherPath = "$normalizedLauncherPath.disabled"
+            if (-not (Test-Path -LiteralPath $disabledLauncherPath)) {
+                continue
+            }
+
+            Write-SuiteNoOpLauncher -LauncherPath $normalizedLauncherPath -Comment $Comment | Out-Null
+            $results += [pscustomobject]@{
+                taskName = $taskName
+                launcherPath = $normalizedLauncherPath
+                disabledLauncherPath = $disabledLauncherPath
+            }
+        }
+    }
+
+    return @($results)
+}
+
 function Start-SuiteDetachedProcess {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,

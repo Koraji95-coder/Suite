@@ -192,7 +192,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["filesystem", "cad"],
                 },
             )
@@ -250,7 +250,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["filesystem"],
                 },
             )
@@ -260,7 +260,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-cad",
                     "name": "AutoCAD Collector",
                     "collectorType": "autocad_state",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["autocad", "drawing_sessions", "commands"],
                 },
             )
@@ -356,7 +356,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-cad",
                     "name": "AutoCAD Collector",
                     "collectorType": "autocad_state",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["autocad", "drawing_sessions", "commands"],
                 },
             )
@@ -432,7 +432,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-cad",
                     "name": "AutoCAD Collector",
                     "collectorType": "autocad_state",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["autocad", "drawing_sessions", "commands"],
                 },
             )
@@ -497,7 +497,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                     "capabilities": ["filesystem", "cad"],
                 },
             )
@@ -552,7 +552,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 },
             )
             first_service.ingest_collector_events(
@@ -601,7 +601,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 },
             )
 
@@ -702,7 +702,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-cad",
                     "name": "AutoCAD Collector",
                     "collectorType": "autocad_state",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 },
             )
             service.ingest_collector_events(
@@ -717,7 +717,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                             "drawingPath": drawing_path,
                             "timestamp": now_ms,
                             "sessionId": "session-1",
-                            "workstationId": "DEV-WORKSTATION",
+                            "workstationId": "DEV-HOME",
                             "metadata": {
                                 "drawingName": "sheet-1.dwg",
                                 "trackedMs": 240000,
@@ -744,7 +744,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
             self.assertEqual(int(row.get("idle_ms") or 0), 60000)
             self.assertEqual(int(row.get("command_count") or 0), 3)
             self.assertEqual(row.get("source_session_id"), "session-1")
-            self.assertEqual(row.get("workstation_id"), "DEV-WORKSTATION")
+            self.assertEqual(row.get("workstation_id"), "DEV-HOME")
             self.assertEqual(row.get("work_date"), "2026-03-19")
             self.assertTrue(str(row.get("sync_key") or "").startswith("watchdog:"))
 
@@ -769,7 +769,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 },
             )
             first = service.ingest_collector_events(
@@ -817,7 +817,7 @@ class TestWatchdogMonitorService(unittest.TestCase):
                     "collectorId": "collector-a",
                     "name": "Desktop Collector",
                     "collectorType": "filesystem",
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 },
             )
             service.ingest_collector_events(
@@ -856,3 +856,4 @@ class TestWatchdogMonitorService(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

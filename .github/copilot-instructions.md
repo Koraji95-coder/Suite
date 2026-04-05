@@ -66,7 +66,8 @@ Suite is an internal operations platform for electrical engineering work.
 **Never commit real personal names, company names, client project names, or machine-specific identifiers.** This has caused repeated cleanup work. See `CODEX.md` for the full replacement table and audit command.
 
 Key rules:
-- Use `Dev` for usernames, `Company` for company names, `MyProject` for project names, `PROJ-00001` for project numbers, `DEV-WORKSTATION` for workstation IDs.
+- Use `Dev` for usernames, `Company` for company names, `MyProject` for project names, `PROJ-00001` for project numbers, and `DEV-HOME` or `DEV-WORK` for workstation IDs.
 - **Test files are the biggest risk** — they contain fixture data often copied from real projects. Always check `*.test.ts`, `*.test.tsx`, and `backend/tests/test_*.py`.
 - Run the PII audit grep from `CODEX.md` before every commit.
 - When regenerating manifests or generated files, verify the output doesn't re-introduce PII from source docs.
+

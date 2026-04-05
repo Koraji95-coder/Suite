@@ -13,7 +13,7 @@ describe("watchdogTelemetry", () => {
 				collectorId: "collector-a",
 				name: "AutoCAD",
 				collectorType: "autocad_state",
-				workstationId: "DEV-WORKSTATION",
+				workstationId: "DEV-HOME",
 				capabilities: [],
 				metadata: {},
 				status: "online",
@@ -30,7 +30,7 @@ describe("watchdogTelemetry", () => {
 				collectorId: "collector-b",
 				name: "Hybrid",
 				collectorType: "filesystem",
-				workstationId: "DEV-WORKSTATION",
+				workstationId: "DEV-HOME",
 				capabilities: ["filesystem", "autocad"],
 				metadata: {},
 				status: "online",
@@ -49,7 +49,7 @@ describe("watchdogTelemetry", () => {
 			collectorId: "collector-a",
 			name: "AutoCAD",
 			collectorType: "autocad_state",
-			workstationId: "DEV-WORKSTATION",
+			workstationId: "DEV-HOME",
 			capabilities: ["autocad"],
 			metadata: {
 				sourceAvailable: true,
@@ -85,7 +85,7 @@ describe("watchdogTelemetry", () => {
 				eventId: 1,
 				collectorId: "collector-a",
 				collectorType: "autocad_state",
-				workstationId: "DEV-WORKSTATION",
+				workstationId: "DEV-HOME",
 				eventType: "drawing_opened",
 				sourceType: "autocad",
 				timestamp: 1,
@@ -97,3 +97,4 @@ describe("watchdogTelemetry", () => {
 		);
 	});
 });
+

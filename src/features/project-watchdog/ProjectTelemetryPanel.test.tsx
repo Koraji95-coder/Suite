@@ -18,7 +18,7 @@ const baseSession = {
 	sessionId: "session-1",
 	collectorId: "collector-cad",
 	collectorType: "autocad_state",
-	workstationId: "DEV-WORKSTATION",
+	workstationId: "DEV-HOME",
 	projectId: "project-1",
 	drawingPath: "C:/Projects/Alpha/Drawing1.dwg",
 	status: "live",
@@ -92,7 +92,7 @@ function createTelemetry(): ProjectWatchdogTelemetry {
 								trackedMs: 10 * 60 * 1000,
 								idleMs: 0,
 								commandCount: 2,
-								workstationId: "DEV-WORKSTATION",
+								workstationId: "DEV-HOME",
 								sourceSessionId: "session-1",
 								syncKey: "segment-1",
 								status: "live",
@@ -232,4 +232,5 @@ describe("ProjectTelemetryPanel", () => {
 		expect(screen.getAllByText("C:/Projects/Alpha").length).toBeGreaterThan(0);
 	});
 });
+
 

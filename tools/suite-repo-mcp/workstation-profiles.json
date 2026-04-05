@@ -1,16 +1,16 @@
 {
   "profiles": [
     {
-      "id": "DEV-WORKSTATION",
-      "label": "Dev Home station",
+      "id": "DEV-HOME",
+      "label": "Dev Home workstation",
       "role": "home",
-      "computerNames": ["DEV-WORKSTATION"],
+      "computerNames": ["DEV-HOME"],
       "gitUserName": "dev-user",
       "gitUserEmail": "dev@example.com"
     },
     {
       "id": "DEV-WORK",
-      "label": "Dev Work station",
+      "label": "Dev Work workstation",
       "role": "work",
       "computerNames": ["DEV-WORK"],
       "gitUserName": "dev-user",
@@ -18,3 +18,4 @@
     }
   ]
 }
+

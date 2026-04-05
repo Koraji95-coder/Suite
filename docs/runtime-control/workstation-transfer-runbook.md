@@ -7,6 +7,7 @@ Use this when moving active development between Windows workstations and you wan
 - the current `Suite` repo
 - the current `Office` repo or workspace
 - the correct workstation profile
+- the shared VS Code user configuration baseline
 - the local Office companion path
 - startup tasks and runtime health
 - a Codex handoff summary plus recent session metadata
@@ -17,10 +18,23 @@ Do not reuse workstation ids across machines.
 
 Recommended pattern:
 
-- Home machine: `DEV-WORKSTATION`
+- Home machine: `DEV-HOME`
 - Work machine: `DEV-WORK`
 
-Each physical machine should keep one permanent id. Do not restore the work PC as `DEV-WORKSTATION`.
+Each physical machine should keep one permanent id. Do not restore the work PC as `DEV-HOME`.
+
+## Settings Parity Baseline
+
+Use the dedicated parity guide for the stable cross-machine model:
+
+- `docs/runtime-control/workstation-settings-parity.md`
+
+In short:
+
+- VS Code built-in Settings Sync should stay on, with `Extensions` excluded
+- the local mirror/restore lane is the offline fallback for VS Code user settings, Codex config, skills, and session metadata
+- Codex shared defaults should live in repo-scoped `.codex/config.toml`
+- workstation-specific Codex env stays in `%USERPROFILE%\.codex\config.toml` and is re-stamped with `npm run workstation:sync`
 
 ## Source Machine Before You Leave
 
@@ -34,6 +48,7 @@ npm run workstation:mirror
 
 That mirror now includes:
 
+- VS Code user settings, keybindings, tasks, snippets, and profiles
 - Codex config
 - Codex skills
 - Suite local learning state
@@ -47,6 +62,12 @@ It still does not mirror Codex auth or the full local Codex SQLite state, so exa
 
 ```powershell
 npm run workstation:sync -- -PrintToml
+```
+
+If this is the home machine, restamp it explicitly as:
+
+```powershell
+npm run workstation:sync -- -WorkstationId DEV-HOME
 ```
 
 ## Destination Machine Layout
@@ -86,6 +107,8 @@ npm run workstation:bringup:validate
 npm run workstation:bringup -- -WorkstationId DEV-WORK
 ```
 
+Use `DEV-HOME` instead if the destination machine is the home workstation.
+
 If you want bootstrap to perform the Daily clone itself instead of cloning `Daily` manually first, use:
 
 ```powershell
@@ -111,6 +134,8 @@ After restore, review `C:\Users\<you>\Dropbox\SuiteLocalStateMirror\codex-handof
 ```powershell
 npm run workstation:sync -- -WorkstationId DEV-WORK
 ```
+
+Use `DEV-HOME` on the home workstation.
 
 ## Runtime Control Expectations
 
@@ -224,3 +249,4 @@ npm run worktale:doctor
 5. Confirm Suite runtime status and doctor output are sane.
 6. Confirm Worktale is bootstrapped and healthy.
 7. If the workstation is CAD-capable, open AutoCAD and re-check watchdog/plugin health.
+

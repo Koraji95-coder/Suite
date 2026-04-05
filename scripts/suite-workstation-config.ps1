@@ -42,6 +42,52 @@ function Get-SuiteTomlStringValue {
     return $null
 }
 
+function Get-SuiteGitConfigValue {
+    param(
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$Key
+    )
+
+    $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+    if ($null -eq $gitCommand) {
+        return $null
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($RepoRoot) -and (Test-Path -LiteralPath $RepoRoot)) {
+        $repoValue = & $gitCommand.Source -C $RepoRoot config --get $Key 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            $repoText = [string]::Join(
+                [Environment]::NewLine,
+                @(
+                    $repoValue | ForEach-Object {
+                        if ($null -eq $_) { "" } else { $_.ToString() }
+                    }
+                )
+            ).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($repoText)) {
+                return $repoText
+            }
+        }
+    }
+
+    $globalValue = & $gitCommand.Source config --global --get $Key 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        $globalText = [string]::Join(
+            [Environment]::NewLine,
+            @(
+                $globalValue | ForEach-Object {
+                    if ($null -eq $_) { "" } else { $_.ToString() }
+                }
+            )
+        ).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($globalText)) {
+            return $globalText
+        }
+    }
+
+    return $null
+}
+
 function Convert-ToSuiteSlug {
     param([Parameter(Mandatory = $true)][string]$Value)
 
@@ -402,22 +448,38 @@ function Resolve-SuiteWorkstationProfile {
         $resolvedWorkstationRole = "secondary"
     }
 
+    $resolvedGitUserName = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserName)) {
+        $configuredGitUserName = Get-SuiteGitConfigValue -RepoRoot $ResolvedRepoRoot -Key "user.name"
+        if ([string]::IsNullOrWhiteSpace($configuredGitUserName)) {
+            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserName"
+        }
+        else {
+            $configuredGitUserName
+        }
+    }
+    else {
+        $ExplicitGitUserName.Trim()
+    }
+
+    $resolvedGitUserEmail = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserEmail)) {
+        $configuredGitUserEmail = Get-SuiteGitConfigValue -RepoRoot $ResolvedRepoRoot -Key "user.email"
+        if ([string]::IsNullOrWhiteSpace($configuredGitUserEmail)) {
+            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserEmail"
+        }
+        else {
+            $configuredGitUserEmail
+        }
+    }
+    else {
+        $ExplicitGitUserEmail.Trim()
+    }
+
     return [pscustomobject]@{
         WorkstationId = $resolvedWorkstationId.Trim()
         WorkstationLabel = $resolvedWorkstationLabel.Trim()
         WorkstationRole = $resolvedWorkstationRole.Trim()
-        GitUserName = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserName)) {
-            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserName"
-        }
-        else {
-            $ExplicitGitUserName.Trim()
-        }
-        GitUserEmail = if ([string]::IsNullOrWhiteSpace($ExplicitGitUserEmail)) {
-            Get-SuiteOptionalProfileString -Profile $baseProfile -PropertyName "gitUserEmail"
-        }
-        else {
-            $ExplicitGitUserEmail.Trim()
-        }
+        GitUserName = $resolvedGitUserName
+        GitUserEmail = $resolvedGitUserEmail
         ComputerName = $resolvedComputerName
         ProfileSource = if ($null -ne $match) { "matrix" } else { "fallback" }
         ProfilePath = $profileSet.Path
@@ -606,7 +668,7 @@ function Update-SuiteCodexConfig {
     $content = Remove-SuiteTomlKeysInSection `
         -Content $content `
         -SectionName "mcp_servers.suite_repo_mcp.env" `
-        -Keys (@($mcpEnvValues.Keys) + @("SUITE_OFFICE_EXECUTABLE_PATH"))
+        -Keys (@($mcpEnvValues.Keys) + @("SUITE_OFFICE_EXECUTABLE_PATH", "SUITE_GATEWAY_STARTUP_CHECK_SCRIPT"))
 
     foreach ($key in $mcpEnvValues.Keys) {
         $content = Set-SuiteTomlKeyInSection `

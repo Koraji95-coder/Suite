@@ -6,7 +6,7 @@ Use the profile sync script to rewrite the local `suite_repo_mcp` block in `%USE
 
 ```powershell
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1
-PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORKSTATION
+PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-HOME
 PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-workstation-profile.ps1 -WorkstationId DEV-WORK
 ```
 
@@ -19,13 +19,21 @@ PowerShell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/sync-suite-works
 Restart Codex after any MCP config change.
 
 `scripts/sync-suite-workstation-profile.ps1` is the only supported path for stamping `mcp_servers.suite_repo_mcp.env`. Avoid manual edits to the MCP env block.
+When you omit `-GitUserName` and `-GitUserEmail`, the sync helper preserves the current repo/global Git identity before falling back to the profile defaults.
 
 ## Profiles
 
 | Workstation ID | Computer names | Label | Role |
 | --- | --- | --- | --- |
-| `DEV-WORK` | `DEV-WORK` | `Dev Work station` | `work` |
-| `DEV-WORKSTATION` | `DEV-WORKSTATION` | `Dev Home station` | `home` |
+| `DEV-WORK` | `DEV-WORK` | `Dev Work workstation` | `work` |
+| `DEV-HOME` | `DEV-HOME` | `Dev Home workstation` | `home` |
+
+Canonical ids for this repo are `DEV-HOME` for the home workstation and `DEV-WORK` for the work workstation. Re-stamp the local profile explicitly after moving machines:
+
+```powershell
+npm run workstation:sync -- -WorkstationId DEV-HOME
+npm run workstation:sync -- -WorkstationId DEV-WORK
+```
 
 If a machine is not listed in the matrix, the sync helper falls back to:
 
@@ -268,3 +276,4 @@ Use `repo.check_suite_workstation` to run backend/filesystem collector/AutoCAD c
 - `autocadReadiness`
 - `issues[]`
 - `recommendedActions[]`
+

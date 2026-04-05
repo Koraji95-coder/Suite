@@ -161,7 +161,8 @@ npm run runtime:core:up
 npm run runtime:core:ps
 npm run runtime:core:down
 npm run workstation:bringup:validate
-npm run workstation:bringup -- -WorkstationId YOUR-WORKSTATION
+npm run workstation:bringup -- -WorkstationId DEV-HOME
+npm run workstation:bringup -- -WorkstationId DEV-WORK
 ```
 
 ### Frontend Preview
@@ -205,6 +206,7 @@ High-signal operating docs:
 - `docs/runtime-control/local-vs-container-ownership.md`
 - `docs/runtime-control/workstation-bringup.md`
 - `docs/runtime-control/workstation-transfer-runbook.md`
+- `docs/runtime-control/workstation-settings-parity.md`
 - `docs/frontend/project-core-feature-slice.md`
 - `docs/frontend/project-review-feature-slice.md`
 - `docs/cad/README.md`

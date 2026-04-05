@@ -182,16 +182,19 @@ Do not casually toggle workstation identity between machines.
 
 Each physical workstation should keep one permanent workstation id, for example:
 
-- `DEV-WORKSTATION`
+- `DEV-HOME`
 - `DEV-WORK`
 
 You can re-stamp the current workstation identity without a full bootstrap:
 
 ```powershell
+npm run workstation:sync -- -WorkstationId DEV-HOME
 npm run workstation:sync -- -WorkstationId DEV-WORK
 ```
 
 Runtime Control also now exposes an `Apply workstation profile` support action for this.
+
+For the full VS Code plus Codex parity workflow, see `docs/runtime-control/workstation-settings-parity.md`.
 
 ## Runtime Control and Office Verification
 
@@ -295,3 +298,4 @@ The key distinction:
 - If AutoCAD is absent, bootstrap will skip AutoCAD collector and plugin installation without blocking the rest of the workstation.
 - If the Office binary is missing, rerun bring-up after the Daily workspace is available.
 - If scheduled-task registration is denied, the startup installers fall back to `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+

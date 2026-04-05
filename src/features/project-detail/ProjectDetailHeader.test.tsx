@@ -28,7 +28,7 @@ const baseSession = {
 	sessionId: "session-1",
 	collectorId: "collector-cad",
 	collectorType: "autocad_state",
-	workstationId: "DEV-WORKSTATION",
+	workstationId: "DEV-HOME",
 	projectId: "project-1",
 	drawingPath: "C:/Projects/Alpha/Drawing1.dwg",
 	status: "live",
@@ -78,7 +78,7 @@ const telemetry = {
 			eventId: 1,
 			collectorId: "collector-cad",
 			collectorType: "autocad_state",
-			workstationId: "DEV-WORKSTATION",
+			workstationId: "DEV-HOME",
 			eventType: "drawing_opened",
 			sourceType: "autocad",
 			timestamp: Date.now(),
@@ -94,7 +94,7 @@ const telemetry = {
 			collectorId: "collector-cad",
 			name: "AutoCAD Collector",
 			collectorType: "autocad_state",
-			workstationId: "DEV-WORKSTATION",
+			workstationId: "DEV-HOME",
 			capabilities: ["autocad", "drawing_sessions", "commands"],
 			metadata: {
 				sourceAvailable: true,
@@ -117,7 +117,7 @@ const telemetry = {
 			collectorId: "collector-cad",
 			name: "AutoCAD Collector",
 			collectorType: "autocad_state",
-			workstationId: "DEV-WORKSTATION",
+			workstationId: "DEV-HOME",
 			capabilities: ["autocad", "drawing_sessions", "commands"],
 			metadata: {
 				sourceAvailable: true,
@@ -141,7 +141,7 @@ const telemetry = {
 		eventId: 1,
 		collectorId: "collector-cad",
 		collectorType: "autocad_state",
-		workstationId: "DEV-WORKSTATION",
+		workstationId: "DEV-HOME",
 		eventType: "drawing_opened",
 		sourceType: "autocad",
 		timestamp: Date.now(),
@@ -249,4 +249,5 @@ describe("ProjectDetailHeader", () => {
 		expect(screen.getByText(/setup needed/i)).toBeTruthy();
 	});
 });
+
 

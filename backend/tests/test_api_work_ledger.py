@@ -318,7 +318,7 @@ class _WatchdogServiceStub:
                     "status": "completed",
                     "durationMs": 45 * 60 * 1000,
                     "commandCount": 12,
-                    "workstationId": "DEV-WORKSTATION",
+                    "workstationId": "DEV-HOME",
                 }
             ]
         }
@@ -354,7 +354,7 @@ class TestApiWorkLedger(unittest.TestCase):
             "os.environ",
             {
                 "SUITE_WORK_LEDGER_ARTIFACT_ROOT": str(self.artifact_root),
-                "SUITE_WORKSTATION_ID": "DEV-WORKSTATION",
+                "SUITE_WORKSTATION_ID": "DEV-HOME",
             },
             clear=False,
         )
@@ -582,3 +582,4 @@ class TestApiWorkLedger(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

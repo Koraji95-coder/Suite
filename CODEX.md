@@ -26,7 +26,7 @@ When writing or modifying **any** file — including test fixtures, placeholder 
 | Company name | `Root 3 Power` | `Company` |
 | Project name (client) | `Nanulak` | `MyProject` |
 | Project number (specific) | `R3P-25074` | `PROJ-00001` |
-| Workstation ID | `DUSTIN-HOME` | `DEV-WORKSTATION` |
+| Workstation ID | `DUSTIN-HOME` | `DEV-HOME` |
 | Workstation ID (work) | `DUSTIN-WORK` | `DEV-WORK` |
 | Display name | `Dustin`, `Dustin Ward` | `Dev`, `Dev User` |
 | Email | `dustinward...@outlook.com`, `koraji95coder@gmail.com` | `dev@example.com` |
@@ -86,7 +86,7 @@ Test files across **both** `backend/tests/` and `src/**/*.test.*` often need Win
 
 - Paths: `C:\Users\Dev\...` (not a real username)
 - Project numbers: `PROJ-00001` or `00001` (not real project numbers)
-- Workstation IDs: `DEV-WORKSTATION` (not real machine names)
+- Workstation IDs: `DEV-HOME` or `DEV-WORK` (not real machine names)
 - Project names: `MyProject` or `MyProject Substation` (not real client names)
 
 The test logic doesn't depend on these being real — it only needs structurally valid values.
@@ -200,3 +200,4 @@ If you add new vendored or third-party code, add its path here to avoid drowning
 Before opening a PR, glance at the **Security → Code scanning** tab on your branch (GitHub shows alerts per-PR). If your changes introduce new alerts, fix them before requesting review.
 
 If you can run CodeQL locally (see above), run it against your branch to catch issues before push.
+

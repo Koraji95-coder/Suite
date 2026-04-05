@@ -1273,7 +1273,7 @@ export function useProjectManagerState({
 				const message =
 					err instanceof Error ? err.message : "An error occurred";
 				showToast("error", `Failed to reorder tasks: ${message}`);
-				if (selectedProject) loadTasks(selectedProject.id);
+				loadTasks(selectedProject.id);
 			}
 		},
 		[tasks, selectedProject, showToast, loadTasks],

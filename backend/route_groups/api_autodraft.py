@@ -19,11 +19,6 @@ from flask import Blueprint, jsonify, request
 from flask_limiter import Limiter
 
 try:
-    import redis  # type: ignore[import-not-found]
-except Exception:
-    redis = None
-
-try:
     from pypdf import PdfReader as _PdfReader
 
     _PYPDF_AVAILABLE = True
@@ -308,15 +303,6 @@ _ANNOT_TEXT_SUBTYPES = {
     "/Underline",
     "/StrikeOut",
 }
-_ANNOT_NOTE_TEXT_SUBTYPES = {
-    "/Text",
-    "/FreeText",
-}
-_ANNOT_HIGHLIGHT_SUBTYPES = {
-    "/Highlight",
-    "/Underline",
-    "/StrikeOut",
-}
 _ANNOT_LINE_SUBTYPES = {
     "/Line",
 }
@@ -328,10 +314,6 @@ _ANNOT_GEOMETRIC_SUBTYPES = {
     "/Polygon",
     "/PolyLine",
     "/Ink",
-}
-_ANNOT_CLOUD_SUBTYPES = {
-    *_ANNOT_RECTANGLE_SUBTYPES,
-    *_ANNOT_GEOMETRIC_SUBTYPES,
 }
 _ANNOT_NOTE_ANCHOR_SUBTYPES = {
     *_ANNOT_RECTANGLE_SUBTYPES,
@@ -7503,16 +7485,7 @@ def create_autodraft_blueprint(
         pdf_points = _normalize_point_pair_list(payload.get("pdf_points"))
         cad_points = _normalize_point_pair_list(payload.get("cad_points"))
         transform: Optional[Dict[str, Any]] = None
-        auto_calibration = _build_auto_calibration_payload(
-            available=True,
-            used=False,
-            status="needs_manual",
-            confidence=0.0,
-            method="none",
-            quality_notes=[],
-            suggested_pdf_points=pdf_points or [],
-            suggested_cad_points=cad_points or [],
-        )
+        auto_calibration: Dict[str, Any]
         manual_points_available = pdf_points is not None and cad_points is not None
         manual_transform_requested = calibration_mode == _COMPARE_CALIBRATION_MODE_MANUAL
         if manual_transform_requested:

@@ -54,12 +54,17 @@ class Logger {
 		};
 	}
 
+	/** Neutralise newline characters that could inject fake log entries. */
+	private sanitize(value: string): string {
+		return value.replace(/\n|\r/g, " ");
+	}
+
 	private formatLog(entry: LogEntry): string {
 		const parts = [
 			`[${entry.timestamp}]`,
 			`[${entry.level}]`,
-			entry.context ? `[${entry.context}]` : "",
-			entry.message,
+			entry.context ? `[${this.sanitize(entry.context)}]` : "",
+			this.sanitize(entry.message),
 		].filter(Boolean);
 		return parts.join(" ");
 	}

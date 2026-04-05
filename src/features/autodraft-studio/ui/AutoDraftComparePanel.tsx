@@ -2479,7 +2479,6 @@ export function AutoDraftComparePanel({
                         void publishReviewedRun();
                       }}
                       disabled={
-                        !compareResult ||
                         !prepareResult ||
                         !selectedDrawingPath ||
                         publishingSnapshot

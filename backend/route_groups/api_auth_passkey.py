@@ -181,9 +181,7 @@ def create_auth_passkey_blueprint(
         requested_redirect_path = str(
             payload.get("redirectPath") or payload.get("redirect_path") or ""
         ).strip()
-        redirect_path = DEFAULT_PASSKEY_REDIRECT_PATH
-        if requested_redirect_path in ALLOWED_REDIRECT_PATHS:
-            redirect_path = requested_redirect_path
+        redirect_path = requested_redirect_path if requested_redirect_path in ALLOWED_REDIRECT_PATHS else DEFAULT_PASSKEY_REDIRECT_PATH
         client_ip = _get_request_ip()
 
         capability = _auth_passkey_capability()

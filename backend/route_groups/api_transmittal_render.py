@@ -164,7 +164,6 @@ def create_transmittal_render_blueprint(
             _ = mode  # retained for parity with existing API payload contract
             project_num = str(fields.get("job_num", "")).strip() or "UNKNOWN"
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_stem = "Transmittal"
 
             if transmittal_type == "cid":
                 if render_cid_transmittal is None:

@@ -554,7 +554,7 @@ class WatchdogMonitorService:
                 session_id.strip().lower(),
             ]
         )
-        digest = hashlib.sha1(source_seed.encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(source_seed.encode("utf-8")).hexdigest()
         return f"watchdog:drawing-segment:{digest}"
 
     def _build_drawing_segment_row(

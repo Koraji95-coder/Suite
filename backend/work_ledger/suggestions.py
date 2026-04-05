@@ -16,7 +16,7 @@ def _short_commit_ref(value: str) -> str:
 
 
 def _stable_suggestion_id(source_key: str) -> str:
-    digest = hashlib.sha1(source_key.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(source_key.encode("utf-8")).hexdigest()
     return f"suggest-{digest[:16]}"
 
 

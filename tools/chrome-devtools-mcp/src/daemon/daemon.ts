@@ -39,7 +39,14 @@ const pidFilePath = getPidFilePath();
 fs.mkdirSync(path.dirname(pidFilePath), {
   recursive: true,
 });
-fs.writeFileSync(pidFilePath, process.pid.toString());
+const pidTmpPath = `${pidFilePath}.tmp`;
+fs.writeFileSync(pidTmpPath, process.pid.toString());
+try {
+  fs.renameSync(pidTmpPath, pidFilePath);
+} catch (err) {
+  try { fs.unlinkSync(pidTmpPath); } catch { /* best-effort cleanup */ }
+  throw err;
+}
 logger(`Writing ${process.pid.toString()} to ${pidFilePath}`);
 
 const socketPath = getSocketPath();

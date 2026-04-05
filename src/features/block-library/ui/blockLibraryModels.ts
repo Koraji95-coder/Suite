@@ -1,3 +1,4 @@
+import { secureRandomInt } from "@/lib/secureRandom";
 import type { Database } from "@/supabase/database";
 
 export type BlockFile = Database["public"]["Tables"]["block_library"]["Row"];
@@ -83,7 +84,7 @@ export const buildUploadPayload = (
 			.map((tag) => tag.trim())
 			.filter((tag) => tag),
 		is_dynamic: form.is_dynamic,
-		file_size: Math.floor(Math.random() * 1000000) + 50000,
+		file_size: secureRandomInt(50000, 1050000),
 		usage_count: 0,
 		is_favorite: false,
 		user_id: userId,

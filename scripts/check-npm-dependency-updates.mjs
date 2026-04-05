@@ -32,7 +32,7 @@ try {
 }
 
 if (result.status !== 0 && result.status !== 1) {
-	console.error(result.stderr.trim() || "npm-updates: npm outdated failed.");
+	console.error("%s", result.stderr.trim() || "npm-updates: npm outdated failed.");
 	process.exit(result.status ?? 1);
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { coordinatesGrabberService } from "@/features/cad-runtime/coordinatesGrabberService";
 import { useCadRuntime } from "@/features/cad-runtime/CadRuntimeContext";
+import { secureRandom } from "@/lib/secureRandom";
 import type { LiveBackendStatus } from "./CoordinatesGrabberModels";
 
 interface UseCoordinatesGrabberLiveStatusOptions {
@@ -36,7 +37,7 @@ export function useCoordinatesGrabberLiveStatus({
 		let current = 5;
 		if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 		progressIntervalRef.current = setInterval(() => {
-			current += Math.random() * 3 + 0.5;
+			current += secureRandom() * 3 + 0.5;
 			if (current >= 90) current = 90;
 			setProgress(Math.round(current));
 		}, 400);

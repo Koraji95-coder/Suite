@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { secureRandom, secureRandomInt } from "@/lib/secureRandom";
 
 const COPPER = "#f59e0b";
 const ROD_GREEN = "#22c55e";
@@ -39,10 +40,10 @@ interface GridBackgroundRuntimeState {
 }
 
 function generateRandomGrid(): GridLayout {
-	const cols = 3 + Math.floor(Math.random() * 4);
-	const rows = 3 + Math.floor(Math.random() * 4);
-	const spacingX = 2 + Math.random() * 1.5;
-	const spacingY = 2 + Math.random() * 1.5;
+	const cols = secureRandomInt(3, 6);
+	const rows = secureRandomInt(3, 6);
+	const spacingX = 2 + secureRandom() * 1.5;
+	const spacingY = 2 + secureRandom() * 1.5;
 	const width = (cols - 1) * spacingX;
 	const height = (rows - 1) * spacingY;
 
@@ -52,7 +53,7 @@ function generateRandomGrid(): GridLayout {
 
 	for (let r = 0; r < rows; r += 1) {
 		for (let c = 0; c < cols; c += 1) {
-			if (Math.random() > 0.3) {
+			if (secureRandom() > 0.3) {
 				rods.push({
 					x: c * spacingX - width / 2,
 					y: r * spacingY - height / 2,
@@ -62,9 +63,9 @@ function generateRandomGrid(): GridLayout {
 	}
 
 	for (let r = 0; r < rows; r += 1) {
-		const skipGap = Math.random() > 0.85;
+		const skipGap = secureRandom() > 0.85;
 		if (skipGap) {
-			const gapCol = 1 + Math.floor(Math.random() * (cols - 2));
+			const gapCol = secureRandomInt(1, cols - 2);
 			hLines.push({
 				y: r * spacingY - height / 2,
 				x1: -width / 2,
@@ -313,7 +314,7 @@ function initializeRuntime(
 		transitionStart: 0,
 		nextGrid: null,
 		phase: "showing",
-		cycleDuration: 8 + Math.random() * 6,
+		cycleDuration: 8 + secureRandom() * 6,
 	};
 
 	state.gridGroup.traverse((obj) => {
@@ -403,7 +404,7 @@ function runTransitionStep(state: GridBackgroundRuntimeState, elapsed: number) {
 		if (buildProgress >= 1) {
 			state.phase = "showing";
 			state.transitionStart = elapsed;
-			state.cycleDuration = 8 + Math.random() * 6;
+			state.cycleDuration = 8 + secureRandom() * 6;
 			state.nextGrid = null;
 		}
 	}

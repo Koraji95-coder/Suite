@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -84,7 +85,7 @@ async function runSingleScenario(
     }
 
     // Append random queryid to avoid caching issues and test distinct runs
-    const randomId = Math.floor(Math.random() * 1000000);
+    const randomId = crypto.randomInt(1000000);
     scenario.prompt = `${scenario.prompt}\nqueryid=${randomId}`;
 
     if (scenario.htmlRoute) {

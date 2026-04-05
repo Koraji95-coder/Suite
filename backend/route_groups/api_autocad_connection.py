@@ -18,7 +18,7 @@ def dyn(
         if type(obj).__name__ == "CDispatch":
             return obj
     except Exception:
-        pass
+        pass  # Type introspection may fail on COM proxy objects
 
     try:
         ole = obj._oleobj_

@@ -244,7 +244,7 @@ def plot_ground_grid_entities(
         try:
             line.Layer = layer_name
         except Exception:
-            pass
+            pass  # COM layer assignment may fail; line is still drawn
         lines_drawn += 1
 
     blocks_inserted = 0
@@ -286,7 +286,7 @@ def plot_ground_grid_entities(
         try:
             block_ref.Layer = layer_name
         except Exception:
-            pass
+            pass  # COM layer assignment may fail; block is still inserted
         blocks_inserted += 1
 
     return {

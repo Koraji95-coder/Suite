@@ -66,9 +66,9 @@ def ensure_layer(
             try:
                 layer.Color = int(color_aci)
             except Exception:
-                pass
+                pass  # COM object may not support color assignment
     except Exception:
-        pass
+        pass  # Best-effort layer creation; failure is non-critical
 
 
 def wait_for_command_finish(
@@ -88,6 +88,6 @@ def wait_for_command_finish(
             if not names.strip():
                 return True
         except Exception:
-            pass
+            pass  # COM call may fail while AutoCAD is busy; keep polling
         time_module.sleep(0.15)
     return False

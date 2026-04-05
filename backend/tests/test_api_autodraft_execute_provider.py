@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import tempfile
 import unittest
@@ -306,8 +307,37 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("ok", True))
         self.assertEqual(payload.get("code"), "AUTODRAFT_UPSTREAM_ERROR")
+        self.assertEqual(payload.get("message"), "AutoDraft bridge execute failed.")
         self.assertEqual(payload.get("requestId"), "req-bridge-2")
         self.assertEqual(payload.get("meta", {}).get("provider_path"), "dotnet_bridge")
+        self.assertNotIn("bridge unavailable", str(payload))
+
+    def test_execute_dotnet_api_hides_request_exception_text(self) -> None:
+        client = self._build_client(
+            execute_provider="dotnet_api",
+            dotnet_url="http://127.0.0.1:5275",
+        )
+
+        with patch(
+            "backend.route_groups.api_autodraft.requests.request",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = client.post(
+                "/api/autodraft/execute",
+                headers={"X-API-Key": "valid-key"},
+                json={
+                    "requestId": "req-api-fail-1",
+                    "actions": [_build_valid_action()],
+                    "dry_run": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_UPSTREAM_ERROR")
+        self.assertEqual(payload.get("message"), "Upstream request failed.")
+        self.assertNotIn("secret boom", str(payload))
 
     def test_execute_falls_back_to_api_when_configured(self) -> None:
         def _bridge_sender(_action: str, _payload: dict[str, object]) -> dict[str, object]:
@@ -353,6 +383,91 @@ class TestApiAutoDraftExecuteProvider(unittest.TestCase):
         self.assertEqual(payload.get("job_id"), "api-job-1")
         self.assertEqual(payload.get("meta", {}).get("providerPath"), "dotnet_api")
         request_mock.assert_called_once()
+
+    def test_compare_prepare_hides_pdf_reader_exception_text(self) -> None:
+        client = self._build_client(execute_provider="dotnet_bridge")
+
+        with patch("backend.route_groups.api_autodraft._PYPDF_AVAILABLE", True), patch(
+            "backend.route_groups.api_autodraft._PdfReader",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = client.post(
+                "/api/autodraft/compare/prepare",
+                headers={"X-API-Key": "valid-key"},
+                data={
+                    "page_index": "0",
+                    "pdf": (io.BytesIO(b"%PDF-1.4\n%test\n"), "demo.pdf"),
+                },
+                content_type="multipart/form-data",
+            )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_INVALID_REQUEST")
+        self.assertEqual(payload.get("message"), "Failed to read PDF.")
+        self.assertNotIn("secret boom", str(payload))
+
+    def test_learning_train_hides_runtime_exception_text(self) -> None:
+        client = self._build_client(execute_provider="dotnet_bridge")
+
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.train_domains",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = client.post(
+                "/api/autodraft/learning/train",
+                headers={"X-API-Key": "valid-key"},
+                json={"domains": ["autodraft_markup"]},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_LEARNING_TRAIN_FAILED")
+        self.assertEqual(payload.get("message"), "Local learning train failed.")
+        self.assertNotIn("secret boom", str(payload))
+
+    def test_learning_models_hides_runtime_exception_text(self) -> None:
+        client = self._build_client(execute_provider="dotnet_bridge")
+
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.list_models",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = client.get(
+                "/api/autodraft/learning/models",
+                headers={"X-API-Key": "valid-key"},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_LEARNING_MODELS_FAILED")
+        self.assertEqual(payload.get("message"), "Failed to list local learning models.")
+        self.assertNotIn("secret boom", str(payload))
+
+    def test_learning_evaluations_hides_runtime_exception_text(self) -> None:
+        client = self._build_client(execute_provider="dotnet_bridge")
+
+        with patch(
+            "backend.route_groups.api_autodraft._LOCAL_LEARNING_RUNTIME.list_evaluations",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = client.get(
+                "/api/autodraft/learning/evaluations?limit=5",
+                headers={"X-API-Key": "valid-key"},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("ok", True))
+        self.assertEqual(payload.get("code"), "AUTODRAFT_LEARNING_EVALUATIONS_FAILED")
+        self.assertEqual(
+            payload.get("message"),
+            "Failed to list local learning evaluations.",
+        )
+        self.assertNotIn("secret boom", str(payload))
 
     def test_execute_normalizes_bridge_commit_response(self) -> None:
         def _bridge_sender(_action: str, payload: dict[str, object]) -> dict[str, object]:

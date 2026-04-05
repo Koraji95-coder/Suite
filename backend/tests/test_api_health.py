@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from flask import Flask
@@ -41,19 +43,19 @@ class TestApiHealth(unittest.TestCase):
         service = payload.get("service") or {}
         self.assertEqual(service.get("id"), "backend")
         self.assertEqual(service.get("label"), "Watchdog Backend")
-        self.assertEqual(service.get("state"), "background")
+        self.assertEqual(service.get("state"), "ready")
         self.assertEqual(service.get("source"), "backend:/health")
         self.assertEqual(service.get("version"), "1.0.0")
         self.assertEqual(service.get("actionableIssueCount"), 0)
         self.assertIsInstance(service.get("checks"), list)
         self.assertGreaterEqual(len(service.get("checks")), 2)
         doctor = payload.get("doctor") or {}
-        self.assertEqual(doctor.get("overallState"), "background")
+        self.assertEqual(doctor.get("overallState"), "ready")
         self.assertEqual(doctor.get("actionableIssueCount"), 0)
         self.assertIsInstance(doctor.get("groups"), list)
         severity_counts = doctor.get("severityCounts") or {}
         self.assertGreaterEqual(severity_counts.get("ready", 0), 1)
-        self.assertGreaterEqual(severity_counts.get("background", 0), 1)
+        self.assertEqual(severity_counts.get("background", 0), 0)
 
     def test_health_payload_includes_limiter_runtime_metadata(self) -> None:
         self.client.application.config["LIMITER_RUNTIME_STATUS"] = {
@@ -160,6 +162,26 @@ class TestApiHealth(unittest.TestCase):
             payload.get("message"),
             "PowerShell is unavailable on this workstation.",
         )
+
+    def test_runtime_control_launcher_hides_unexpected_exception_text(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            launcher_path = Path(temp_dir) / "launch-suite-runtime-control.ps1"
+            launcher_path.write_text("Write-Output 'ok'\n", encoding="utf-8")
+
+            with patch(
+                "backend.route_groups.api_health._RUNTIME_CONTROL_LAUNCHER_PATH",
+                launcher_path,
+            ), patch(
+                "backend.route_groups.api_health.subprocess.Popen",
+                side_effect=RuntimeError("secret boom"),
+            ):
+                response = self.client.post("/api/runtime/open-control")
+
+        self.assertEqual(response.status_code, 500)
+        payload = response.get_json() or {}
+        self.assertFalse(bool(payload.get("ok")))
+        self.assertEqual(payload.get("message"), "Runtime Control could not start.")
+        self.assertNotIn("secret boom", str(payload))
 
 
 if __name__ == "__main__":

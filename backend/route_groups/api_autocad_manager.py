@@ -123,6 +123,16 @@ class AutoCADManager:
         with self._lock:
             return normalized in self._allowed_export_paths
 
+    def resolve_allowed_export_path_by_name(self, file_name: str) -> Optional[str]:
+        normalized_name = self.os.path.normcase(self.os.path.basename(file_name or ""))
+        if not normalized_name:
+            return None
+        with self._lock:
+            for candidate in reversed(self._allowed_export_paths):
+                if self.os.path.normcase(self.os.path.basename(candidate)) == normalized_name:
+                    return candidate
+        return None
+
     def _set_progress(
         self,
         *,

@@ -13,6 +13,7 @@ from backend.route_groups.api_autodraft import (
     _export_feedback_data,
     _import_feedback_data,
     _infer_action_replacement,
+    _normalize_display_text,
     _load_replacement_metric_scores,
     _normalize_feedback_items,
     _replacement_learning_features,
@@ -75,6 +76,13 @@ class TestAutoDraftCompareReplacements(unittest.TestCase):
         self.assertEqual(replacement_obj.get("target_entity_id"), "E-TS410")
         self.assertEqual(replacement_obj.get("status"), _REPLACEMENT_STATUS_RESOLVED)
         self.assertGreater(float(replacement_obj.get("confidence") or 0.0), 0.36)
+
+    def test_normalize_display_text_strips_repeated_html_tags_linearly(self) -> None:
+        raw = "<div>" * 1000 + "Panel <b>Name</b><br>Line 2"
+        normalized = _normalize_display_text(raw, max_length=200)
+
+        self.assertIsNotNone(normalized)
+        self.assertEqual(normalized, "Panel Name Line 2")
 
     def test_infer_action_replacement_respects_tuning_thresholds(self) -> None:
         replacement = _infer_action_replacement(

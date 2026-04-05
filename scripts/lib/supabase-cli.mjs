@@ -166,12 +166,17 @@ function ensureGeneratedSupabaseWorkdir(
 	return generatedRoot;
 }
 
-export function createSupabaseInvocation(args = [], workdir = process.cwd()) {
+export function createSupabaseInvocation(args = [], workdir = process.cwd(), options = {}) {
+	const platform = options.platform || process.platform;
+	const nodeExecPath = options.nodeExecPath || process.execPath;
+	const npmCliPath =
+		options.npmCliPath ||
+		path.join(path.dirname(nodeExecPath), "node_modules", "npm", "bin", "npm-cli.js");
 	const cliArgs = ["supabase", "--workdir", workdir, ...args];
-	if (process.platform === "win32") {
+	if (platform === "win32") {
 		return {
-			command: "cmd.exe",
-			args: ["/d", "/c", "npx", ...cliArgs],
+			command: nodeExecPath,
+			args: [npmCliPath, "exec", "--yes", "--package", "supabase", "--", ...cliArgs],
 		};
 	}
 

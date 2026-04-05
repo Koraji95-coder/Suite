@@ -562,6 +562,22 @@ class TestApiWorkLedger(unittest.TestCase):
             bool(((bootstrap_payload.get("checks") or {}).get("postPushHookInstalled")))
         )
 
+    def test_bootstrap_hides_runtime_exception_text(self) -> None:
+        with patch(
+            "backend.route_groups.api_work_ledger.WorkLedgerPublisher.bootstrap",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = self.client.post("/api/work-ledger/publishers/worktale/bootstrap")
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json() or {}
+        self.assertEqual(
+            payload.get("error"),
+            "Failed to bootstrap Worktale on this workstation.",
+        )
+        self.assertEqual(payload.get("code"), "WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED")
+        self.assertNotIn("secret boom", str(payload))
+
     def test_draft_suggestions_merge_git_and_watchdog_sources(self) -> None:
         response = self.client.get(
             "/api/work-ledger/draft-suggestions?limit=6",

@@ -12,6 +12,11 @@ from backend.route_groups.api_batch_find_replace import create_batch_find_replac
 
 class TestApiBatchFindReplace(unittest.TestCase):
     def setUp(self) -> None:
+        self.bridge_actions: list[str] = []
+        self.acade_actions: list[str] = []
+        self.client = self._build_client()
+
+    def _build_client(self, *, send_autocad_dotnet_command=None, send_autocad_acade_command=None):
         app = Flask(__name__)
         app.config["TESTING"] = True
 
@@ -35,14 +40,13 @@ class TestApiBatchFindReplace(unittest.TestCase):
                 schedule_cleanup=lambda _path: None,
                 batch_session_cookie="bfr_session",
                 batch_session_ttl_seconds=3600,
-                send_autocad_dotnet_command=self._send_autocad_dotnet_command,
-                send_autocad_acade_command=self._send_autocad_acade_command,
+                send_autocad_dotnet_command=send_autocad_dotnet_command
+                or self._send_autocad_dotnet_command,
+                send_autocad_acade_command=send_autocad_acade_command
+                or self._send_autocad_acade_command,
             )
         )
-
-        self.client = app.test_client()
-        self.bridge_actions: list[str] = []
-        self.acade_actions: list[str] = []
+        return app.test_client()
 
     def _send_autocad_dotnet_command(self, action: str, payload: dict[str, object]):
         self.bridge_actions.append(action)
@@ -404,7 +408,7 @@ class TestApiBatchFindReplace(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
-        self.assertIn("Invalid regex", str(payload.get("error")))
+        self.assertEqual(payload.get("error"), "Invalid regex rule.")
 
     def test_cad_preview_routes_to_acade_host(self) -> None:
         response = self.client.post(
@@ -507,6 +511,29 @@ class TestApiBatchFindReplace(unittest.TestCase):
         self.assertTrue((payload.get("data") or {}).get("summary", {}).get("saved"))
         self.assertIn("suite_drawing_cleanup_apply", self.acade_actions)
         self.assertNotIn("suite_drawing_cleanup_apply", self.bridge_actions)
+
+    def test_drawing_cleanup_preview_hides_internal_exception_text(self) -> None:
+        def failing_acade_command(_action: str, _payload: dict[str, object]):
+            raise RuntimeError("secret boom")
+
+        failing_client = self._build_client(send_autocad_acade_command=failing_acade_command)
+        response = failing_client.post(
+            "/api/batch-find-replace/cad/cleanup-preview",
+            headers={"X-API-Key": "valid-key", "X-Request-ID": "cleanup-preview-secret"},
+            json={
+                "entryMode": "import_file",
+                "preset": "import_full",
+                "sourcePath": r"C:\incoming\dirty-export.dxf",
+                "saveDrawing": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.get_json() or {}
+        self.assertFalse(payload.get("success", True))
+        self.assertEqual(payload.get("message"), "Drawing cleanup preview failed.")
+        self.assertEqual(payload.get("code"), "ACADE_HOST_FAILED")
+        self.assertNotIn("secret boom", str(payload))
 
     def test_project_cad_preview_resolves_issue_set_drawings(self) -> None:
         response = self.client.post(

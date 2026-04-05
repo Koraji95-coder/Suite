@@ -11,12 +11,13 @@ import time
 import uuid
 from datetime import datetime
 from functools import wraps
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, send_file
 from flask_limiter import Limiter
 from openpyxl import Workbook
+from werkzeug.utils import safe_join, secure_filename
 
 MAX_DRAWINGS = 75
 MAX_RULES = 100
@@ -80,6 +81,9 @@ def create_automation_recipe_blueprint(
 
         return decorated
 
+    def _request_error_response(*, message: str, request_id: str, status_code: int):
+        return jsonify({"success": False, "error": message, "requestId": request_id}), status_code
+
     def _normalize_text(value: Any) -> str:
         return str(value or "").strip()
 
@@ -129,6 +133,70 @@ def create_automation_recipe_blueprint(
     def _is_absolute_windows_path(path: str) -> bool:
         normalized = path.strip()
         return bool(re.match(r"^[A-Za-z]:[\\/]", normalized)) or normalized.startswith("\\\\")
+
+    def _is_absolute_local_path(path: str) -> bool:
+        normalized = _normalize_text(path)
+        return Path(normalized).expanduser().is_absolute() or _is_absolute_windows_path(normalized)
+
+    def _resolve_existing_directory(path_value: Any) -> Path | None:
+        normalized = _normalize_text(path_value)
+        if not normalized:
+            return None
+        try:
+            candidate = Path(normalized).expanduser().resolve()
+        except Exception:
+            return None
+        if not candidate.exists() or not candidate.is_dir():
+            return None
+        return candidate
+
+    def _resolve_project_scoped_file(
+        project_root: Path | None,
+        path_value: Any,
+        *,
+        field_name: str,
+        allowed_suffixes: Tuple[str, ...],
+    ) -> Path:
+        normalized = _normalize_text(path_value)
+        if not normalized:
+            raise ValueError(f"{field_name} is required.")
+        if project_root is None:
+            raise ValueError(f"{field_name} requires a valid projectRootPath.")
+        project_root_real = os.path.realpath(str(project_root))
+        candidate_text = (
+            os.path.realpath(normalized)
+            if _is_absolute_local_path(normalized)
+            else safe_join(project_root_real, normalized.replace("\\", "/"))
+        )
+        if candidate_text is None:
+            raise ValueError(f"{field_name} resolves outside the project root.")
+        candidate_real = os.path.realpath(str(candidate_text))
+        try:
+            if os.path.commonpath([project_root_real, candidate_real]) != project_root_real:
+                raise ValueError
+        except ValueError as exc:
+            raise ValueError(f"{field_name} resolves outside the project root.") from exc
+        candidate = Path(candidate_real)
+        if candidate.suffix.lower() not in allowed_suffixes:
+            raise ValueError(
+                f"{field_name} must use one of the following extensions: {', '.join(allowed_suffixes)}."
+            )
+        if not candidate.exists() or not candidate.is_file():
+            raise ValueError(f"{field_name} was not found: {candidate}")
+        return candidate
+
+    def _workspace_destination_path(workspace_root: str, relative_path: str, fallback_name: str) -> str:
+        normalized_relative = _normalize_text(relative_path) or _normalize_text(fallback_name) or "drawing.dwg"
+        normalized_relative = normalized_relative.replace("\\", "/")
+        candidate_parts = [
+            part for part in PurePosixPath(normalized_relative).parts if part not in {"", ".", "/"}
+        ]
+        if any(part == ".." for part in candidate_parts):
+            raise ValueError(f"Drawing path '{relative_path}' resolves outside the workspace.")
+        destination = safe_join(os.path.join(workspace_root, "drawings"), *candidate_parts)
+        if destination is None:
+            raise ValueError(f"Drawing path '{relative_path}' resolves outside the workspace.")
+        return destination
 
     def _request_id() -> str:
         raw = (
@@ -234,37 +302,48 @@ def create_automation_recipe_blueprint(
             "errors": ["Suite CAD authoring plugin bundle was not found on this workstation."],
         }
 
-    def _find_acade_support(project_root: str) -> Dict[str, Any]:
-        normalized_root = _normalize_text(project_root)
-        if not normalized_root:
+    def _find_acade_support(work_package: Dict[str, Any]) -> Dict[str, Any]:
+        project_root = _resolve_existing_directory(work_package.get("projectRootPath"))
+        raw_project_file = _normalize_text(work_package.get("acadeProjectFilePath"))
+        if not project_root and not _normalize_text(work_package.get("projectRootPath")):
             return {
                 "projectFile": None,
                 "supportFiles": [],
-                "warnings": ["Project root path is missing, so ACADE support files could not be checked."],
+                "warnings": [
+                    "Project root path is missing, so ACADE support files could not be checked."
+                ],
             }
-        root_path = Path(normalized_root)
-        if not root_path.exists() or not root_path.is_dir():
+        if not project_root:
             return {
                 "projectFile": None,
                 "supportFiles": [],
-                "warnings": [f"Project root '{normalized_root}' was not found for ACADE support checks."],
+                "warnings": [
+                    f"Project root '{_normalize_text(work_package.get('projectRootPath'))}' was not found for ACADE support checks."
+                ],
             }
 
         project_file = None
         support_files: List[str] = []
         warnings: List[str] = []
-        patterns = ["*.wdp", "*.wdt", "*.wdl"]
-        for pattern in patterns:
-            for candidate in root_path.rglob(pattern):
-                support_files.append(str(candidate))
-                if candidate.suffix.lower() == ".wdp" and project_file is None:
-                    project_file = str(candidate)
-        if not support_files:
+        if raw_project_file:
+            try:
+                resolved_project_file = _resolve_project_scoped_file(
+                    project_root,
+                    raw_project_file,
+                    field_name="acadeProjectFilePath",
+                    allowed_suffixes=(".wdp",),
+                )
+            except ValueError:
+                warnings.append(
+                    "ACADE project file path is invalid or outside the project root."
+                )
+            else:
+                project_file = str(resolved_project_file)
+                support_files.append(project_file)
+        else:
             warnings.append(
-                "No AutoCAD Electrical support files (.wdp/.wdt/.wdl) were found under the project root."
+                "ACADE support auto-discovery is disabled. Provide acadeProjectFilePath in the work package to enable project-file checks."
             )
-        elif project_file is None:
-            warnings.append("ACADE support files were found, but no .wdp project file was detected.")
         return {
             "projectFile": project_file,
             "supportFiles": support_files[:32],
@@ -289,7 +368,7 @@ def create_automation_recipe_blueprint(
                 continue
             if _is_absolute_windows_path(raw_path):
                 absolute_path = os.path.abspath(raw_path)
-                relative_path = raw_path
+                relative_path = os.path.basename(absolute_path) or raw_path
                 if drawing_root:
                     try:
                         candidate_relative = os.path.relpath(absolute_path, drawing_root)
@@ -489,7 +568,7 @@ def create_automation_recipe_blueprint(
         elif not plugin_status["ok"]:
             warnings.extend(plugin_status["errors"])
 
-        acade_support = _find_acade_support(_normalize_text(work_package.get("projectRootPath")))
+        acade_support = _find_acade_support(work_package)
         warnings.extend(acade_support["warnings"])
 
         for drawing in drawings:
@@ -842,7 +921,11 @@ def create_automation_recipe_blueprint(
         for drawing in drawings:
             source_path = drawing["path"]
             relative_path = drawing["relativePath"] or drawing["drawingName"]
-            destination_path = os.path.join(workspace_root, "drawings", relative_path)
+            destination_path = _workspace_destination_path(
+                workspace_root,
+                relative_path,
+                drawing.get("drawingName") or "",
+            )
             os.makedirs(os.path.dirname(destination_path), exist_ok=True)
             shutil.copy2(source_path, destination_path)
             path_map[source_path.lower()] = destination_path
@@ -995,11 +1078,19 @@ def create_automation_recipe_blueprint(
                     "message": "CAD preflight completed.",
                 }
             )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
-        except Exception as exc:
+        except ValueError:
+            return _request_error_response(
+                message="Invalid CAD preflight request.",
+                request_id=request_id,
+                status_code=400,
+            )
+        except Exception:
             logger.exception("CAD preflight failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return _request_error_response(
+                message="CAD preflight failed.",
+                request_id=request_id,
+                status_code=500,
+            )
 
     @bp.route("/automation-recipes/preview", methods=["POST"])
     @require_user_or_api_key
@@ -1207,11 +1298,19 @@ def create_automation_recipe_blueprint(
                     "message": f"Recipe preview built {len(operations)} CAD operation(s) across {len(drawings)} scoped drawing(s).",
                 }
             )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
-        except Exception as exc:
+        except ValueError:
+            return _request_error_response(
+                message="Invalid automation recipe preview request.",
+                request_id=request_id,
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Automation recipe preview failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return _request_error_response(
+                message="Automation recipe preview failed.",
+                request_id=request_id,
+                status_code=500,
+            )
 
     @bp.route("/automation-recipes/apply", methods=["POST"])
     @require_user_or_api_key
@@ -1449,11 +1548,19 @@ def create_automation_recipe_blueprint(
                     "message": f"Recipe apply completed across {len(changed_drawing_keys)} drawing(s) with {changed_item_count} changed item(s).",
                 }
             )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
-        except Exception as exc:
+        except ValueError:
+            return _request_error_response(
+                message="Invalid automation recipe apply request.",
+                request_id=request_id,
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Automation recipe apply failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return _request_error_response(
+                message="Automation recipe apply failed.",
+                request_id=request_id,
+                status_code=500,
+            )
 
     @bp.route("/automation-recipes/verify", methods=["POST"])
     @require_user_or_api_key
@@ -1487,7 +1594,12 @@ def create_automation_recipe_blueprint(
                     verified = False
 
             verification_dir = tempfile.mkdtemp(prefix="suite_automation_verify_")
-            verification_path = os.path.join(verification_dir, f"automation_verify_{run_id}.json")
+            verification_filename = secure_filename(f"automation_verify_{run_id}.json") or (
+                f"automation_verify_{uuid.uuid4().hex}.json"
+            )
+            verification_path = safe_join(verification_dir, verification_filename)
+            if verification_path is None:
+                raise ValueError("Verification artifact path could not be created.")
             with open(verification_path, "w", encoding="utf-8") as verification_file:
                 json.dump(
                     {
@@ -1526,11 +1638,19 @@ def create_automation_recipe_blueprint(
                     "message": "Recipe verification completed." if verified else "Recipe verification completed with warnings.",
                 }
             )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
-        except Exception as exc:
+        except ValueError:
+            return _request_error_response(
+                message="Invalid automation recipe verify request.",
+                request_id=request_id,
+                status_code=400,
+            )
+        except Exception:
             logger.exception("Automation recipe verify failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return _request_error_response(
+                message="Automation recipe verify failed.",
+                request_id=request_id,
+                status_code=500,
+            )
 
     @bp.route("/acade/reconcile/project-scope", methods=["POST"])
     @require_user_or_api_key
@@ -1579,11 +1699,19 @@ def create_automation_recipe_blueprint(
                     "message": "ACADE reconcile completed.",
                 }
             )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
-        except Exception as exc:
+        except ValueError:
+            return _request_error_response(
+                message="Invalid ACADE reconcile request.",
+                request_id=request_id,
+                status_code=400,
+            )
+        except Exception:
             logger.exception("ACADE reconcile failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return _request_error_response(
+                message="ACADE reconcile failed.",
+                request_id=request_id,
+                status_code=500,
+            )
 
     @bp.route("/cad/reports/<report_id>", methods=["GET"])
     @require_user_or_api_key

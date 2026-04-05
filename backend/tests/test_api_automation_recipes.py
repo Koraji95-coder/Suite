@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from flask import Flask, g
 from flask_limiter import Limiter
@@ -114,6 +115,7 @@ class TestApiAutomationRecipes(unittest.TestCase):
                 "selectedDrawingPaths": ["A-100.dwg"],
                 "drawingRootPath": self.drawing_root,
                 "projectRootPath": self.project_root,
+                "acadeProjectFilePath": os.path.join(self.project_root, "demo.wdp"),
                 "pdfPackageRootPath": os.path.join(self.project_root, "pdf"),
                 "titleBlockSnapshotStatus": "ready",
                 "titleBlockWarningCount": 0,
@@ -615,6 +617,41 @@ class TestApiAutomationRecipes(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertTrue(payload.get("success"))
         self.assertTrue(payload.get("acadeProjectFilePath"))
+
+    def test_preflight_warns_when_acade_project_file_is_not_provided(self) -> None:
+        payload = self._build_payload()
+        payload["workPackage"].pop("acadeProjectFilePath", None)
+
+        response = self.client.post(
+            "/api/cad/preflight/project-scope",
+            headers={"X-API-Key": "valid-key"},
+            json=payload,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json() or {}
+        self.assertTrue(body.get("success"))
+        self.assertIn(
+            "ACADE support auto-discovery is disabled. Provide acadeProjectFilePath in the work package to enable project-file checks.",
+            body.get("warnings") or [],
+        )
+
+    def test_preflight_hides_internal_exception_text(self) -> None:
+        with patch(
+            "backend.route_groups.api_automation_recipes.os.path.commonpath",
+            side_effect=RuntimeError("secret boom"),
+        ):
+            response = self.client.post(
+                "/api/cad/preflight/project-scope",
+                headers={"X-API-Key": "valid-key"},
+                json=self._build_payload(),
+            )
+
+        self.assertEqual(response.status_code, 500)
+        body = response.get_json() or {}
+        self.assertFalse(body.get("success", True))
+        self.assertEqual(body.get("error"), "CAD preflight failed.")
+        self.assertNotIn("secret boom", str(body))
 
 
 if __name__ == "__main__":

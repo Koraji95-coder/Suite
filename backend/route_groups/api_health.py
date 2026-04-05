@@ -313,7 +313,7 @@ def _launch_runtime_control() -> tuple[bool, str]:
     except FileNotFoundError:
         return False, "PowerShell is unavailable on this workstation."
     except Exception as exc:  # pragma: no cover - defensive launcher wrapper
-        return False, f"Runtime Control could not start: {exc}"
+        return False, "Runtime Control could not start."
 
     return True, "Suite Runtime Control is starting."
 

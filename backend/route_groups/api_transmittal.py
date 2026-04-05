@@ -110,7 +110,7 @@ def create_transmittal_blueprint(
                             "accepted": False,
                             "override_reason": None,
                         },
-                        "error": str(exc),
+                        "error": "Document analysis failed.",
                     }
                 )
                 continue

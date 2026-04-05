@@ -496,10 +496,10 @@ def create_terminal_authoring_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
+            return jsonify({"success": False, "error": "Invalid request parameters.", "requestId": request_id}), 400
         except Exception as exc:
             logger.exception("Project terminal authoring preview failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return jsonify({"success": False, "error": "An internal error occurred.", "requestId": request_id}), 500
 
     @bp.route("/terminal-authoring/project-apply", methods=["POST"])
     @require_user_or_api_key
@@ -565,10 +565,10 @@ def create_terminal_authoring_blueprint(
                 }
             )
         except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 400
+            return jsonify({"success": False, "error": "Invalid request parameters.", "requestId": request_id}), 400
         except Exception as exc:
             logger.exception("Project terminal authoring apply failed")
-            return jsonify({"success": False, "error": str(exc), "requestId": request_id}), 500
+            return jsonify({"success": False, "error": "An internal error occurred.", "requestId": request_id}), 500
 
     @bp.route("/reports/<report_id>", methods=["GET"])
     @require_user_or_api_key

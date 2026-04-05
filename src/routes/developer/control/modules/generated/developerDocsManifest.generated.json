@@ -1,7 +1,7 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-05T05:20:38.709Z",
-	"docCount": 80,
+	"generatedAt": "2026-04-05T07:05:39.890Z",
+	"docCount": 81,
 	"sections": [
 		{
 			"id": "frontend-app",
@@ -709,7 +709,7 @@
 			"id": "security-auth",
 			"title": "Security & Auth",
 			"description": "Authentication, secrets, environment, and rollout hardening guidance for developer use.",
-			"count": 13,
+			"count": 14,
 			"docs": [
 				{
 					"id": "docs-security-readme-md",
@@ -788,6 +788,17 @@
 					"sectionId": "security-auth",
 					"tags": [
 						"rollout",
+						"security-auth"
+					],
+					"startHere": false
+				},
+				{
+					"id": "docs-security-stack-trace-exposure-remediation-md",
+					"title": "Stack-Trace Exposure Remediation",
+					"summary": "All original exception details remain available server-side via",
+					"relativePath": "docs/security/stack-trace-exposure-remediation.md",
+					"sectionId": "security-auth",
+					"tags": [
 						"security-auth"
 					],
 					"startHere": false

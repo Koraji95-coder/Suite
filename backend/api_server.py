@@ -209,6 +209,23 @@ _env_path = bootstrap_runtime.load_default_env(__file__, logger)
 app = Flask(__name__)
 sock = Sock(app)
 
+
+@app.errorhandler(Exception)
+def _handle_unhandled_exception(exc):
+    """Global fallback — never expose stack traces to HTTP clients."""
+    logger.exception("Unhandled exception in request")
+    return (
+        jsonify(
+            {
+                "success": False,
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected server error occurred.",
+            }
+        ),
+        500,
+    )
+
+
 # ── Transmittal Builder render helpers ──────────────────────────
 TRANSMITTAL_RENDER_AVAILABLE = False
 TRANSMITTAL_BUILDER_DIR = Path(__file__).resolve().parent / "Transmittal-Builder"

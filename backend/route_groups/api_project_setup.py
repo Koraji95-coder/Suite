@@ -188,7 +188,7 @@ def create_project_setup_blueprint(
         except ValueError as exc:
             return _error_response(
                 code="INVALID_REQUEST",
-                message=str(exc),
+                message="Invalid project setup parameters.",
                 status_code=400,
                 request_id=request_id,
                 meta={"stage": "preview.validate"},
@@ -197,7 +197,7 @@ def create_project_setup_blueprint(
             logger.exception("Project setup preview failed (request_id=%s)", request_id)
             return _error_response(
                 code="PROJECT_SETUP_PREVIEW_FAILED",
-                message=f"Project setup preview failed: {autocad_exception_message(exc)}",
+                message="Project setup preview failed.",
                 status_code=500,
                 request_id=request_id,
                 meta={"stage": "preview"},

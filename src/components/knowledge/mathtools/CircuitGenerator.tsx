@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/useAuth";
 import { Section } from "@/components/system/PageFrame";
 import { useToast } from "@/components/notification-system/ToastProvider";
 import { logger } from "@/lib/errorLogger";
-import { secureRandom, secureRandomInt } from "@/lib/secureRandom";
+import { secureRandomInt } from "@/lib/secureRandom";
 import { supabase } from "@/supabase/client";
 import type { Database, Json } from "@/supabase/database";
 import styles from "./CircuitGenerator.module.css";

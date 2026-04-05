@@ -224,9 +224,8 @@ class YAMLEditorDialog(QDialog):
             self.status_label.setStyleSheet("color: #4ADE80;")
             return True
         except ImportError:
-            # Fallback: basic validation without PyYAML
+            # Fallback: minimal check without PyYAML (non-empty content only)
             try:
-                # Basic validation without PyYAML
                 if content.strip():
                     self.status_label.setText("⚠️ PyYAML not installed. Basic validation passed.")
                     self.status_label.setStyleSheet("color: #FFB84D;")

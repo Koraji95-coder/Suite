@@ -97,7 +97,7 @@
 		"guard:appearance": "node scripts/guard-appearance-debt.mjs",
 		"guard:tailwind": "node scripts/guard-no-tailwind.mjs",
 		"guard:workshop-split": "node scripts/guard-workshop-split.mjs",
-		"check": "npm run docs:manifest:verify && npm run arch:ensure && npm run env:check && npm run guard:eslint && npm run guard:appearance && npm run guard:tailwind && npm run guard:workshop-split && biome lint src backend dotnet scripts && npm run typecheck",
+		"check": "npm run docs:manifest:ensure && npm run arch:ensure && npm run env:check && npm run guard:eslint && npm run guard:appearance && npm run guard:tailwind && npm run guard:workshop-split && biome lint src backend dotnet scripts && npm run typecheck",
 		"check:fix": "biome check --write src backend dotnet scripts",
 		"lint": "biome lint src backend dotnet scripts",
 		"lint:fix": "biome lint --write src backend dotnet scripts",

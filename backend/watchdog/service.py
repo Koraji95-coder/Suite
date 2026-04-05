@@ -1025,9 +1025,6 @@ class WatchdogMonitorService:
 
         collectors = self.ledger.list_collectors(user_key)
         rules = self.ledger.list_project_rules(user_key)
-        collector_map = {
-            str(item.get("collectorId") or ""): item for item in collectors
-        }
 
         raw_events = self.ledger.list_window_events(
             user_key,

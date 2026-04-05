@@ -235,7 +235,7 @@ def ensure_layer(doc, name: str, aci: int):
     try:
         layer.Color = int(aci)
     except Exception:
-        pass
+        pass  # COM layer object may not support Color assignment
     return layer
 
 def com_call_with_retry(callable_func, max_retries=10, initial_delay=0.05):
@@ -379,7 +379,7 @@ def split_lines_at_points(lines: List[Line2D], pts: Dict[Tuple[int, int], Point2
     atomic: List[Line2D] = []
 
     for ln in lines:
-        (x1, y1), (x2, y2) = ln
+        (x1, y1), (_x2, _y2) = ln
         bx1, bx2, by1, by2 = line_bounds(ln)
 
         if is_h(ln):
@@ -526,7 +526,7 @@ def insert_block(ms, name: str, x: float, y: float, layer: str, rot: float = 0.0
         try:
             com_call_with_retry(setrot)
         except Exception:
-            pass
+            pass  # Rotation may not be supported on this block reference
     return br
 
 def zoom_extents(doc):
@@ -536,7 +536,7 @@ def zoom_extents(doc):
         try:
             doc.Application.ZoomExtents()
         except Exception:
-            pass
+            pass  # Zoom is cosmetic; safe to skip if COM interface is unavailable
 
 # ----------------------------
 # Reporting
@@ -597,7 +597,7 @@ def main():
         # Compute scale in GRID units -> convert to AutoCAD units by multiplying after mapping
         global BLOCK_SCALE, TEE_HALF, TEE_STEM, ROD_RADIUS, ROD_TICK, CROSS_ARM
         # block scale in AutoCAD units, so compute grid spacing, then multiply by 12
-        grid_scale = calculate_block_scale_from_grid(grid_lines)
+        _grid_scale = calculate_block_scale_from_grid(grid_lines)
         BLOCK_SCALE = float(BLOCK_SCALE_SETTING)  # 8.33
         TEE_HALF = 1.5 * BLOCK_SCALE
         TEE_STEM = 1.2 * BLOCK_SCALE
@@ -673,7 +673,7 @@ def main():
         try:
             doc.Regen(1)
         except Exception:
-            pass
+            pass  # Regen is cosmetic; drawing data is already committed
         zoom_extents(doc)
 
         # Report

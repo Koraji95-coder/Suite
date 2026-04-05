@@ -370,11 +370,11 @@ def _draw_line_entity(
     try:
         line.Layer = layer_name
     except (AttributeError, TypeError, ValueError):
-        pass
+        pass  # COM object may not support Layer property
     try:
         line.Color = 256  # BYLAYER
     except (AttributeError, TypeError, ValueError):
-        pass
+        pass  # COM object may not support Color property
     return _entity_handle(line)
 
 
@@ -415,11 +415,11 @@ def _draw_arc_entity(
     try:
         arc.Layer = layer_name
     except (AttributeError, TypeError, ValueError):
-        pass
+        pass  # COM object may not support Layer property
     try:
         arc.Color = 256  # BYLAYER
     except (AttributeError, TypeError, ValueError):
-        pass
+        pass  # COM object may not support Color property
     return _entity_handle(arc)
 
 
@@ -529,32 +529,32 @@ def _draw_route_label_entity(
         try:
             label.Layer = layer_name
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Layer property
         try:
             label.Color = 256  # BYLAYER
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Color property
         try:
             label.AttachmentPoint = 5  # Middle Center
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support AttachmentPoint property
         try:
             label.Rotation = float(rotation)
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Rotation property
         try:
             label.BackgroundFill = True
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support BackgroundFill property
         try:
             label.UseBackgroundColor = True
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support UseBackgroundColor property
         handle = _entity_handle(label)
         if handle:
             return handle, ""
     except Exception:
-        pass
+        pass  # MText creation failed; fall through to Text fallback below
 
     # Fallback keeps route labeling available even if MText props are unsupported.
     try:
@@ -565,28 +565,28 @@ def _draw_route_label_entity(
         try:
             label.Layer = layer_name
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Layer property
         try:
             label.Color = 256  # BYLAYER
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Color property
         try:
             label.Alignment = 10  # Middle Center
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Alignment property
         try:
             label.TextAlignmentPoint = point
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support TextAlignmentPoint property
         try:
             label.Rotation = float(rotation)
         except (AttributeError, TypeError, ValueError):
-            pass
+            pass  # COM object may not support Rotation property
         handle = _entity_handle(label)
         if handle:
             return handle, "MText mask unavailable; used Text fallback."
     except Exception:
-        pass
+        pass  # Text fallback also failed; caller receives empty handle
     return "", "Unable to annotate route with centered label."
 
 
@@ -1030,7 +1030,7 @@ def _delete_entity_handle(
     try:
         target = dyn_fn(target)
     except Exception:
-        pass
+        pass  # Dynamic dispatch wrapper may fail; proceed with unwrapped object
     try:
         com_call_with_retry_fn(lambda: target.Delete())
         return True

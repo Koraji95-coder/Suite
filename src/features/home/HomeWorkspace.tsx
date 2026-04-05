@@ -274,8 +274,7 @@ export function HomeWorkspace() {
 							{activeProjectCount === 1 ? "" : "s"}
 						</Badge>
 						<Badge color="default" variant="outline" size="sm">
-							{releasedToolCount} released drafting tool
-							{releasedToolCount === 1 ? "" : "s"}
+							{releasedToolCount} released drafting tools
 						</Badge>
 					</div>
 				}

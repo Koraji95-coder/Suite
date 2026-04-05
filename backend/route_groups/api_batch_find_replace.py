@@ -203,7 +203,7 @@ def create_batch_find_replace_blueprint(
                 try:
                     file_storage.close()
                 except Exception:
-                    pass
+                    pass  # Best-effort cleanup of uploaded file handle
             content = _decode_uploaded_text(raw_bytes)
 
             line_break = "\r\n" if "\r\n" in content else "\n"
@@ -411,7 +411,7 @@ def create_batch_find_replace_blueprint(
                         if not candidate_relative.startswith(".."):
                             relative_path = candidate_relative
                     except ValueError:
-                        pass
+                        pass  # Paths on different drives (Windows); keep original path
             else:
                 if not drawing_root:
                     raise ValueError(

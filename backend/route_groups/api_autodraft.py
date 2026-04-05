@@ -368,7 +368,7 @@ def _read_json_error(response: requests.Response) -> str:
                 if isinstance(value, str) and value.strip():
                     return value.strip()
     except Exception:
-        pass
+        pass  # Response body may not be valid JSON; fall through to generic message
     return f"Upstream request failed ({response.status_code})"
 
 
@@ -2920,7 +2920,7 @@ def _extract_measurement_seed(page_obj: Any) -> Dict[str, Any]:
             try:
                 seed["scale_hint"] = abs(ratio_numbers[1] / ratio_numbers[0])
             except Exception:
-                pass
+                pass  # Division or conversion may fail for malformed PDF ratio metadata
 
     if seed["scale_hint"] is None:
         raw_x = first.get("/X")
@@ -3690,7 +3690,7 @@ def _extract_prepare_text_fallback_markups(
         if hasattr(pdf_stream, "seek"):
             pdf_stream.seek(0)
     except Exception:
-        pass
+        pass  # Stream may not be seekable; proceed with current position
 
     with tempfile.TemporaryDirectory(prefix="autodraft_prepare_") as temp_dir:
         pdf_path = os.path.join(temp_dir, "prepare.pdf")
@@ -7388,7 +7388,7 @@ def create_autodraft_blueprint(
             if hasattr(uploaded_pdf, "stream") and hasattr(uploaded_pdf.stream, "seek"):
                 uploaded_pdf.stream.seek(0)
         except Exception:
-            pass
+            pass  # Stream may not be seekable; proceed with current position
 
         prepared_payload, error, status_code = _extract_pdf_compare_markups(
             pdf_stream=getattr(uploaded_pdf, "stream", uploaded_pdf),

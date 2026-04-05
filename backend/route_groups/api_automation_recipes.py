@@ -296,7 +296,7 @@ def create_automation_recipe_blueprint(
                         if not candidate_relative.startswith(".."):
                             relative_path = candidate_relative
                     except ValueError:
-                        pass
+                        pass  # Paths on different drives (Windows); keep original path
             else:
                 if not drawing_root:
                     raise ValueError(
@@ -595,7 +595,7 @@ def create_automation_recipe_blueprint(
     ) -> Dict[str, Any]:
         operation_id = _normalize_text(operation.get("operationId")) or uuid.uuid4().hex
         operation_type = _normalize_text(operation.get("operationType")) or "label-upsert"
-        source = _normalize_text(operation.get("source")) or "strip"
+        _source = _normalize_text(operation.get("source")) or "strip"
         drawing_path = _normalize_nullable_text(operation.get("drawingPath"))
         managed_value = _normalize_nullable_text(
             operation.get("routeKey") or operation.get("stripKey") or operation_id
@@ -1147,7 +1147,7 @@ def create_automation_recipe_blueprint(
                     )
                 else:
                     autodraft_payload = step_payloads.get("autodraft") if isinstance(step_payloads, dict) else None
-                    queue_items = autodraft_payload.get("queueItems") if isinstance(autodraft_payload, dict) else []
+                    _queue_items = autodraft_payload.get("queueItems") if isinstance(autodraft_payload, dict) else []
                     if not isinstance(autodraft_payload, dict):
                         step_summaries.append(
                             _build_step_summary(

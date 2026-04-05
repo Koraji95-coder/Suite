@@ -253,24 +253,19 @@ def create_terminal_authoring_blueprint(
         normalized_root = _normalize_text(project_root)
         if not normalized_root:
             return None
+        # Require absolute paths to prevent relative path traversal
+        if not os.path.isabs(normalized_root):
+            return None
         try:
-            root_path = Path(normalized_root).resolve(strict=False)
+            root_path = Path(os.path.realpath(normalized_root))
         except (OSError, ValueError):
             return None
         if not root_path.exists() or not root_path.is_dir():
             return None
 
-        # Guard: reject paths containing traversal components after resolution
-        try:
-            root_str = str(root_path)
-            if ".." in root_str.split(os.sep):
-                return None
-        except (TypeError, ValueError):
-            return None
-
         direct_matches = sorted(root_path.glob("*.wdp"))
         if direct_matches:
-            matched = direct_matches[0].resolve(strict=False)
+            matched = Path(os.path.realpath(str(direct_matches[0])))
             # Ensure the match is still under the resolved root
             try:
                 matched.relative_to(root_path)
@@ -280,7 +275,7 @@ def create_terminal_authoring_blueprint(
 
         try:
             for candidate in root_path.rglob("*.wdp"):
-                resolved_candidate = candidate.resolve(strict=False)
+                resolved_candidate = Path(os.path.realpath(str(candidate)))
                 try:
                     resolved_candidate.relative_to(root_path)
                 except ValueError:

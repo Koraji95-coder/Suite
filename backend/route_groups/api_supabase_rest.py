@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional, Tuple
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def supabase_rest_base_url(supabase_url: str) -> str:
@@ -77,8 +80,9 @@ def supabase_service_rest_request(
             json=payload,
             timeout=timeout,
         )
-    except Exception as exc:
-        return None, f"Supabase REST request failed: {exc}", 0
+    except Exception:
+        logger.exception("Supabase REST request failed")
+        return None, "Supabase REST request failed.", 0
 
     if response.status_code >= 400:
         return None, extract_supabase_error_message_fn(response), response.status_code

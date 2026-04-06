@@ -119,7 +119,9 @@
 		"deps:check:npm": "node scripts/check-npm-dependency-updates.mjs",
 		"deps:check:npm:all": "node scripts/check-npm-dependency-updates.mjs --all",
 		"deps:check:python": "node scripts/check-python-dependency-updates.mjs",
-		"deps:python:lock": "python -m piptools compile backend/requirements-api.in --output-file backend/requirements-api.lock.txt && python -m piptools compile backend/Transmittal-Builder/requirements.in --output-file backend/Transmittal-Builder/requirements.lock.txt"
+		"deps:python:lock": "python -m piptools compile backend/requirements-api.in --output-file backend/requirements-api.lock.txt && python -m piptools compile backend/Transmittal-Builder/requirements.in --output-file backend/Transmittal-Builder/requirements.lock.txt",
+		"pr:status": "node scripts/pr-status.mjs",
+		"pr:status:all": "node scripts/pr-status.mjs --office"
 	},
 	"overrides": {
 		"undici": "7.24.7",

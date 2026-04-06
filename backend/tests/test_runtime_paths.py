@@ -67,7 +67,7 @@ class TestRuntimePaths(unittest.TestCase):
             file_path.write_text("content")
 
             resolved_directory = resolve_runtime_directory(
-                r"X:\Workspace\Suite\output\some-subdir\file.txt",
+                "/workspace/Suite/output/some-subdir/file.txt",
                 repo_root=runtime_repo_root,
             )
 
@@ -100,7 +100,7 @@ class TestRuntimePaths(unittest.TestCase):
             runtime_repo_root = Path(temp_dir)
 
             resolved_directory = resolve_runtime_directory(
-                r"X:\Workspace\Suite\output\nonexistent-path\missing-dir",
+                "/workspace/Suite/output/nonexistent-path/missing-dir",
                 repo_root=runtime_repo_root,
             )
 

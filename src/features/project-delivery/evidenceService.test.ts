@@ -285,7 +285,7 @@ function createReceipts(): ProjectTransmittalReceiptRecord[] {
 			outputs: [
 				{
 					label: "PDF",
-					filename: "nanulak-ifc.pdf",
+					filename: "myproject-ifc.pdf",
 					size: 1024,
 					createdAt: "2026-03-21T00:00:00.000Z",
 				},

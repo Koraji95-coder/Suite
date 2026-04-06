@@ -119,7 +119,7 @@ function createTransmittalReceiptRecord() {
 		outputs: [
 			{
 				label: "PDF",
-				filename: "nanulak-ifc.pdf",
+				filename: "myproject-ifc.pdf",
 				size: 2048,
 				createdAt: "2026-04-02T00:00:00.000Z",
 			},

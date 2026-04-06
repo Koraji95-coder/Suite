@@ -410,7 +410,7 @@ describe("WatchdogRoutePage", () => {
 
 	it("keeps the standard operator surfaces even when a stale drawing filter is present", async () => {
 		renderWatchdog(
-			"/app/developer/control/watchdog?project=project-1&collector=collector-cad&window=4&drawing=c:/projects/nanulak/drawing-02.dwg",
+			"/app/developer/control/watchdog?project=project-1&collector=collector-cad&window=4&drawing=c:/projects/myproject/drawing-02.dwg",
 		);
 
 		expect(await screen.findAllByText("Recent activity")).toBeTruthy();

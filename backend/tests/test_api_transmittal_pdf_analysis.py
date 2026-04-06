@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 from unittest.mock import patch
 
 
@@ -203,7 +204,7 @@ class TestMaterializeDocumentsForRender(unittest.TestCase):
 
 
 class TestAnalyzePdfTitleBlock(unittest.TestCase):
-    def _fake_embedded_lines(self) -> dict:
+    def _fake_embedded_lines(self) -> Dict[str, Any]:
         return {
             "lines": [
                 {"text": "E1-100", "x": 550.0, "y": 20.0},
@@ -216,7 +217,15 @@ class TestAnalyzePdfTitleBlock(unittest.TestCase):
             "page_height": 792.0,
         }
 
-    def _passthrough_model_hints(self, *, lines, page_width, page_height, zone, current):
+    def _passthrough_model_hints(
+        self,
+        *,
+        lines: List[Dict[str, Any]],
+        page_width: float,
+        page_height: float,
+        zone: str,
+        current: Dict[str, Any],
+    ) -> Dict[str, Any]:
         return current
 
     def test_returns_expected_fields_with_mocked_extraction(self) -> None:

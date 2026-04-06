@@ -115,6 +115,7 @@
 		"test:e2e": "playwright test",
 		"test:e2e:dashboard:perf": "playwright test tests/e2e/dashboard-performance.spec.ts",
 		"test:e2e:list": "playwright test --list",
+		"pr:diagnostics": "node scripts/pr-diagnostics.mjs",
 		"deps:check": "npm run deps:check:npm && npm run deps:check:python",
 		"deps:check:npm": "node scripts/check-npm-dependency-updates.mjs",
 		"deps:check:npm:all": "node scripts/check-npm-dependency-updates.mjs --all",

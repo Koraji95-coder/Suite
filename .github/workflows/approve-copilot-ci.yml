@@ -1,0 +1,88 @@
+name: Approve Copilot CI
+
+# Runs with base-branch (main) permissions so it can approve pending workflow
+# runs triggered by the Copilot bot. This avoids the "action_required" stall
+# that blocks every Copilot PR from getting CI results.
+#
+# Security note: pull_request_target runs with base-repo write permissions.
+# This workflow does NOT check out the PR branch code, so there is no risk of
+# arbitrary code execution from the PR.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: write
+
+jobs:
+  approve:
+    name: Approve CI for Copilot PRs
+    runs-on: ubuntu-latest
+    # Only run for the Copilot bot.
+    # The API login for the GitHub Copilot coding agent is 'Copilot' (type: Bot,
+    # id: 198982749). The display name shown in the UI is 'copilot-swe-agent[bot]'.
+    # Both are included here to guard against GitHub renaming the account.
+    if: |
+      github.event.pull_request.user.login == 'Copilot' ||
+      github.event.pull_request.user.login == 'copilot-swe-agent[bot]'
+    steps:
+      - name: Wait for CI run to register
+        # Give GitHub a moment to queue the CI workflow run before we try to
+        # approve it — the pull_request_target event fires nearly simultaneously
+        # with the pull_request event that triggers CI.
+        run: sleep 15
+
+      - name: Approve pending CI workflow runs
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const headSha = context.payload.pull_request.head.sha;
+            const prNumber = context.payload.pull_request.number;
+
+            core.info(`Looking for pending CI runs on PR #${prNumber} (${headSha})`);
+
+            let approved = 0;
+            // Retry for up to ~60 s in case the CI run is slow to register.
+            for (let attempt = 0; attempt < 6; attempt++) {
+              const { data: { workflow_runs: runs } } =
+                await github.rest.actions.listWorkflowRunsForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head_sha: headSha,
+                  status: "action_required",
+                  per_page: 20,
+                });
+
+              for (const run of runs) {
+                if (run.name !== "CI") continue;
+                try {
+                  await github.rest.actions.approveWorkflowRun({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id,
+                  });
+                  core.info(`Approved CI run #${run.run_number} (id: ${run.id})`);
+                  approved++;
+                } catch (err) {
+                  core.warning(`Could not approve run ${run.id}: ${err.message}`);
+                }
+              }
+
+              if (approved > 0) break;
+
+              if (attempt < 5) {
+                core.info(`No pending CI runs found yet — retrying in 10 s (attempt ${attempt + 1}/6)`);
+                await new Promise((r) => setTimeout(r, 10_000));
+              }
+            }
+
+            if (approved === 0) {
+              core.warning(
+                "No pending CI runs found after retries. " +
+                "Manual approval may still be required for this PR."
+              );
+            } else {
+              core.info(`Done — approved ${approved} CI run(s) for PR #${prNumber}.`);
+            }

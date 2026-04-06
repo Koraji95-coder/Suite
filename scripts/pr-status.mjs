@@ -16,7 +16,11 @@
  */
 
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
 
 // ── CLI argument parsing ──────────────────────────────────────────────────────
 
@@ -93,7 +97,12 @@ function ghJson(ghArgs) {
 		throw new Error(detail);
 	}
 
-	return JSON.parse(result.stdout.trim());
+	const raw = result.stdout.trim();
+	try {
+		return JSON.parse(raw);
+	} catch {
+		throw new Error(`gh returned non-JSON output: ${raw.slice(0, 200)}`);
+	}
 }
 
 // ── PR classification ─────────────────────────────────────────────────────────
@@ -106,10 +115,18 @@ function ghJson(ghArgs) {
  * positives from unrelated words that contain "security" as a substring
  * (e.g. "insecurity", "cybersecurity tooling").
  *
+ * Examples of titles by category:
+ *   security: "fix(security): ...", "security: ...", "[Security] ...", "remove security leak"
+ *   fix:      "fix: ...", "fix(auth): ..."
+ *   docs:     "docs: ...", "[docs] ..."
+ *   tests:    "test: ...", "[tests] ...", "add integration tests"
+ *   chore:    "chore: ...", "refactor: ...", "ci: ..."
+ *   wip:      "[wip] ..."
+ *
  * @param {string} title
  * @returns {"security"|"fix"|"docs"|"tests"|"chore"|"wip"|"other"}
  */
-function categorizePr(title) {
+export function categorizePr(title) {
 	const t = title.toLowerCase();
 	// Explicit security-scoped prefixes take highest priority, then a word-
 	// boundary match on "security" anywhere in the title.
@@ -143,7 +160,7 @@ function categorizePr(title) {
  * @param {{ conclusion: string|null, status: string }[]} checks
  * @returns {string}  emoji-prefixed label
  */
-function ciStatusLabel(checks) {
+export function ciStatusLabel(checks) {
 	if (!checks || checks.length === 0) return "⏳ no checks";
 
 	// Each check exposes a `conclusion` once completed; fall back to `status` while in-flight.
@@ -176,7 +193,7 @@ function ciStatusLabel(checks) {
  * @param {{ number: number, title: string }[]} prs
  * @returns {number[][]}  each element is an array of PR numbers in the same group
  */
-function detectDuplicates(prs) {
+export function detectDuplicates(prs) {
 	const normalize = (title) =>
 		title
 			.replace(/^\[.*?\]\s*/, "") // strip leading [TAG] markers
@@ -222,8 +239,10 @@ async function reportRepo(repo) {
 			repo,
 			"--state",
 			"open",
+			// gh paginates automatically for limits > 100; cap at 200 for typical repos.
+			// Increase this constant if the repo has more than 200 open PRs.
 			"--limit",
-			"100",
+			"200",
 			"--json",
 			"number,title,isDraft,state,headRefName,createdAt,labels,author",
 		]);
@@ -363,7 +382,9 @@ async function main() {
 	console.log(`\n${"─".repeat(70)}`);
 }
 
-main().catch((err) => {
-	console.error(`pr-status: ${err.message}`);
-	process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
+	main().catch((err) => {
+		console.error(`pr-status: ${err.message}`);
+		process.exit(1);
+	});
+}

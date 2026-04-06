@@ -16,6 +16,7 @@ This section is the canonical home for AutoCAD execution, local CAD transport, a
 - [Autodesk Local Install Reference](./autodesk-local-install-reference.md)
 - [Autodesk Standards Checker Comparison And Flow](./autodesk-standards-checker-comparison.md)
 - [AutoCAD Electrical 2026 Reference Pack](../development/autocad-electrical-2026-reference-pack.md)
+- [AutoCAD Electrical Project-Level Sidecar Files](./autocad-electrical-project-level-sidecars.md)
 
 ## Current Ownership Notes
 

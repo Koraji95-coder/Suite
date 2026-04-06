@@ -79,6 +79,7 @@ Generated from allowlisted wrapped Autodesk Offline Help payloads under `C:\Prog
 - AutoCAD Electrical manages a secondary `.aepx` file automatically and recreates it if it is deleted.
 - Key project-level sidecars called out by Autodesk include `.WDT` for title block mapping, `.WDL` for project label/LINEx customization, `*_CAT.MDB` or `DEFAULT_CAT.MDB` for catalog lookup, `.INST` and `.LOC` defaults, and `.WDW` wire color/gauge label mappings.
 - These files are ACADE-managed project context files that live beside, or are resolved relative to, the active `.wdp` rather than Suite-owned scaffold files.
+- For the full per-file breakdown of each sidecar — purpose, resolution sequence, and Suite ownership boundary — see [AutoCAD Electrical Project-Level Sidecar Files](../cad/autocad-electrical-project-level-sidecars.md).
 
 ### WD.ENV, WD_PROJ, and default path behavior
 

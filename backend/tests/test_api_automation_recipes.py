@@ -462,6 +462,29 @@ class TestApiAutomationRecipes(unittest.TestCase):
         self.assertEqual(payload.get("resolvedDrawingCount"), 1)
         self.assertTrue(payload.get("pluginReady"))
 
+    def test_preflight_returns_full_success_response(self) -> None:
+        response = self.client.post(
+            "/api/cad/preflight/project-scope",
+            headers={"X-API-Key": "valid-key"},
+            json=self._build_payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json() or {}
+        self.assertTrue(body.get("success"))
+        self.assertTrue(body.get("ok"))
+        self.assertEqual(body.get("message"), "CAD preflight completed.")
+        self.assertTrue(body.get("requestId"))
+        self.assertEqual(body.get("workPackageId"), "work-package-1")
+        self.assertEqual(body.get("recipeSnapshotId"), "recipe-1")
+        self.assertTrue(body.get("simulateOnCopy"))
+        self.assertEqual(body.get("drawingCount"), 1)
+        self.assertEqual(body.get("resolvedDrawingCount"), 1)
+        self.assertTrue(body.get("pluginReady"))
+        self.assertTrue(body.get("acadeContextFound"))
+        self.assertEqual(body.get("issues"), [])
+        self.assertEqual(body.get("warnings"), [])
+        self.assertEqual(body.get("blockers"), [])
+
     def test_preflight_blocks_missing_issue_set(self) -> None:
         payload = self._build_payload()
         payload["workPackage"]["issueSetId"] = None

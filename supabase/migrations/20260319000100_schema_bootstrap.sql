@@ -312,48 +312,6 @@ create table if not exists public.user_passkeys (
 	updated_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.formulas (
-	id uuid primary key default gen_random_uuid(),
-	name text not null,
-	category text not null,
-	formula text not null,
-	description text not null default '',
-	variables jsonb not null default '{}'::jsonb,
-	user_id uuid not null references auth.users (id) on delete cascade,
-	created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.saved_calculations (
-	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references auth.users (id) on delete cascade,
-	calculation_type text not null,
-	inputs jsonb not null default '{}'::jsonb,
-	results jsonb not null default '{}'::jsonb,
-	notes text not null default '',
-	created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.saved_circuits (
-	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references auth.users (id) on delete cascade,
-	name text not null,
-	circuit_data jsonb not null default '{}'::jsonb,
-	image_url text null,
-	created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.whiteboards (
-	id uuid primary key default gen_random_uuid(),
-	user_id uuid not null references auth.users (id) on delete cascade,
-	title text not null,
-	panel_context text not null,
-	canvas_data jsonb not null default '{}'::jsonb,
-	thumbnail_url text null,
-	tags text[] not null default '{}',
-	created_at timestamptz not null default timezone('utc', now()),
-	updated_at timestamptz not null default timezone('utc', now())
-);
-
 create table if not exists public.block_library (
 	id uuid primary key default gen_random_uuid(),
 	user_id uuid not null references auth.users (id) on delete cascade,
@@ -498,10 +456,6 @@ create unique index if not exists idx_user_passkeys_credential_active
 	on public.user_passkeys (credential_id)
 	where revoked_at is null;
 
-create index if not exists idx_formulas_user_id on public.formulas (user_id);
-create index if not exists idx_saved_calculations_user_id on public.saved_calculations (user_id);
-create index if not exists idx_saved_circuits_user_id on public.saved_circuits (user_id);
-create index if not exists idx_whiteboards_user_id on public.whiteboards (user_id);
 create index if not exists idx_block_library_user_id on public.block_library (user_id);
 create index if not exists idx_automation_workflows_user_id on public.automation_workflows (user_id);
 create index if not exists idx_drawing_annotations_user_id on public.drawing_annotations (user_id);
@@ -534,11 +488,6 @@ for each row execute function public.set_updated_at();
 drop trigger if exists set_projects_updated_at on public.projects;
 create trigger set_projects_updated_at
 before update on public.projects
-for each row execute function public.set_updated_at();
-
-drop trigger if exists set_whiteboards_updated_at on public.whiteboards;
-create trigger set_whiteboards_updated_at
-before update on public.whiteboards
 for each row execute function public.set_updated_at();
 
 drop trigger if exists set_user_settings_updated_at on public.user_settings;

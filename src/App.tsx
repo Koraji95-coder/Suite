@@ -33,7 +33,6 @@ import {
 	loadHomeRoutePage,
 	loadLandingPage,
 	loadLoginPage,
-	loadMathToolsLibraryPage,
 	loadPrivacyPage,
 	loadProjectsRoutePage,
 	loadReviewRoutePage,
@@ -43,7 +42,6 @@ import {
 	loadStandardsCheckerRoutePage,
 	loadTransmittalBuilderRoutePage,
 	loadWatchdogRoutePage,
-	loadWhiteboardRoutePage,
 } from "./routes/routeModuleLoaders";
 
 const Shell = lazy(loadShell);
@@ -56,7 +54,6 @@ const StandardsCheckerRoutePage = lazy(loadStandardsCheckerRoutePage);
 const TransmittalBuilderRoutePage = lazy(loadTransmittalBuilderRoutePage);
 const DeveloperDocsRoutePage = lazy(loadDeveloperDocsRoutePage);
 const LoginPage = lazy(loadLoginPage);
-const MathToolsLibraryPage = lazy(loadMathToolsLibraryPage);
 const PrivacyPage = lazy(loadPrivacyPage);
 const ProjectsRoutePage = lazy(loadProjectsRoutePage);
 const SettingsPage = lazy(loadSettingsPage);
@@ -73,7 +70,6 @@ const GraphRoutePage = lazy(loadGraphRoutePage);
 const BatchFindReplaceRoutePage = lazy(loadBatchFindReplaceRoutePage);
 const BlockLibraryRoutePage = lazy(loadBlockLibraryRoutePage);
 const AutoWireRoutePage = lazy(loadAutoWireRoutePage);
-const WhiteboardRoutePage = lazy(loadWhiteboardRoutePage);
 
 function withRouteSuspense(element: React.ReactNode) {
 	return <Suspense fallback={<RouteLoadingFallback />}>{element}</Suspense>;
@@ -200,12 +196,6 @@ export default function App() {
 										)}
 									/>
 									<Route
-										path="developer/labs/whiteboard"
-										element={withRouteSuspense(
-											withAudience(<WhiteboardRoutePage />, "dev"),
-										)}
-									/>
-									<Route
 										path="projects"
 										element={withRouteSuspense(<ProjectsRoutePage />)}
 									/>
@@ -240,10 +230,6 @@ export default function App() {
 									<Route
 										path="review/standards-checker"
 										element={withRouteSuspense(<StandardsCheckerRoutePage />)}
-									/>
-									<Route
-										path="review/math-tools"
-										element={withRouteSuspense(<MathToolsLibraryPage />)}
 									/>
 									<Route
 										path="settings"

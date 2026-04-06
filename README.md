@@ -11,7 +11,7 @@ The authenticated shell is organized around five families:
 - `Home` for current work, product entry points, and restrained readiness signals
 - `Projects` for the project notebook, meetings/calendar, files, stage status, review, and release context
 - `Draft` for released drafting tools such as Drawing List Manager and Block Library
-- `Review` for standards validation, readiness summaries, and math/reference support
+- `Review` for standards validation, readiness summaries, and issue-path review work
 - `Developer` for control, architecture, and lab surfaces that stay outside the released customer shell
 
 ## Core Capabilities
@@ -34,7 +34,7 @@ The authenticated shell is organized around five families:
   - AutoWire
   - Ground Grid Generation
   - Batch Find & Replace
-  - Whiteboard and supporting developer labs
+  - supporting developer labs
 - Runtime and diagnostics:
   - Runtime Control companion app
   - Command Center diagnostics
@@ -207,8 +207,8 @@ High-signal operating docs:
 - `docs/runtime-control/workstation-bringup.md`
 - `docs/runtime-control/workstation-transfer-runbook.md`
 - `docs/runtime-control/workstation-settings-parity.md`
-- `docs/frontend/project-core-feature-slice.md`
-- `docs/frontend/project-review-feature-slice.md`
+- `docs/frontend/project-architecture.md`
+- `docs/frontend/workflow-architecture.md`
 - `docs/cad/README.md`
 
 ## Notes

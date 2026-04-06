@@ -144,27 +144,6 @@ const STATIC_RESOURCES = [
 		filePath: AUTODESK_INTEGRATION_PLAYBOOK_RESOURCE_PATH,
 	},
 	{
-		uri: "repo://docs/development/long-term-overhaul-todo-plan",
-		name: "Long-Term Overhaul Todo Plan",
-		description: "Master backlog and overhaul plan for the Suite codebase.",
-		mimeType: "text/markdown",
-		filePath: path.join(REPO_ROOT, "docs", "development", "long-term-overhaul-todo-plan.md"),
-	},
-	{
-		uri: "repo://docs/development/post-bridge-tranche-handoff",
-		name: "Latest Tranche Handoff Note",
-		description: "Cold-start handoff note from the most recent development tranche.",
-		mimeType: "text/markdown",
-		filePath: path.join(REPO_ROOT, "docs", "development", "post-bridge-tranche-handoff-2026-04-03.md"),
-	},
-	{
-		uri: "repo://docs/app-feature-roadmap-opinions",
-		name: "App Feature Roadmap & Opinions",
-		description: "Opinionated filter layer over raw feature ideas with build priority recommendations.",
-		mimeType: "text/markdown",
-		filePath: path.join(REPO_ROOT, "docs", "app-feature-roadmap-opinions.md"),
-	},
-	{
 		uri: "repo://docs/runtime-control/mcp-workstation-matrix",
 		name: "MCP Workstation Matrix",
 		description: "Canonical workstation profile data, naming rules, and MCP env overrides.",
@@ -193,27 +172,12 @@ const STATIC_RESOURCES = [
 		filePath: path.join(REPO_ROOT, "docs", "development", "documentation-structure.md"),
 	},
 	{
-		uri: "repo://docs/deep-repo-hardening-backlog",
-		name: "Deep Repo Hardening Backlog",
-		description: "Tracked hardening and cleanup backlog for the Suite codebase.",
-		mimeType: "text/markdown",
-		filePath: path.join(REPO_ROOT, "docs", "deep-repo-hardening-backlog.md"),
-	},
-	{
 		uri: "repo://docs/backend/local-learning-opportunities",
 		name: "Local Learning Opportunities (ML Pilots)",
 		description:
 			"Concrete ML opportunities for Suite: scikit-learn confidence scoring, PyTorch markup classification, anomaly detection, and recommended stack order.",
 		mimeType: "text/markdown",
 		filePath: path.join(REPO_ROOT, "docs", "backend", "local-learning-opportunities.md"),
-	},
-	{
-		uri: "repo://docs/development/post-overhaul-feature-backlog",
-		name: "Post-Overhaul Feature Backlog",
-		description:
-			"Immediate feature backlog after overhaul including ML pilot candidates and Autodesk API exploration items.",
-		mimeType: "text/markdown",
-		filePath: path.join(REPO_ROOT, "docs", "development", "post-overhaul-feature-backlog.md"),
 	},
 	{
 		uri: "repo://docs/cad/autodesk-local-install-reference",
@@ -246,6 +210,14 @@ const STATIC_RESOURCES = [
 			"Guide for running CodeQL and njsscan locally, understanding alerts, preventing common security-quality issues, and keeping the scanning backlog clean.",
 		mimeType: "text/markdown",
 		filePath: path.join(REPO_ROOT, "docs", "security", "code-scanning-guide.md"),
+	},
+	{
+		uri: "repo://docs/security/docker-image-vulnerability-remediation",
+		name: "Docker Image Vulnerability Remediation",
+		description:
+			"Runbook for scanning Suite runtime images with Docker Scout, updating vulnerable dependencies, and comparing current versus hardened Dockerfiles.",
+		mimeType: "text/markdown",
+		filePath: path.join(REPO_ROOT, "docs", "security", "docker-image-vulnerability-remediation.md"),
 	},
 ];
 const LATEST_PROTOCOL_VERSION = "2026-01-26";
@@ -2878,17 +2850,17 @@ Use this prompt at the start of a new session to orient without relying on threa
 - Run \`repo.check_suite_workstation\` for full workstation health
 
 ### Key Docs
-- \`docs/development/post-bridge-tranche-handoff-2026-04-03.md\` — latest handoff note
-- \`docs/development/long-term-overhaul-todo-plan.md\` — overhaul plan
-- \`docs/app-feature-roadmap-opinions.md\` — product roadmap
+- \`docs/README.md\` — docs entry point
 - \`docs/runtime-control/mcp-workstation-matrix.md\` — MCP matrix
+- \`docs/runtime-control/local-vs-container-ownership.md\` — local versus hosted ownership
 - \`docs/security/auth-architecture-canonical.md\` — auth architecture
+- \`docs/security/code-scanning-guide.md\` — security and quality guardrails
 
 ### Workflow
-1. Read the latest handoff note first
-2. Check \`repo.git_log\` for what landed since the last handoff
+1. Read \`docs/README.md\` and the relevant section README first
+2. Check \`repo.git_log\` for what landed recently
 3. Run \`repo.run_check\` to confirm the repo is green
-4. Begin the next tranche
+4. Begin the next focused change
 `,
 	},
 	"repo.code_review": {
@@ -2940,17 +2912,16 @@ npm run test:unit
 Use this prompt when starting a new tranche of work.
 
 ### Input Sources
-1. Read \`docs/development/long-term-overhaul-todo-plan.md\` for the master backlog
-2. Read \`docs/development/post-bridge-tranche-handoff-2026-04-03.md\` for the latest handoff
-3. Read \`docs/app-feature-roadmap-opinions.md\` for product priorities
-4. Read \`docs/deep-repo-hardening-backlog.md\` for hardening items
+1. Read \`docs/README.md\` for the current docs map
+2. Read the owning section README (\`docs/frontend/README.md\`, \`docs/backend/README.md\`, \`docs/runtime-control/README.md\`, or \`docs/cad/README.md\`)
+3. Read \`docs/security/code-scanning-guide.md\` for security-quality guardrails
+4. Read \`docs/development/documentation-structure.md\` for move/delete/archive rules
 
 ### Planning Rules
 - Each tranche should be a coherent, shippable unit
 - Do not mix cleanup tranches with feature tranches
 - Always end with \`npm run check\` green
-- Always write a handoff note for the next session
-- Keep the overhaul todo plan updated after each tranche
+- Update the owning docs in the same tranche when ownership changes
 
 ### Output Format
 - Tranche title
@@ -2969,9 +2940,8 @@ Use this prompt when starting ML-related work in Suite.
 
 ### Input Sources
 1. Read \`docs/backend/local-learning-opportunities.md\` for concrete ML opportunities and stack order
-2. Read \`docs/app-feature-roadmap-opinions.md\` (Scikit-learn And PyTorch section) for product-level opinions
-3. Read \`docs/development/post-overhaul-feature-backlog.md\` for where ML fits in the backlog
-4. Run \`repo.check_python_env\` to see what ML packages are already installed
+2. Read \`docs/security/code-scanning-guide.md\` for security-quality guardrails
+3. Run \`repo.check_python_env\` to see what ML packages are already installed
 
 ### ML Stack Order
 1. **scikit-learn first** — tabular features, small training sets, fast local training, explainable

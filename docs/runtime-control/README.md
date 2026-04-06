@@ -15,7 +15,7 @@ This section is the canonical home for workstation-local companion behavior, bri
 - [Workstation Settings Parity](./workstation-settings-parity.md)
 - [MCP Workstation Matrix](./mcp-workstation-matrix.md)
 - [Project Standards Native Review Flow](./project-standards-native-review.md)
-- [Frontend Project Setup Runtime Flow](../frontend/project-setup-title-block-runtime-flow.md)
+- [Project Setup + Title Block Runtime Flow](../frontend/project-architecture.md#project-setup-and-title-block-runtime-flow)
 
 ## Supported Startup Lanes
 

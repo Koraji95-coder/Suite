@@ -177,7 +177,6 @@ The repo uses `.github/codeql-config.yml` to exclude paths that produce noise:
 ```yaml
 paths-ignore:
   - tools/chrome-devtools-mcp/src/third_party   # vendored Lighthouse bundle
-  - docs/autodraft/upgrade-archive               # archived reference code
   - docs/autodraft/reference                      # archived reference code
   - scripts/testdata                              # test fixture data
 ```

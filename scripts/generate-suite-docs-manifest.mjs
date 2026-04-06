@@ -19,14 +19,14 @@ const outputFile = path.join(
 const verifyOnly = process.argv.includes("--verify");
 
 const MARKDOWN_PATTERN = /\.(md|mdx)$/i;
-const EXCLUDED_PATH_PARTS = new Set(["upgrade-archive"]);
+const EXCLUDED_PATH_PARTS = new Set();
 
 const SECTION_META = {
 	frontend: {
 		id: "frontend-app",
 		title: "Frontend",
 		description:
-			"Browser-owned architecture, feature slices, and UI/runtime flow notes.",
+			"Browser-owned architecture, ownership maps, and UI/runtime flow notes.",
 	},
 	autodraft: {
 		id: "automation-lab",

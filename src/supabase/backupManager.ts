@@ -14,10 +14,6 @@ const BACKUP_TABLES = [
 	"files",
 	"activity_log",
 	"calendar_events",
-	"formulas",
-	"saved_calculations",
-	"saved_circuits",
-	"whiteboards",
 	"block_library",
 	"automation_workflows",
 	"drawing_annotations",
@@ -354,16 +350,12 @@ export async function restoreFromYaml(
 
 	// Restore in dependency order (projects before tasks, etc.)
 	const orderedTables: BackupTable[] = [
-		"formulas",
-		"saved_calculations",
-		"saved_circuits",
 		"user_preferences",
 		"projects",
 		"tasks",
 		"files",
 		"activity_log",
 		"calendar_events",
-		"whiteboards",
 		"block_library",
 		"automation_workflows",
 		"drawing_annotations",

@@ -4,6 +4,19 @@ Updated: 2026-04-04
 
 This document now tracks active frontend performance follow-ups only. Items that were fixed move to [Performance Fix Log](./Performance%20Fix%20Log.md).
 
+## Latest Local Baseline
+
+Date captured: March 10, 2026
+
+- LCP: 9.42s (poor)
+- INP: 264ms (needs improvement)
+- CLS: 0.00 (good)
+
+Notes:
+
+- These values came from local development tooling and are directional, not release-grade measurements.
+- Use `npm run test:e2e:dashboard:perf` and the clean browser profile before treating a new trace as the baseline to optimize against.
+
 ## Profiling Hygiene
 
 - Use `npm run browser:dev:clean` before capturing a trace you want to act on. That opens a clean browser profile with extensions disabled.

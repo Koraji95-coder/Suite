@@ -12,11 +12,13 @@ This section is for operational and support docs. It is not the canonical home f
 
 ## Canonical Docs
 
-- [Long-Term Overhaul TODO Plan](./long-term-overhaul-todo-plan.md)
 - [Documentation Structure and Move Rules](./documentation-structure.md)
 - [Supabase Local/Hosted Workflow](./supabase-local-hosted-workflow.md)
 - [Command Center](./command-center.md)
-- [Repo Hygiene Playbook](./repo-hygiene-playbook.md)
+- [Conduit Terminal Label Sync Rollout](./conduit-terminal-label-sync-rollout.md)
+- [Electrical Drawing Program Test Readiness](./electrical-drawing-program-test-readiness.md)
+- [Playwright Auth Bootstrap](./playwright-auth-bootstrap.md)
+- [Public Rollout Readiness](./public-rollout-readiness.md)
 
 ## Do Not Use This Section For
 

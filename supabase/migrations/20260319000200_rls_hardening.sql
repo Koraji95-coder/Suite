@@ -64,10 +64,6 @@ alter table if exists public.recent_files enable row level security;
 alter table if exists public.user_settings enable row level security;
 alter table if exists public.user_preferences enable row level security;
 alter table if exists public.user_passkeys enable row level security;
-alter table if exists public.formulas enable row level security;
-alter table if exists public.saved_calculations enable row level security;
-alter table if exists public.saved_circuits enable row level security;
-alter table if exists public.whiteboards enable row level security;
 alter table if exists public.block_library enable row level security;
 alter table if exists public.automation_workflows enable row level security;
 alter table if exists public.drawing_annotations enable row level security;
@@ -118,26 +114,6 @@ for each row execute function public.set_user_id_from_auth();
 drop trigger if exists set_user_id_user_passkeys on public.user_passkeys;
 create trigger set_user_id_user_passkeys
 before insert on public.user_passkeys
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_formulas on public.formulas;
-create trigger set_user_id_formulas
-before insert on public.formulas
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_saved_calculations on public.saved_calculations;
-create trigger set_user_id_saved_calculations
-before insert on public.saved_calculations
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_saved_circuits on public.saved_circuits;
-create trigger set_user_id_saved_circuits
-before insert on public.saved_circuits
-for each row execute function public.set_user_id_from_auth();
-
-drop trigger if exists set_user_id_whiteboards on public.whiteboards;
-create trigger set_user_id_whiteboards
-before insert on public.whiteboards
 for each row execute function public.set_user_id_from_auth();
 
 drop trigger if exists set_user_id_block_library on public.block_library;
@@ -402,90 +378,6 @@ with check (user_id = auth.uid());
 
 drop policy if exists user_passkeys_delete_own on public.user_passkeys;
 create policy user_passkeys_delete_own on public.user_passkeys
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists formulas_select_own on public.formulas;
-create policy formulas_select_own on public.formulas
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists formulas_insert_own on public.formulas;
-create policy formulas_insert_own on public.formulas
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists formulas_update_own on public.formulas;
-create policy formulas_update_own on public.formulas
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists formulas_delete_own on public.formulas;
-create policy formulas_delete_own on public.formulas
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists saved_calculations_select_own on public.saved_calculations;
-create policy saved_calculations_select_own on public.saved_calculations
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists saved_calculations_insert_own on public.saved_calculations;
-create policy saved_calculations_insert_own on public.saved_calculations
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists saved_calculations_update_own on public.saved_calculations;
-create policy saved_calculations_update_own on public.saved_calculations
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists saved_calculations_delete_own on public.saved_calculations;
-create policy saved_calculations_delete_own on public.saved_calculations
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists saved_circuits_select_own on public.saved_circuits;
-create policy saved_circuits_select_own on public.saved_circuits
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists saved_circuits_insert_own on public.saved_circuits;
-create policy saved_circuits_insert_own on public.saved_circuits
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists saved_circuits_update_own on public.saved_circuits;
-create policy saved_circuits_update_own on public.saved_circuits
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists saved_circuits_delete_own on public.saved_circuits;
-create policy saved_circuits_delete_own on public.saved_circuits
-for delete to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists whiteboards_select_own on public.whiteboards;
-create policy whiteboards_select_own on public.whiteboards
-for select to authenticated
-using (user_id = auth.uid());
-
-drop policy if exists whiteboards_insert_own on public.whiteboards;
-create policy whiteboards_insert_own on public.whiteboards
-for insert to authenticated
-with check (user_id = auth.uid());
-
-drop policy if exists whiteboards_update_own on public.whiteboards;
-create policy whiteboards_update_own on public.whiteboards
-for update to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
-
-drop policy if exists whiteboards_delete_own on public.whiteboards;
-create policy whiteboards_delete_own on public.whiteboards
 for delete to authenticated
 using (user_id = auth.uid());
 

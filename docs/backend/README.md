@@ -10,7 +10,7 @@ This section is the canonical home for hosted-core Python API and service owners
 
 ## Canonical Docs
 
-- [Frontend Project Setup Runtime Flow](../frontend/project-setup-title-block-runtime-flow.md)
+- [Project Setup + Title Block Runtime Flow](../frontend/project-architecture.md#project-setup-and-title-block-runtime-flow)
 - [Project Standards Profile](./project-standards-profile.md)
 - [Route Groups Index](../../backend/route_groups/README.md)
 - [Backend API Server Pointer](../../backend/API_SERVER_README.md)

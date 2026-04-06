@@ -5,7 +5,7 @@ This is the canonical entry point for repository documentation. People and tooli
 ## Runtime Sections
 
 - [Frontend](./frontend/README.md)
-  - Browser flows, app-owned feature slices, and UI/runtime ownership notes.
+  - Browser flows, app-owned architecture, and UI/runtime ownership notes.
 - [Backend](./backend/README.md)
   - Hosted-core Python APIs, route groups, and service/domain ownership.
 - [Runtime Control](./runtime-control/README.md)
@@ -29,20 +29,13 @@ This is the canonical entry point for repository documentation. People and tooli
 
 ## Current High-Signal Docs
 
-- [Long-Term Overhaul TODO Plan](./development/long-term-overhaul-todo-plan.md)
-- [Project Setup + Title Block Runtime Flow](./frontend/project-setup-title-block-runtime-flow.md)
-- [Project Manager Feature Slice](./frontend/project-manager-feature-slice.md)
+- [Project Architecture](./frontend/project-architecture.md)
+- [Workflow Architecture](./frontend/workflow-architecture.md)
 - [Windows Workstation Bring-Up](./runtime-control/workstation-bringup.md)
-- [Post-Overhaul Feature Backlog](./development/post-overhaul-feature-backlog.md)
-- [Performance Baseline](./performance-baseline.md)
-- [Deep Repo Hardening Backlog](./deep-repo-hardening-backlog.md)
-
-## Working Notes
-
-- [App Feature Ideas](./app feature ideas.md)
-  - Working intake note for feature ideas and external workflow inspiration. This is not a canonical architecture spec.
-- [App Feature Roadmap And Opinions](./app-feature-roadmap-opinions.md)
-  - Opinionated triage of the idea note: what to build soon, what to delay, and what to skip.
+- [MCP Workstation Matrix](./runtime-control/mcp-workstation-matrix.md)
+- [Performance Insights](<./frontend/Performance Insights.md>)
+- [Code Scanning & Security Quality Guide](./security/code-scanning-guide.md)
+- [Docker Image Vulnerability Remediation](./security/docker-image-vulnerability-remediation.md)
 
 ## Documentation Rules
 

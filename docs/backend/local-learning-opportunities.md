@@ -1,6 +1,6 @@
 # Local Learning Opportunities
 
-This note captures concrete machine-learning opportunities for Suite after the current runtime/ownership overhaul is stable.
+This note captures concrete local-learning opportunities for Suite if and when review-assistive ML work is resumed.
 
 ## Scope
 
@@ -129,9 +129,9 @@ This should remain review-assistive, not an automatic source of truth.
 - keep learning data and model artifacts local-only unless the product direction changes explicitly
 - do not let ML silently override promoted local model output or deterministic rules
 
-## Follow-Up After Overhaul
+## Follow-Up
 
-Revisit this document after the current overhaul lands and choose the first pilot.
+Treat this as a parking lot for future pilots, not as an active product commitment.
 
 The strongest likely first pilot is:
 

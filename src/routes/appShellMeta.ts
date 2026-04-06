@@ -105,15 +105,6 @@ const shellRouteMeta: readonly ShellRouteMeta[] = [
 		familyLabel: "Projects",
 		icon: FolderOpen,
 	},
-	{
-		match: "/app/review/math-tools",
-		title: "Math tools",
-		subtitle: "Formulas and calculators that support review and field validation work.",
-		areaLabel: "Review",
-		family: "review",
-		familyLabel: "Review",
-		icon: ShieldCheck,
-	},
 	...developerToolShellMeta,
 	{
 		match: "/app/home",

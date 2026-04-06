@@ -24,7 +24,6 @@ test.describe("authenticated shell routes", () => {
 		{ path: "/app/draft/block-library", title: "Block Library" },
 		{ path: "/app/review", title: "Review" },
 		{ path: "/app/review/standards-checker", title: "Standards Checker" },
-		{ path: "/app/review/math-tools", title: "Math tools" },
 		{ path: "/app/projects/transmittal-builder", title: "Transmittal Builder" },
 		{ path: "/app/settings", title: "Settings" },
 	] as const;

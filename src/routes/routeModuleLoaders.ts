@@ -22,9 +22,6 @@ export const loadDeveloperDocsRoutePage = () =>
 
 export const loadLoginPage = () => import("./LoginPage");
 
-export const loadMathToolsLibraryPage = () =>
-	import("./review/math-tools/MathToolsLibraryPage");
-
 export const loadPrivacyPage = () => import("./PrivacyPage");
 
 export const loadProjectsRoutePage = () =>
@@ -71,6 +68,3 @@ export const loadBlockLibraryRoutePage = () =>
 
 export const loadAutoWireRoutePage = () =>
 	import("./developer/labs/autowire/AutoWireRoutePage");
-
-export const loadWhiteboardRoutePage = () =>
-	import("./developer/labs/whiteboard/WhiteboardKnowledgePage");

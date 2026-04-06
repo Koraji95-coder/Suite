@@ -137,17 +137,6 @@
 			"releaseState": "lab",
 			"futureProduct": false,
 			"runtimeRequirements": ["frontend", "backend"]
-		},
-		{
-			"id": "whiteboard",
-			"title": "Whiteboard",
-			"description": "Developer sketching and note capture surface for experiments, workflows, and support callouts.",
-			"route": "/app/developer/labs/whiteboard",
-			"group": "labs",
-			"audience": "dev",
-			"releaseState": "lab",
-			"futureProduct": true,
-			"runtimeRequirements": ["frontend"]
 		}
 	]
 }

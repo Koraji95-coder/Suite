@@ -123,14 +123,13 @@ If a machine is not listed in the matrix, the sync helper falls back to:
 
 | Resource URI | Description |
 | --- | --- |
-| `repo://docs/development/long-term-overhaul-todo-plan` | Master overhaul backlog |
-| `repo://docs/development/post-bridge-tranche-handoff` | Latest tranche handoff |
-| `repo://docs/app-feature-roadmap-opinions` | Product roadmap |
 | `repo://docs/runtime-control/mcp-workstation-matrix` | This document |
 | `repo://docs/runtime-control/workstation-bringup` | Bring-up guide |
 | `repo://docs/security/auth-architecture-canonical` | Auth architecture |
 | `repo://docs/development/documentation-structure` | Doc structure guide |
-| `repo://docs/deep-repo-hardening-backlog` | Hardening backlog |
+| `repo://docs/security/code-scanning-guide` | Scanning and quality guardrails |
+| `repo://docs/security/docker-image-vulnerability-remediation` | Container-image remediation runbook |
+| `repo://docs/backend/local-learning-opportunities` | ML pilot opportunities |
 
 ## Optional Companion MCP Servers
 
@@ -189,7 +188,7 @@ Suite's ML roadmap is documented in `docs/backend/local-learning-opportunities.m
 | Resource URI | Description |
 | --- | --- |
 | `repo://docs/backend/local-learning-opportunities` | Concrete ML opportunities and stack recommendations |
-| `repo://docs/development/post-overhaul-feature-backlog` | Where ML fits in the feature backlog |
+| `repo://docs/security/code-scanning-guide` | Security-quality guardrails to keep ML/dev tooling changes clean |
 
 ## Future-Proofing: Autodesk API & AutoCAD
 

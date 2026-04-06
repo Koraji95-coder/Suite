@@ -32,8 +32,8 @@ export default function DeveloperDocsRoutePage() {
 					meta={
 						<div className={styles.bandFacts}>
 							<div className={styles.bandFact}>
-								<strong>2</strong>
-								<span>Developer surfaces</span>
+								<strong>1</strong>
+								<span>Developer surface</span>
 							</div>
 							<div className={styles.bandFact}>
 								<strong>{DEVELOPER_DOC_COUNT}</strong>
@@ -60,24 +60,6 @@ export default function DeveloperDocsRoutePage() {
 							</p>
 							<Link to="/app/developer" className={styles.libraryAction}>
 								Open developer portal
-							</Link>
-						</Panel>
-						<Panel
-							variant="support"
-							padding="lg"
-							className={styles.libraryCard}
-						>
-							<span className={styles.featuredLabel}>Capture surface</span>
-							<h3 className={styles.libraryTitle}>Whiteboard</h3>
-							<p className={styles.libraryDescription}>
-								Sketch, tag, and review workshop notes without surfacing them in
-								the customer knowledge library.
-							</p>
-							<Link
-								to="/app/developer/labs/whiteboard"
-								className={styles.libraryAction}
-							>
-								Open whiteboard
 							</Link>
 						</Panel>
 					</div>

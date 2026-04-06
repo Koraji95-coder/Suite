@@ -8,7 +8,6 @@ import {
 	loadDraftRoutePage,
 	loadDrawingListManagerRoutePage,
 	loadHomeRoutePage,
-	loadMathToolsLibraryPage,
 	loadProjectsRoutePage,
 	loadReviewRoutePage,
 	loadSettingsPage,
@@ -34,7 +33,6 @@ const shellFamilyWarmers: Partial<
 	review: [
 		loadReviewRoutePage,
 		loadStandardsCheckerRoutePage,
-		loadMathToolsLibraryPage,
 	],
 	developer: [
 		loadDeveloperPortalRoutePage,

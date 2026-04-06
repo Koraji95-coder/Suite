@@ -692,39 +692,6 @@ export type Database = {
           },
         ]
       }
-      formulas: {
-        Row: {
-          category: string
-          created_at: string
-          description: string
-          formula: string
-          id: string
-          name: string
-          user_id: string
-          variables: Json
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          description?: string
-          formula: string
-          id?: string
-          name: string
-          user_id: string
-          variables?: Json
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          description?: string
-          formula?: string
-          id?: string
-          name?: string
-          user_id?: string
-          variables?: Json
-        }
-        Relationships: []
-      }
       ground_grid_conductors: {
         Row: {
           design_id: string
@@ -1068,63 +1035,6 @@ export type Database = {
         }
         Relationships: []
       }
-      saved_calculations: {
-        Row: {
-          calculation_type: string
-          created_at: string
-          id: string
-          inputs: Json
-          notes: string
-          results: Json
-          user_id: string
-        }
-        Insert: {
-          calculation_type: string
-          created_at?: string
-          id?: string
-          inputs?: Json
-          notes?: string
-          results?: Json
-          user_id: string
-        }
-        Update: {
-          calculation_type?: string
-          created_at?: string
-          id?: string
-          inputs?: Json
-          notes?: string
-          results?: Json
-          user_id?: string
-        }
-        Relationships: []
-      }
-      saved_circuits: {
-        Row: {
-          circuit_data: Json
-          created_at: string
-          id: string
-          image_url: string | null
-          name: string
-          user_id: string
-        }
-        Insert: {
-          circuit_data?: Json
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          name: string
-          user_id: string
-        }
-        Update: {
-          circuit_data?: Json
-          created_at?: string
-          id?: string
-          image_url?: string | null
-          name?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       tasks: {
         Row: {
           completed: boolean
@@ -1309,42 +1219,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      whiteboards: {
-        Row: {
-          canvas_data: Json
-          created_at: string
-          id: string
-          panel_context: string
-          tags: string[]
-          thumbnail_url: string | null
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          canvas_data?: Json
-          created_at?: string
-          id?: string
-          panel_context: string
-          tags?: string[]
-          thumbnail_url?: string | null
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          canvas_data?: Json
-          created_at?: string
-          id?: string
-          panel_context?: string
-          tags?: string[]
-          thumbnail_url?: string | null
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       work_ledger_entries: {
         Row: {

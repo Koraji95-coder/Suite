@@ -449,6 +449,284 @@ function createDecisions(): ProjectReviewDecisionRecord[] {
 }
 
 describe("projectDeliveryEvidenceService", () => {
+	it("accumulates drawing-level warnings from scan rows into the evidence packet", () => {
+		const scanRowWithWarnings = {
+			id: "row-1",
+			projectId: "project-1",
+			fileName: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+			relativePath: "Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+			absolutePath:
+				"C:/Projects/MyProject/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+			fileType: "dwg",
+			drawingNumber: "PROJ-00001-E0-0001",
+			title: "Drawing Index",
+			revision: "A",
+			source: "title_block_sync",
+			reviewState: "ready",
+			confidence: 1,
+			titleBlockFound: true,
+			hasWdTbConflict: false,
+			currentAttributes: {},
+			acadeValues: {},
+			suiteUpdates: {},
+			revisionRows: [],
+			issues: [],
+			warnings: ["Title block attribute mismatch detected.", "Revision note pending review."],
+			rawRow: {},
+		} as unknown as ProjectDocumentMetadataRow;
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
+			scanRows: [scanRowWithWarnings],
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
+			revisions: [],
+			telemetry: createTelemetry(),
+			standardsChecks: [],
+			nativeStandardsReview: null,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.selectedDrawings).toHaveLength(1);
+		expect(packet.selectedDrawings[0]?.warnings).toEqual([
+			"Title block attribute mismatch detected.",
+			"Revision note pending review.",
+		]);
+		expect(packet.titleBlock.drawings[0]?.warnings).toEqual([
+			"Title block attribute mismatch detected.",
+			"Revision note pending review.",
+		]);
+
+		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
+		expect(markdown).toContain("- Warning: Title block attribute mismatch detected.");
+		expect(markdown).toContain("- Warning: Revision note pending review.");
+	});
+
+	it("excludes a passing native standards review from evidence (non-blocking)", () => {
+		const passingReview: Parameters<
+			typeof buildProjectIssueSetEvidencePacket
+		>[0]["nativeStandardsReview"] = {
+			id: "review-pass-1",
+			projectId: "project-1",
+			userId: "user-1",
+			requestId: "req-pass-1",
+			recordedAt: "2026-03-21T00:00:00.000Z",
+			cadFamilyId: "jic",
+			standardsCategory: "NEC",
+			selectedStandardIds: ["nec-210"],
+			results: [{ standardId: "nec-210", status: "pass", message: "All checks passed." }],
+			warnings: [],
+			summary: { inspectedDrawingCount: 1, providerPath: "dotnet+inproc" },
+			meta: { source: "dotnet" },
+			overallStatus: "pass",
+		};
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: null,
+			scanRows: createScanRows(),
+			revisions: [],
+			telemetry: createTelemetry(),
+			standardsChecks: [],
+			nativeStandardsReview: passingReview,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.standards.nativeReview.hasReview).toBe(false);
+		expect(packet.standards.nativeReview.overallStatus).toBeNull();
+		expect(packet.standards.nativeReview.warningCount).toBe(0);
+		expect(packet.standards.nativeReview.messages).toHaveLength(0);
+
+		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
+		expect(markdown).toContain("Native project review: Not recorded yet.");
+	});
+
+	it("records zero decisions when no review decisions are provided", () => {
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
+			scanRows: createScanRows(),
+			revisions: [],
+			telemetry: createTelemetry(),
+			standardsChecks: createStandardsChecks(),
+			nativeStandardsReview: null,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.reviewDecisions.acceptedTitleBlockCount).toBe(0);
+		expect(packet.reviewDecisions.waivedStandardsCount).toBe(0);
+		expect(packet.reviewDecisions.items).toHaveLength(0);
+
+		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
+		expect(markdown).toContain("No package decisions recorded yet.");
+	});
+
+	it("counts multiple standards checks with mixed warning states accurately", () => {
+		const mixedChecks: Parameters<
+			typeof buildProjectIssueSetEvidencePacket
+		>[0]["standardsChecks"] = [
+			{
+				id: "ann-pass",
+				drawing_name: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				annotations: [],
+				qa_status: "pass",
+				checked_at: "2026-03-21T00:00:00.000Z",
+				checked_by: "QA",
+				rules_applied: ["Title Block"],
+				issues_found: 0,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+			{
+				id: "ann-warn",
+				drawing_name: "PROJ-00001-E0-0002 - ONE LINE.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
+				annotations: [
+					{ type: "layer", severity: "warning", message: "Layer naming issue", location: "Sheet 1" },
+				],
+				qa_status: "warning",
+				checked_at: "2026-03-21T00:00:00.000Z",
+				checked_by: "QA",
+				rules_applied: ["Layer Standards"],
+				issues_found: 1,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+			{
+				id: "ann-fail",
+				drawing_name: "PROJ-00001-E0-0003 - LAYOUT.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0003 - LAYOUT.dwg",
+				annotations: [
+					{ type: "block", severity: "error", message: "Missing required block", location: "Sheet 2" },
+				],
+				qa_status: "fail",
+				checked_at: "2026-03-21T00:00:00.000Z",
+				checked_by: "QA",
+				rules_applied: ["Block Standards"],
+				issues_found: 1,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+			{
+				id: "ann-pending",
+				drawing_name: "PROJ-00001-E0-0004 - SCHEMATIC.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0004 - SCHEMATIC.dwg",
+				annotations: [],
+				qa_status: "pending",
+				checked_at: null,
+				checked_by: null,
+				rules_applied: [],
+				issues_found: 0,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+		];
+
+		const issueSetWithAllDrawings = {
+			...createIssueSet(),
+			selectedDrawingPaths: [
+				"Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				"Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
+				"Issued/PROJ-00001-E0-0003 - LAYOUT.dwg",
+				"Issued/PROJ-00001-E0-0004 - SCHEMATIC.dwg",
+			],
+		};
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: issueSetWithAllDrawings,
+			registerSnapshot: null,
+			scanRows: createScanRows(),
+			revisions: [],
+			telemetry: createTelemetry(),
+			standardsChecks: mixedChecks,
+			nativeStandardsReview: null,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.standards.matchedDrawingCount).toBe(4);
+		expect(packet.standards.passCount).toBe(1);
+		expect(packet.standards.warningCount).toBe(1);
+		expect(packet.standards.failCount).toBe(1);
+		expect(packet.standards.pendingCount).toBe(1);
+	});
+
+	it("captures every warning from native standards review in evidence messages", () => {
+		const reviewWithManyWarnings: Parameters<
+			typeof buildProjectIssueSetEvidencePacket
+		>[0]["nativeStandardsReview"] = {
+			id: "review-warn-1",
+			projectId: "project-1",
+			userId: "user-1",
+			requestId: "req-warn-1",
+			recordedAt: "2026-03-21T00:00:00.000Z",
+			cadFamilyId: "jic",
+			standardsCategory: "NEC",
+			selectedStandardIds: ["nec-210", "nec-250", "nec-300"],
+			results: [
+				{ standardId: "nec-210", status: "warning", message: "Follow-up on branch circuits." },
+				{ standardId: "nec-250", status: "warning", message: "Grounding path review needed." },
+				{ standardId: "nec-300", status: "pass", message: "Wiring method compliant." },
+			],
+			warnings: [
+				"No .dws standards files were found under the project root.",
+				"Standards file version mismatch detected.",
+			],
+			summary: { inspectedDrawingCount: 2, providerPath: "dotnet+inproc" },
+			meta: { source: "dotnet" },
+			overallStatus: "warning",
+		};
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: null,
+			scanRows: createScanRows(),
+			revisions: [],
+			telemetry: createTelemetry(),
+			standardsChecks: [],
+			nativeStandardsReview: reviewWithManyWarnings,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.standards.nativeReview.hasReview).toBe(true);
+		expect(packet.standards.nativeReview.overallStatus).toBe("warning");
+		expect(packet.standards.nativeReview.warningCount).toBe(2);
+		expect(packet.standards.nativeReview.selectedStandardCount).toBe(3);
+		expect(packet.standards.nativeReview.inspectedDrawingCount).toBe(2);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"No .dws standards files were found under the project root.",
+		);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"Standards file version mismatch detected.",
+		);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"Follow-up on branch circuits.",
+		);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"Grounding path review needed.",
+		);
+		expect(packet.standards.nativeReview.messages).not.toContain(
+			"Wiring method compliant.",
+		);
+
+		const markdown = renderProjectIssueSetEvidencePacketMarkdown(packet);
+		expect(markdown).toContain("No .dws standards files were found under the project root.");
+		expect(markdown).toContain("Follow-up on branch circuits.");
+		expect(markdown).toContain("Grounding path review needed.");
+	});
+
 	it("builds an evidence packet scoped to the selected drawings", () => {
 		const packet = buildProjectIssueSetEvidencePacket({
 			project: createProject(),

@@ -105,4 +105,126 @@ describe("AutoCAD Electrical integration playbook generator", () => {
 		expect(markdown).toContain("## Recommended Suite Feature Opportunities");
 		expect(markdown).toContain("## Suggested Next Steps");
 	});
+
+	it("includes ACE_PANEL_MENU_GB.DAT in the panel-layout section with correct family label and note", async () => {
+		const markdown = await buildAcadeIntegrationPlaybookMarkdown({
+			summary: {
+				generatedAt: "2026-04-06T00:00:00.000Z",
+				menuSummaries: [
+					{
+						fileName: "ACE_JIC_MENU.DAT",
+						firstPageTitle: "JIC: Schematic Symbols",
+						totalEntryCount: 555,
+						topLevelEntries: [{ label: "Push Buttons" }],
+					},
+					{
+						fileName: "ACE_PANEL_MENU_GB.DAT",
+						firstPageTitle: "Panel Layout Symbols",
+						totalEntryCount: 128,
+						topLevelEntries: [
+							{ label: "Push Buttons" },
+							{ label: "Selector Switches" },
+							{ label: "Limit Switches" },
+							{ label: "Relays" },
+							{ label: "Pressure/ Temperature Switches" },
+						],
+					},
+				],
+				supportScripts: [],
+				databaseInventories: [],
+				sampleDrawings: [],
+				demoProjects: [],
+			},
+		});
+
+		expect(markdown).toContain("ACE_PANEL_MENU_GB.DAT");
+		expect(markdown).toContain("Panel Layout");
+		expect(markdown).toContain("panel-layout symbol discovery, not schematic insert search");
+		expect(markdown).not.toContain("schematic insert search\nACE_PANEL_MENU_GB.DAT");
+	});
+
+	it("includes ACE_PANEL_MENU_IEC-60617.DAT in the panel-layout section with IEC 60617 family label and panel note", async () => {
+		const markdown = await buildAcadeIntegrationPlaybookMarkdown({
+			summary: {
+				generatedAt: "2026-04-06T00:00:00.000Z",
+				menuSummaries: [
+					{
+						fileName: "ACE_JIC_MENU.DAT",
+						firstPageTitle: "JIC: Schematic Symbols",
+						totalEntryCount: 555,
+						topLevelEntries: [{ label: "Push Buttons" }],
+					},
+					{
+						fileName: "ACE_PANEL_MENU_IEC-60617.DAT",
+						firstPageTitle: "Panel Layout Symbols",
+						totalEntryCount: 128,
+						topLevelEntries: [
+							{ label: "Push Buttons" },
+							{ label: "Selector Switches" },
+							{ label: "Limit Switches" },
+							{ label: "Relays" },
+							{ label: "Pressure/ Temperature Switches" },
+						],
+					},
+				],
+				supportScripts: [],
+				databaseInventories: [],
+				sampleDrawings: [],
+				demoProjects: [],
+			},
+		});
+
+		expect(markdown).toContain("ACE_PANEL_MENU_IEC-60617.DAT");
+		expect(markdown).toContain("IEC 60617");
+		expect(markdown).toContain("panel-layout symbol discovery, not schematic insert search");
+	});
+
+	it("keeps ACE_PANEL_MENU_GB.DAT and ACE_PANEL_MENU_IEC-60617.DAT in the panel section, separate from schematic menus", async () => {
+		const markdown = await buildAcadeIntegrationPlaybookMarkdown({
+			summary: {
+				generatedAt: "2026-04-06T00:00:00.000Z",
+				menuSummaries: [
+					{
+						fileName: "ACE_JIC_MENU.DAT",
+						firstPageTitle: "JIC: Schematic Symbols",
+						totalEntryCount: 555,
+						topLevelEntries: [{ label: "Push Buttons" }],
+					},
+					{
+						fileName: "ACE_PANEL_MENU_GB.DAT",
+						firstPageTitle: "Panel Layout Symbols",
+						totalEntryCount: 128,
+						topLevelEntries: [{ label: "Push Buttons" }, { label: "Relays" }],
+					},
+					{
+						fileName: "ACE_PANEL_MENU_IEC-60617.DAT",
+						firstPageTitle: "Panel Layout Symbols",
+						totalEntryCount: 128,
+						topLevelEntries: [{ label: "Push Buttons" }, { label: "Relays" }],
+					},
+				],
+				supportScripts: [],
+				databaseInventories: [],
+				sampleDrawings: [],
+				demoProjects: [],
+			},
+		});
+
+		expect(markdown).toContain("ACE_PANEL_MENU_GB.DAT");
+		expect(markdown).toContain("ACE_PANEL_MENU_IEC-60617.DAT");
+		expect(markdown).toContain("ACE_JIC_MENU.DAT");
+
+		const panelSectionStart = markdown.indexOf("### Panel Layout Menus");
+		const schematicSectionStart = markdown.indexOf("### Schematic Standards");
+		expect(panelSectionStart).toBeGreaterThan(-1);
+		expect(schematicSectionStart).toBeGreaterThan(-1);
+
+		const gbPosition = markdown.indexOf("ACE_PANEL_MENU_GB.DAT");
+		const iecPosition = markdown.indexOf("ACE_PANEL_MENU_IEC-60617.DAT");
+		const jicPosition = markdown.indexOf("ACE_JIC_MENU.DAT");
+
+		expect(gbPosition).toBeGreaterThan(panelSectionStart);
+		expect(iecPosition).toBeGreaterThan(panelSectionStart);
+		expect(jicPosition).toBeGreaterThan(schematicSectionStart);
+	});
 });

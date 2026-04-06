@@ -106,4 +106,130 @@ describe("AutoCAD Electrical menu index generator", () => {
 			utility: ["location_symbols"],
 		});
 	});
+
+	it("classifies ACE_PANEL_MENU_GB.DAT as panel kind with panel_layout family", () => {
+		const payload = buildMenuIndexFromInstallationSummary({
+			generatedAt: "2026-04-06T00:00:00.000Z",
+			menuSummaries: [
+				{
+					fileName: "ACE_PANEL_MENU_GB.DAT",
+					firstPageTitle: "Panel Layout Symbols",
+					pageCount: 17,
+					totalEntryCount: 128,
+					submenuCount: 16,
+					commandActionCount: 112,
+					symbolInsertCount: 0,
+					topLevelEntries: [
+						{ label: "Push Buttons" },
+						{ label: "Selector Switches" },
+						{ label: "Limit Switches" },
+						{ label: "Relays" },
+						{ label: "Pressure/ Temperature Switches" },
+					],
+				},
+			],
+		});
+
+		expect(payload.counts.menus).toBe(1);
+		expect(payload.counts.byKind).toMatchObject({ panel: 1, schematic: 0 });
+		expect(payload.menus[0]).toMatchObject({
+			fileName: "ACE_PANEL_MENU_GB.DAT",
+			kind: "panel",
+			familyId: "panel_layout",
+			familyLabel: "Panel Layout",
+			isLegacy: false,
+			symbolInsertCount: 0,
+			commandActionCount: 112,
+			totalEntryCount: 128,
+		});
+		expect(payload.menus[0].topCategories).toContain("Push Buttons");
+		expect(payload.menus[0].topCategories).toContain("Relays");
+		expect(payload.recommendedDefaults.panel).toContain("panel_layout");
+	});
+
+	it("classifies ACE_PANEL_MENU_IEC-60617.DAT as panel kind with iec_60617 family", () => {
+		const payload = buildMenuIndexFromInstallationSummary({
+			generatedAt: "2026-04-06T00:00:00.000Z",
+			menuSummaries: [
+				{
+					fileName: "ACE_PANEL_MENU_IEC-60617.DAT",
+					firstPageTitle: "Panel Layout Symbols",
+					pageCount: 17,
+					totalEntryCount: 128,
+					submenuCount: 16,
+					commandActionCount: 112,
+					symbolInsertCount: 0,
+					topLevelEntries: [
+						{ label: "Push Buttons" },
+						{ label: "Selector Switches" },
+						{ label: "Limit Switches" },
+						{ label: "Relays" },
+						{ label: "Pressure/ Temperature Switches" },
+					],
+				},
+			],
+		});
+
+		expect(payload.counts.menus).toBe(1);
+		expect(payload.counts.byKind).toMatchObject({ panel: 1, schematic: 0 });
+		expect(payload.menus[0]).toMatchObject({
+			fileName: "ACE_PANEL_MENU_IEC-60617.DAT",
+			kind: "panel",
+			familyId: "iec_60617",
+			familyLabel: "IEC 60617",
+			isLegacy: false,
+			symbolInsertCount: 0,
+			commandActionCount: 112,
+			totalEntryCount: 128,
+		});
+		expect(payload.menus[0].topCategories).toContain("Push Buttons");
+		expect(payload.menus[0].topCategories).toContain("Relays");
+		// iec_60617 is not in the panel recommendedDefaults list (panel_layout/legacy_panel);
+		// the panel family is correctly identified via familyId on the menu entry itself.
+		expect(payload.recommendedDefaults.panel).not.toContain("iec_60617");
+	});
+
+	it("separates ACE_PANEL_MENU_GB.DAT and ACE_PANEL_MENU_IEC-60617.DAT into distinct panel families", () => {
+		const payload = buildMenuIndexFromInstallationSummary({
+			generatedAt: "2026-04-06T00:00:00.000Z",
+			menuSummaries: [
+				{
+					fileName: "ACE_PANEL_MENU_GB.DAT",
+					firstPageTitle: "Panel Layout Symbols",
+					pageCount: 17,
+					totalEntryCount: 128,
+					submenuCount: 16,
+					commandActionCount: 112,
+					symbolInsertCount: 0,
+					topLevelEntries: [{ label: "Push Buttons" }, { label: "Relays" }],
+				},
+				{
+					fileName: "ACE_PANEL_MENU_IEC-60617.DAT",
+					firstPageTitle: "Panel Layout Symbols",
+					pageCount: 17,
+					totalEntryCount: 128,
+					submenuCount: 16,
+					commandActionCount: 112,
+					symbolInsertCount: 0,
+					topLevelEntries: [{ label: "Push Buttons" }, { label: "Relays" }],
+				},
+			],
+		});
+
+		expect(payload.counts.menus).toBe(2);
+		expect(payload.counts.byKind).toMatchObject({ panel: 2, schematic: 0 });
+
+		const gb = payload.menus.find((m) => m.fileName === "ACE_PANEL_MENU_GB.DAT");
+		const iec = payload.menus.find((m) => m.fileName === "ACE_PANEL_MENU_IEC-60617.DAT");
+
+		expect(gb).toBeDefined();
+		expect(gb).toMatchObject({ kind: "panel", familyId: "panel_layout" });
+
+		expect(iec).toBeDefined();
+		expect(iec).toMatchObject({ kind: "panel", familyId: "iec_60617" });
+
+		const familyIds = payload.families.map((s) => s.id);
+		expect(familyIds).toContain("panel_layout");
+		expect(familyIds).toContain("iec_60617");
+	});
 });

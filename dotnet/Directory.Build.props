@@ -1,0 +1,6 @@
+<Project>
+  <!-- Allow dotnet restore on Linux for projects targeting net*-windows (e.g. Dependabot NuGet updates). -->
+  <PropertyGroup>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>

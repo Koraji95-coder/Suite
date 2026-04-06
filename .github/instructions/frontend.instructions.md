@@ -1,0 +1,11 @@
+---
+applyTo: "src/**/*.ts,src/**/*.tsx"
+---
+- Use CSS Modules for styling, never Tailwind
+- ESM imports only, CommonJS is banned
+- `noExplicitAny` is an error — always type explicitly
+- Double quotes, tab indentation
+- Biome is the only linter/formatter — never add ESLint or Prettier
+- Feature code goes in `src/features/<name>/`
+- Route entries go in `src/routes/`
+- Shared UI components go in `src/components/system/`

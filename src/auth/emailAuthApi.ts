@@ -82,16 +82,11 @@ export async function requestEmailAuthLink(
 				message = candidate;
 			}
 		} catch (jsonError) {
-			const rawText = (await response.text().catch(() => "")).trim();
-			if (rawText) {
-				message = rawText;
-			} else {
-				logger.warn(
-					"Email auth API response was not JSON; using generic error.",
-					"emailAuthApi",
-					{ error: jsonError },
-				);
-			}
+			logger.warn(
+				"Email auth API response was not JSON; using generic error.",
+				"emailAuthApi",
+				{ error: jsonError },
+			);
 		}
 
 		throw new Error(message);

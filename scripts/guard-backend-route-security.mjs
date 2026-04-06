@@ -6,6 +6,7 @@ const root = process.cwd();
 // Expand this list as more route groups are remediated and covered by the
 // focused security pytest slice.
 const monitoredFiles = [
+	"backend/route_groups/api_auth_email.py",
 	"backend/route_groups/api_autodraft.py",
 	"backend/route_groups/api_automation_recipes.py",
 	"backend/route_groups/api_batch_find_replace.py",

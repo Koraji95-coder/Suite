@@ -13,6 +13,7 @@ This section is for operational and support docs. It is not the canonical home f
 ## Canonical Docs
 
 - [Documentation Structure and Move Rules](./documentation-structure.md)
+- [CI/CD Pipeline and Automation Workflow](./ci-cd-pipeline.md)
 - [Supabase Local/Hosted Workflow](./supabase-local-hosted-workflow.md)
 - [Command Center](./command-center.md)
 - [Conduit Terminal Label Sync Rollout](./conduit-terminal-label-sync-rollout.md)

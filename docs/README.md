@@ -34,6 +34,7 @@ This is the canonical entry point for repository documentation. People and tooli
 - [Windows Workstation Bring-Up](./runtime-control/workstation-bringup.md)
 - [MCP Workstation Matrix](./runtime-control/mcp-workstation-matrix.md)
 - [Performance Insights](<./frontend/Performance Insights.md>)
+- [CI/CD Pipeline and Automation Workflow](./development/ci-cd-pipeline.md)
 - [Code Scanning & Security Quality Guide](./security/code-scanning-guide.md)
 - [Docker Image Vulnerability Remediation](./security/docker-image-vulnerability-remediation.md)
 

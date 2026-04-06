@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from backend.runtime_paths import (
     is_absolute_path_value,
@@ -56,6 +57,56 @@ class TestRuntimePaths(unittest.TestCase):
             joined_path,
             r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project\wddemo.wdp",
         )
+
+    # --- resolve_runtime_directory edge cases ---
+
+    def test_resolve_runtime_directory_returns_none_for_nonexistent_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            # Path does not exist and cannot be suffix-matched under repo_root
+            resolved = resolve_runtime_directory(
+                "/nonexistent/suite/test/missing",
+                repo_root=repo_root,
+            )
+            self.assertIsNone(resolved)
+
+    def test_resolve_runtime_directory_returns_none_for_file_not_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            file_path = Path(temp_dir) / "test_file.txt"
+            file_path.write_text("data")
+            resolved = resolve_runtime_directory(str(file_path))
+            self.assertIsNone(resolved)
+
+    def test_resolve_runtime_directory_follows_symlink_to_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_dir = Path(temp_dir) / "real_dir"
+            real_dir.mkdir()
+            link_path = Path(temp_dir) / "link_to_dir"
+            link_path.symlink_to(real_dir)
+            resolved = resolve_runtime_directory(str(link_path))
+            self.assertIsNotNone(resolved)
+            self.assertEqual(resolved, link_path.resolve())
+
+    def test_resolve_runtime_directory_returns_none_for_symlink_to_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_file = Path(temp_dir) / "real_file.txt"
+            real_file.write_text("data")
+            link_path = Path(temp_dir) / "link_to_file"
+            link_path.symlink_to(real_file)
+            resolved = resolve_runtime_directory(str(link_path))
+            self.assertIsNone(resolved)
+
+    def test_resolve_runtime_directory_returns_none_on_permission_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            test_dir = Path(temp_dir) / "restricted_dir"
+            test_dir.mkdir()
+            with patch.object(Path, "is_dir", side_effect=PermissionError("access denied")):
+                resolved = resolve_runtime_directory(str(test_dir))
+            self.assertIsNone(resolved)
+
+    def test_resolve_runtime_directory_returns_none_for_empty_string(self) -> None:
+        resolved = resolve_runtime_directory("")
+        self.assertIsNone(resolved)
 
 
 if __name__ == "__main__":

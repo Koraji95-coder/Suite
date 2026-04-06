@@ -71,3 +71,44 @@ Key rules:
 - Run the PII audit grep from `CODEX.md` before every commit.
 - When regenerating manifests or generated files, verify the output doesn't re-introduce PII from source docs.
 
+## How to validate a change
+
+Run this sequence in order before opening a PR:
+
+1. `npm ci` — install dependencies
+2. `npm run check` — lint + typecheck + guards + env parity
+3. `npm run test:unit` — Vitest unit tests
+4. `npm run build` — production build
+5. If editing `backend/route_groups/`, also run `npm run check:security:routes`
+6. Before any push: `npm run check:prepush`
+7. If `npm run check` fails on docs or architecture verification, run `npm run docs:manifest:ensure` and `npm run arch:ensure` to regenerate stale artifacts, then re-run `npm run check`
+
+## How to add a new feature
+
+1. Create the feature module under `src/features/<feature-name>/`
+2. Add a route entry under `src/routes/`
+3. Write unit tests alongside the feature (colocated `*.test.ts` files)
+4. Use CSS Modules for styling (never Tailwind)
+5. Run the full validation sequence above
+
+## How to add a new backend endpoint
+
+1. Add the route in the appropriate `backend/route_groups/` file
+2. Add pytest coverage in `backend/tests/`
+3. Run `npm run check:security:routes` to validate security
+4. Update `scripts/guard-backend-route-security.mjs` if adding a new route group
+
+## How tests work
+
+- **Frontend:** Vitest + Testing Library, run with `npm run test:unit`
+- **Backend:** pytest, run with `python -m pytest backend/tests/`
+- **E2E:** Playwright, run with `npm run test:e2e`
+- Test files are the #1 source of PII leaks — always use generic data (see PII section above)
+
+## Common mistakes Copilot should avoid
+
+- Don't use absolute Windows paths in test fixtures — use relative paths from `output/`
+- Don't add ESLint, Prettier, or Tailwind — this repo uses Biome and CSS Modules exclusively
+- Don't mix the managed lane (`workstation:bootstrap`) with the dev lane (`dev:full`)
+- Don't hand-edit generated manifests — regenerate via `npm run docs:manifest:ensure` or `npm run arch:ensure` and verify the output
+

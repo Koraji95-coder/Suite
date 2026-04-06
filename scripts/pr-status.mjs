@@ -29,6 +29,16 @@ const includeOffice = args.includes("--office");
 const customRepoIdx = args.indexOf("--repo");
 const customRepo = customRepoIdx !== -1 ? args[customRepoIdx + 1] ?? null : null;
 
+if (customRepoIdx !== -1 && !customRepo) {
+	console.error("pr-status: --repo requires a value in the form owner/repo (e.g. Koraji95-coder/Suite).");
+	process.exit(1);
+}
+
+if (customRepo && !/^[^/]+\/[^/]+$/.test(customRepo)) {
+	console.error(`pr-status: invalid --repo value "${customRepo}". Expected format: owner/repo (e.g. Koraji95-coder/Suite).`);
+	process.exit(1);
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SUITE_REPO = "Koraji95-coder/Suite";
@@ -75,7 +85,11 @@ function ghJson(ghArgs) {
 	}
 
 	if (result.status !== 0) {
-		const detail = result.stderr.trim() || `gh exited with code ${result.status}`;
+		// Always include exit code; append stderr when it contains useful detail.
+		const stderr = result.stderr.trim();
+		const detail = stderr
+			? `gh exited with code ${result.status}: ${stderr}`
+			: `gh exited with code ${result.status}`;
 		throw new Error(detail);
 	}
 
@@ -87,12 +101,24 @@ function ghJson(ghArgs) {
 /**
  * Maps a PR title to a coarse category for grouping in the report.
  * Priority: security > fix > docs > tests > chore > wip > other.
+ *
+ * "security" uses a word-boundary regex (/\bsecurity\b/) to avoid false
+ * positives from unrelated words that contain "security" as a substring
+ * (e.g. "insecurity", "cybersecurity tooling").
+ *
  * @param {string} title
  * @returns {"security"|"fix"|"docs"|"tests"|"chore"|"wip"|"other"}
  */
 function categorizePr(title) {
 	const t = title.toLowerCase();
-	if (t.startsWith("fix(security)") || t.startsWith("[security]") || t.includes("security")) {
+	// Explicit security-scoped prefixes take highest priority, then a word-
+	// boundary match on "security" anywhere in the title.
+	if (
+		t.startsWith("fix(security)") ||
+		t.startsWith("security:") ||
+		t.startsWith("[security]") ||
+		/\bsecurity\b/.test(t)
+	) {
 		return "security";
 	}
 	if (t.startsWith("fix(") || t.startsWith("fix:")) return "fix";
@@ -202,8 +228,13 @@ async function reportRepo(repo) {
 			"number,title,isDraft,state,headRefName,createdAt,labels,author",
 		]);
 	} catch (err) {
-		// Non-fatal for the overall run; continue to the next repo.
-		console.error(`  Error fetching PRs from ${repo}: ${err.message}`);
+		// Provide a targeted hint when the repo doesn't exist or isn't accessible.
+		const msg = err.message.toLowerCase();
+		const hint =
+			msg.includes("not found") || msg.includes("could not resolve") || msg.includes("does not exist")
+				? ` (repo not found or not accessible — check the name and your gh auth scope)`
+				: "";
+		console.error(`  Error fetching PRs from ${repo}: ${err.message}${hint}`);
 		return;
 	}
 

@@ -1,6 +1,6 @@
 {
 	"schemaVersion": "suite.developer-docs.v1",
-	"generatedAt": "2026-04-06T00:44:44.074Z",
+	"generatedAt": "2026-04-06T03:47:51.386Z",
 	"docCount": 56,
 	"sections": [
 		{
@@ -15,9 +15,7 @@
 					"summary": "This section is the canonical home for browser-owned architecture, ownership maps, and UI/runtime flow notes.",
 					"relativePath": "docs/frontend/README.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": true
 				},
 				{
@@ -26,9 +24,7 @@
 					"summary": "This is the running log for frontend performance and diagnostics fixes. Append future dates here instead of creating one-off notes.",
 					"relativePath": "docs/frontend/Performance Fix Log.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -37,9 +33,7 @@
 					"summary": "This document now tracks active frontend performance follow-ups only. Items that were fixed move to Performance Fix Log.",
 					"relativePath": "docs/frontend/Performance Insights.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -48,9 +42,7 @@
 					"summary": "This is the consolidated frontend architecture note for the project-owned browser surfaces.",
 					"relativePath": "docs/frontend/project-architecture.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				},
 				{
@@ -59,9 +51,7 @@
 					"summary": "This is the consolidated frontend architecture note for the specialist workflow surfaces that sit outside the core project shell.",
 					"relativePath": "docs/frontend/workflow-architecture.md",
 					"sectionId": "frontend-app",
-					"tags": [
-						"frontend-app"
-					],
+					"tags": ["frontend-app"],
 					"startHere": false
 				}
 			]
@@ -78,10 +68,7 @@
 					"summary": "This folder tracks the migration from a one-off Python COM script to a staged",
 					"relativePath": "docs/autodraft/README.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": true
 				},
 				{
@@ -90,10 +77,7 @@
 					"summary": "This document defines when to switch from current staged AutoDraft behavior to",
 					"relativePath": "docs/autodraft/execute-cutover.md",
 					"sectionId": "automation-lab",
-					"tags": [
-						"automation",
-						"automation-lab"
-					],
+					"tags": ["automation", "automation-lab"],
 					"startHere": false
 				}
 			]
@@ -110,9 +94,7 @@
 					"summary": "This section is the canonical home for hosted-core Python API and service ownership.",
 					"relativePath": "docs/backend/README.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": true
 				},
 				{
@@ -121,9 +103,7 @@
 					"summary": "This note captures concrete local-learning opportunities for Suite if and when review-assistive ML work is resumed.",
 					"relativePath": "docs/backend/local-learning-opportunities.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": false
 				},
 				{
@@ -132,9 +112,7 @@
 					"summary": "This is the canonical backend note for the hosted-core project standards profile and native-review slice.",
 					"relativePath": "docs/backend/project-standards-profile.md",
 					"sectionId": "backend-core",
-					"tags": [
-						"backend-core"
-					],
+					"tags": ["backend-core"],
 					"startHere": false
 				}
 			]
@@ -151,9 +129,7 @@
 					"summary": "This section is the canonical home for workstation-local companion behavior, bring-up, transfer, and local action ownership.",
 					"relativePath": "docs/runtime-control/README.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": true
 				},
 				{
@@ -162,9 +138,7 @@
 					"summary": "Suite now uses a deliberate hybrid runtime model with two supported startup lanes.",
 					"relativePath": "docs/runtime-control/local-vs-container-ownership.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -173,9 +147,7 @@
 					"summary": "Canonical workstation profile data lives in tools/suite-repo-mcp/workstation-profiles.json.",
 					"relativePath": "docs/runtime-control/mcp-workstation-matrix.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -184,9 +156,7 @@
 					"summary": "This is the canonical Runtime Control note for the workstation-local project standards review handoff.",
 					"relativePath": "docs/runtime-control/project-standards-native-review.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -195,9 +165,7 @@
 					"summary": "Use this when setting up Suite on a new Windows workstation or when standardizing an existing machine onto the cross-workstation layout.",
 					"relativePath": "docs/runtime-control/workstation-bringup.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -206,9 +174,7 @@
 					"summary": "Use this to keep DEV-HOME and DEV-WORK functionally identical without trying to copy machine-only state that should stay local.",
 					"relativePath": "docs/runtime-control/workstation-settings-parity.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runtime-control"
-					],
+					"tags": ["runtime-control"],
 					"startHere": false
 				},
 				{
@@ -217,10 +183,7 @@
 					"summary": "Use this when moving active development between Windows workstations and you want the destination machine to pick up:",
 					"relativePath": "docs/runtime-control/workstation-transfer-runbook.md",
 					"sectionId": "runtime-control",
-					"tags": [
-						"runbook",
-						"runtime-control"
-					],
+					"tags": ["runbook", "runtime-control"],
 					"startHere": false
 				}
 			]
@@ -237,9 +200,7 @@
 					"summary": "This section is the canonical home for AutoCAD execution, local CAD transport, and workstation-CAD integration references.",
 					"relativePath": "docs/cad/README.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": true
 				},
 				{
@@ -248,10 +209,7 @@
 					"summary": "This note is the canonical inventory of local-only Autodesk material under C:\\Program Files\\Autodesk\\AutoCAD 2026 that is useful to Suite architecture and CAD/runtime work.",
 					"relativePath": "docs/cad/autodesk-local-install-reference.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"autodesk",
-						"cad-local"
-					],
+					"tags": ["autodesk", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -260,10 +218,7 @@
 					"summary": "This is the canonical comparison between Autodesk's built-in standards surfaces and Suite's standards-checker workflow.",
 					"relativePath": "docs/cad/autodesk-standards-checker-comparison.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"autodesk",
-						"cad-local"
-					],
+					"tags": ["autodesk", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -272,10 +227,7 @@
 					"summary": "Status: this is a compatibility/reference doc for backend-served local AutoCAD status and coordinates endpoints. Project setup/title block local actions no longer use a backend-owned folder-picker model; they go through ",
 					"relativePath": "docs/cad/coordinates-grabber-api.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"api",
-						"cad-local"
-					],
+					"tags": ["api", "cad-local"],
 					"startHere": false
 				},
 				{
@@ -284,9 +236,7 @@
 					"summary": "This is the canonical runtime note for the Drawing Cleanup workflow that now lives inside Batch Find & Replace.",
 					"relativePath": "docs/cad/drawing-cleanup.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": false
 				},
 				{
@@ -295,9 +245,7 @@
 					"summary": "Status: this is the canonical low-level reference for explicit diagnostic/manual bridge validation. Project setup/title block, project standards review, AutoDraft / automation-recipe markup apply, terminal authoring prev",
 					"relativePath": "docs/cad/named-pipe-bridge.md",
 					"sectionId": "cad-local",
-					"tags": [
-						"cad-local"
-					],
+					"tags": ["cad-local"],
 					"startHere": false
 				}
 			]
@@ -314,9 +262,7 @@
 					"summary": "This section is for operational and support docs. It is not the canonical home for runtime architecture when an owning section already exists.",
 					"relativePath": "docs/development/README.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": true
 				},
 				{
@@ -325,12 +271,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the installed Autodesk CHM help.",
 					"relativePath": "docs/development/AutoCAD Electrical 2026 AutoLISP Reference API Documentation.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"api",
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["api", "autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -339,11 +280,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the installed Autodesk AutoCAD Electrical payload on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-installation-context-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -352,11 +289,7 @@
 					"summary": "Generated at 2026-04-02T17:24:57.376Z.",
 					"relativePath": "docs/development/autocad-electrical-2026-reference-pack.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -365,11 +298,7 @@
 					"summary": "Generated from allowlisted wrapped Autodesk Offline Help payloads under C:\\Program Files\\Autodesk\\Offline Help for AutoCAD Electrical 2026 - English. This focused reference is the authoritative Suite-side doc for ACADE p",
 					"relativePath": "docs/development/autocad-electrical-2026-project-flow-reference.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -378,11 +307,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the local ACADE install summary on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-regression-fixtures.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -391,11 +316,7 @@
 					"summary": "Do not edit this file manually. Regenerate it from the locally installed ACADE reference set on the workstation.",
 					"relativePath": "docs/development/autocad-electrical-2026-suite-integration-playbook.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"autocad",
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["autocad", "developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -404,9 +325,7 @@
 					"summary": "Command Center is the developer-only diagnostics toolshed for Suite.",
 					"relativePath": "docs/development/command-center.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -415,10 +334,7 @@
 					"summary": "This runbook now documents the post-cutover state for conduit terminal label sync. The staged bridge rollout is complete; dotnet-backed label sync now uses the in-process ACADE host, and the old bridge endpoint remains o",
 					"relativePath": "docs/development/conduit-terminal-label-sync-rollout.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"rollout"
-					],
+					"tags": ["developer-workshop", "rollout"],
 					"startHere": false
 				},
 				{
@@ -427,9 +343,7 @@
 					"summary": "This document defines the permanent documentation move/archive policy for Suite.",
 					"relativePath": "docs/development/documentation-structure.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -438,10 +352,7 @@
 					"summary": "Use this before the first focused test pass of the new R3P Electrical v1 drawing-program workflow.",
 					"relativePath": "docs/development/electrical-drawing-program-test-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"electrical"
-					],
+					"tags": ["developer-workshop", "electrical"],
 					"startHere": false
 				},
 				{
@@ -450,10 +361,7 @@
 					"summary": "Use this when automation needs access to protected /app/ routes without",
 					"relativePath": "docs/development/playwright-auth-bootstrap.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"auth",
-						"developer-workshop"
-					],
+					"tags": ["auth", "developer-workshop"],
 					"startHere": false
 				},
 				{
@@ -462,10 +370,7 @@
 					"summary": "Use this checklist before exposing the app to non-dev users.",
 					"relativePath": "docs/development/public-rollout-readiness.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"rollout"
-					],
+					"tags": ["developer-workshop", "rollout"],
 					"startHere": false
 				},
 				{
@@ -474,10 +379,7 @@
 					"summary": "Suite now treats local and hosted Supabase as explicit targets instead of one blended runtime.",
 					"relativePath": "docs/development/supabase-local-hosted-workflow.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop",
-						"supabase"
-					],
+					"tags": ["developer-workshop", "supabase"],
 					"startHere": false
 				},
 				{
@@ -486,9 +388,7 @@
 					"summary": "This repo can use Vercel for a frontend-only preview deployment.",
 					"relativePath": "docs/development/vercel-frontend-preview.md",
 					"sectionId": "developer-workshop",
-					"tags": [
-						"developer-workshop"
-					],
+					"tags": ["developer-workshop"],
 					"startHere": false
 				}
 			]
@@ -505,9 +405,7 @@
 					"summary": "This section is the canonical home for auth, passkey, Supabase security, secrets guidance, and security scanning runbooks.",
 					"relativePath": "docs/security/README.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": true
 				},
 				{
@@ -516,11 +414,7 @@
 					"summary": "2. Auth method telemetry expansion",
 					"relativePath": "docs/security/auth-readiness-checklist.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"checklist",
-						"security-auth"
-					],
+					"tags": ["auth", "checklist", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -529,10 +423,7 @@
 					"summary": "Auth method telemetry is written to activitylog.action with this format:",
 					"relativePath": "docs/security/auth-telemetry.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"security-auth"
-					],
+					"tags": ["auth", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -541,9 +432,7 @@
 					"summary": "This guide explains why Suite runs automated code scanning, what the scanners catch, how to run them locally, and how to prevent future alerts.",
 					"relativePath": "docs/security/code-scanning-guide.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -552,9 +441,7 @@
 					"summary": "This document summarizes the CodeQL security and quality alerts that were identified and fixed across the Suite codebase.",
 					"relativePath": "docs/security/codeql-remediation-report.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -563,9 +450,7 @@
 					"summary": "This document is the canonical home for scanning and remediating container-image vulnerabilities in Suite.",
 					"relativePath": "docs/security/docker-image-vulnerability-remediation.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -574,9 +459,7 @@
 					"summary": "This project uses environment variables for runtime configuration and keeps secrets out of source control.",
 					"relativePath": "docs/security/environment-and-secrets.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -585,10 +468,7 @@
 					"summary": "Passkeys are the target primary login method, but rollout should avoid lockout risk and preserve operational stability.",
 					"relativePath": "docs/security/passkey-rollout-plan.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"rollout",
-						"security-auth"
-					],
+					"tags": ["rollout", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -597,9 +477,7 @@
 					"summary": "All original exception details remain available server-side via",
 					"relativePath": "docs/security/stack-trace-exposure-remediation.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -608,10 +486,7 @@
 					"summary": "This is the canonical auth reference for Suite after agent retirement.",
 					"relativePath": "docs/security/auth-architecture-canonical.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"auth",
-						"security-auth"
-					],
+					"tags": ["auth", "security-auth"],
 					"startHere": false
 				},
 				{
@@ -620,9 +495,7 @@
 					"summary": "This document is the Suite-side source of truth for external passkey callback wiring.",
 					"relativePath": "docs/security/passkey-external-callback-contract.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth"
-					],
+					"tags": ["security-auth"],
 					"startHere": false
 				},
 				{
@@ -631,10 +504,7 @@
 					"summary": "This is the execution flow to apply Suite database/storage hardening and verify isolation.",
 					"relativePath": "docs/security/supabase-apply-and-verify.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -643,11 +513,7 @@
 					"summary": "Browser or terminal logs can repeat:",
 					"relativePath": "docs/security/supabase-clock-skew-runbook.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"runbook",
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["runbook", "security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -656,11 +522,7 @@
 					"summary": "Use this when Supabase returns 429 email rate limit exceeded for auth emails.",
 					"relativePath": "docs/security/supabase-custom-smtp-runbook.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"runbook",
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["runbook", "security-auth", "supabase"],
 					"startHere": false
 				},
 				{
@@ -669,10 +531,7 @@
 					"summary": "This runbook applies row-level security hardening for user-owned records (projects, tasks, files, calendar events, activity logs, settings).",
 					"relativePath": "docs/security/supabase-rls-hardening.md",
 					"sectionId": "security-auth",
-					"tags": [
-						"security-auth",
-						"supabase"
-					],
+					"tags": ["security-auth", "supabase"],
 					"startHere": false
 				}
 			]
@@ -689,9 +548,7 @@
 					"summary": "This section is for historical notes only. Files here may explain how older implementations worked, but they should not be treated as the canonical guide for active development.",
 					"relativePath": "docs/archive/legacy/README.md",
 					"sectionId": "legacy-archive",
-					"tags": [
-						"legacy-archive"
-					],
+					"tags": ["legacy-archive"],
 					"startHere": true
 				},
 				{
@@ -700,10 +557,7 @@
 					"summary": "Historical-only note. This document should not be used as the implementation guide for active AutoWire work.",
 					"relativePath": "docs/archive/legacy/autowire-legacy-artifacts-archive.md",
 					"sectionId": "legacy-archive",
-					"tags": [
-						"automation",
-						"legacy-archive"
-					],
+					"tags": ["automation", "legacy-archive"],
 					"startHere": false
 				}
 			]
@@ -720,9 +574,7 @@
 					"summary": "This is the canonical entry point for repository documentation. People and tooling should start here, then move into the owning section README before drilling into individual notes.",
 					"relativePath": "docs/README.md",
 					"sectionId": "workspace-docs",
-					"tags": [
-						"workspace-docs"
-					],
+					"tags": ["workspace-docs"],
 					"startHere": true
 				}
 			]

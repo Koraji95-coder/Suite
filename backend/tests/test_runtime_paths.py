@@ -13,6 +13,79 @@ from backend.runtime_paths import (
 from backend.watchdog.filesystem import ensure_absolute_roots
 
 
+class TestNormalizeRuntimePath(unittest.TestCase):
+    # ------------------------------------------------------------------
+    # Empty / blank inputs
+    # ------------------------------------------------------------------
+
+    def test_empty_string_returns_empty(self) -> None:
+        self.assertEqual(normalize_runtime_path(""), "")
+
+    def test_whitespace_only_returns_empty(self) -> None:
+        self.assertEqual(normalize_runtime_path("   "), "")
+
+    # ------------------------------------------------------------------
+    # Windows absolute paths
+    # ------------------------------------------------------------------
+
+    def test_windows_absolute_normalizes_case_and_backslashes(self) -> None:
+        # ntpath.normcase lowercases and enforces backslash separators
+        result = normalize_runtime_path(r"C:\Users\Dev\Documents")
+        self.assertEqual(result, r"c:\users\dev\documents")
+
+    def test_windows_absolute_converts_forward_slashes_to_backslashes(self) -> None:
+        result = normalize_runtime_path("C:/Users/Dev/Documents")
+        self.assertEqual(result, r"c:\users\dev\documents")
+
+    def test_windows_absolute_collapses_dotdot_segments(self) -> None:
+        result = normalize_runtime_path(r"C:\Users\Dev\..\Documents")
+        self.assertEqual(result, r"c:\users\documents")
+
+    def test_windows_absolute_strips_leading_whitespace(self) -> None:
+        result = normalize_runtime_path(r"  C:\Users\Dev\Documents  ")
+        self.assertEqual(result, r"c:\users\dev\documents")
+
+    # ------------------------------------------------------------------
+    # UNC Windows paths
+    # ------------------------------------------------------------------
+
+    def test_unc_path_normalizes_case(self) -> None:
+        result = normalize_runtime_path(r"\\Server\Share\Folder")
+        self.assertEqual(result, r"\\server\share\folder")
+
+    # ------------------------------------------------------------------
+    # POSIX absolute paths
+    # ------------------------------------------------------------------
+
+    def test_posix_absolute_preserved(self) -> None:
+        result = normalize_runtime_path("/suite-test/output/project")
+        self.assertEqual(result, "/suite-test/output/project")
+
+    def test_posix_absolute_trailing_slash_stripped(self) -> None:
+        result = normalize_runtime_path("/suite-test/output/project/")
+        self.assertEqual(result, "/suite-test/output/project")
+
+    def test_posix_absolute_collapses_dotdot_segments(self) -> None:
+        result = normalize_runtime_path("/suite-test/output/../project")
+        self.assertEqual(result, "/suite-test/project")
+
+    def test_posix_absolute_collapses_dot_segments(self) -> None:
+        result = normalize_runtime_path("/suite-test/./output/./project")
+        self.assertEqual(result, "/suite-test/output/project")
+
+    # ------------------------------------------------------------------
+    # Relative paths
+    # ------------------------------------------------------------------
+
+    def test_relative_path_backslashes_converted_to_forward_slashes(self) -> None:
+        result = normalize_runtime_path("output\\autodesk-acade\\project")
+        self.assertEqual(result, "output/autodesk-acade/project")
+
+    def test_relative_posix_path_returned_unchanged(self) -> None:
+        result = normalize_runtime_path("output/autodesk-acade/project")
+        self.assertEqual(result, "output/autodesk-acade/project")
+
+
 class TestRuntimePaths(unittest.TestCase):
     def test_is_absolute_path_value_supports_windows_and_posix(self) -> None:
         self.assertTrue(is_absolute_path_value(r"C:\Users\Dev\Documents\GitHub\Suite"))

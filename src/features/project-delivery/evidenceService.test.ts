@@ -505,6 +505,193 @@ describe("projectDeliveryEvidenceService", () => {
 		expect(packet.automation.latestReceipt?.requestId).toBe("req-123");
 	});
 
+	it("tracks multiple warnings across selected drawings in the evidence chain", () => {
+		const scanRows = createScanRows();
+		const selectedRow = scanRows[0];
+		if (!selectedRow) throw new Error("fixture missing scan row");
+
+		const issueSet = createIssueSet();
+		const multiWarnIssueSet = {
+			...issueSet,
+			selectedDrawingPaths: [
+				selectedRow.relativePath,
+				"Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
+			],
+			selectedRegisterRowIds: ["register-row-1"],
+			selectedDrawingNumbers: ["PROJ-00001-E0-0001", "PROJ-00001-E0-0002"],
+		};
+
+		const warnChecks: DrawingAnnotation[] = [
+			{
+				id: "ann-warn-1",
+				drawing_name: "PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0001 - DRAWING INDEX.dwg",
+				annotations: [
+					{
+						type: "layer",
+						severity: "warning" as const,
+						message: "Layer naming issue",
+						location: "Sheet 1",
+					},
+				],
+				qa_status: "warning",
+				checked_at: "2026-03-21T00:00:00.000Z",
+				checked_by: "QA",
+				rules_applied: ["Layer Standards"],
+				issues_found: 1,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+			{
+				id: "ann-warn-2",
+				drawing_name: "PROJ-00001-E0-0002 - ONE LINE.dwg",
+				file_path: "/Issued/PROJ-00001-E0-0002 - ONE LINE.dwg",
+				annotations: [
+					{
+						type: "text",
+						severity: "warning" as const,
+						message: "Missing revision cloud",
+						location: "Sheet 2",
+					},
+				],
+				qa_status: "warning",
+				checked_at: "2026-03-21T00:00:00.000Z",
+				checked_by: "QA",
+				rules_applied: ["Revision Standards"],
+				issues_found: 1,
+				created_at: "2026-03-21T00:00:00.000Z",
+			},
+		];
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: multiWarnIssueSet,
+			registerSnapshot: createRegisterSnapshot(),
+			scanRows,
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
+			revisions: createRevisions(),
+			telemetry: createTelemetry(),
+			standardsChecks: warnChecks,
+			nativeStandardsReview: null,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.standards.matchedDrawingCount).toBe(2);
+		expect(packet.standards.warningCount).toBe(2);
+		expect(packet.standards.passCount).toBe(0);
+		expect(packet.standards.failCount).toBe(0);
+		expect(packet.standards.checks[0]?.qaStatus).toBe("warning");
+		expect(packet.standards.checks[0]?.issues[0]?.message).toBe(
+			"Layer naming issue",
+		);
+		expect(packet.standards.checks[1]?.qaStatus).toBe("warning");
+		expect(packet.standards.checks[1]?.issues[0]?.message).toBe(
+			"Missing revision cloud",
+		);
+	});
+
+	it("excludes decisions scoped to a different issue set", () => {
+		const crossSetDecisions = [
+			{
+				id: "decision-x1",
+				projectId: "project-1",
+				issueSetId: "other-issue-set",
+				itemId: "title-block:row-1",
+				itemType: "title-block" as const,
+				fingerprint: "title-block:row-1",
+				status: "accepted" as const,
+				note: null,
+				createdAt: "2026-03-21T00:00:00.000Z",
+				updatedAt: "2026-03-21T00:00:00.000Z",
+			},
+			{
+				id: "decision-x2",
+				projectId: "project-1",
+				issueSetId: "other-issue-set",
+				itemId: "standards:ann-1",
+				itemType: "standards" as const,
+				fingerprint: "standards:ann-1",
+				status: "waived" as const,
+				note: null,
+				createdAt: "2026-03-21T00:00:00.000Z",
+				updatedAt: "2026-03-21T00:00:00.000Z",
+			},
+		];
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
+			scanRows: createScanRows(),
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
+			revisions: createRevisions(),
+			telemetry: createTelemetry(),
+			standardsChecks: createStandardsChecks(),
+			nativeStandardsReview: createNativeStandardsReview(),
+			decisions: crossSetDecisions,
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.reviewDecisions.acceptedTitleBlockCount).toBe(0);
+		expect(packet.reviewDecisions.waivedStandardsCount).toBe(0);
+		expect(packet.reviewDecisions.items).toHaveLength(0);
+		expect(packet.titleBlock.drawings[0]?.acceptedForPackage).toBe(false);
+	});
+
+	it("captures native standards review warnings in the evidence chain", () => {
+		const nativeReviewWithWarnings = {
+			...createNativeStandardsReview(),
+			warnings: [
+				"No .dws standards files were found under the project root.",
+				"One or more drawings could not be opened for inspection.",
+			],
+			results: [
+				{
+					standardId: "nec-210",
+					status: "warning" as const,
+					message: "Project-level standards review found follow-up items.",
+				},
+				{
+					standardId: "nec-250",
+					status: "warning" as const,
+					message: "Grounding conductor sizing requires review.",
+				},
+			],
+			overallStatus: "warning" as const,
+		};
+
+		const packet = buildProjectIssueSetEvidencePacket({
+			project: createProject(),
+			issueSet: createIssueSet(),
+			registerSnapshot: createRegisterSnapshot(),
+			scanRows: createScanRows(),
+			scanProfile: createScanProfile(),
+			scanArtifacts: createArtifacts(),
+			revisions: createRevisions(),
+			telemetry: createTelemetry(),
+			standardsChecks: createStandardsChecks(),
+			nativeStandardsReview: nativeReviewWithWarnings,
+			decisions: [],
+			transmittalReceipts: [],
+			automationReceipts: [],
+		});
+
+		expect(packet.standards.nativeReview.hasReview).toBe(true);
+		expect(packet.standards.nativeReview.overallStatus).toBe("warning");
+		expect(packet.standards.nativeReview.warningCount).toBe(2);
+		expect(packet.standards.nativeReview.messages).toHaveLength(4);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"No .dws standards files were found under the project root.",
+		);
+		expect(packet.standards.nativeReview.messages).toContain(
+			"Project-level standards review found follow-up items.",
+		);
+	});
+
 	it("renders a readable markdown evidence packet", () => {
 		const packet = buildProjectIssueSetEvidencePacket({
 			project: createProject(),

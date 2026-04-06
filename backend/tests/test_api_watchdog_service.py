@@ -579,6 +579,157 @@ class TestWatchdogMonitorService(unittest.TestCase):
                 "file_modified",
             )
 
+    def test_collector_registration_persists_across_service_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            first_service = make_service(temp_dir)
+            first_service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-persist",
+                    "name": "Persistent Collector",
+                    "collectorType": "filesystem",
+                    "workstationId": "DEV-HOME",
+                },
+            )
+
+            second_service = make_service(temp_dir)
+            result = second_service.list_collectors("user:demo")
+            collector_ids = [
+                str(c.get("collectorId") or "")
+                for c in (result.get("collectors") or [])
+            ]
+            self.assertIn("collector-persist", collector_ids)
+
+    def test_event_deduplication_persists_across_service_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            now_ms = int(time.time() * 1000)
+            first_service = make_service(temp_dir)
+            first_service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "name": "Desktop Collector",
+                    "collectorType": "filesystem",
+                    "workstationId": "DEV-HOME",
+                },
+            )
+            first_service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "events": [
+                        {
+                            "eventKey": "dedup-evt-1",
+                            "eventType": "file_modified",
+                            "projectId": "project-1",
+                            "path": r"C:\\repo\\file.dwg",
+                            "timestamp": now_ms - 500,
+                        }
+                    ],
+                },
+            )
+
+            second_service = make_service(temp_dir)
+            second_service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "name": "Desktop Collector",
+                    "collectorType": "filesystem",
+                    "workstationId": "DEV-HOME",
+                },
+            )
+            result = second_service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "events": [
+                        {
+                            "eventKey": "dedup-evt-1",
+                            "eventType": "file_modified",
+                            "projectId": "project-1",
+                            "path": r"C:\\repo\\file.dwg",
+                            "timestamp": now_ms - 500,
+                        }
+                    ],
+                },
+            )
+            self.assertEqual(result.get("accepted"), 0)
+            self.assertEqual(result.get("duplicates"), 1)
+            listed = second_service.list_events("user:demo", project_id="project-1")
+            self.assertEqual(int(listed.get("count") or 0), 1)
+
+    def test_multiple_events_persist_across_service_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            now_ms = int(time.time() * 1000)
+            first_service = make_service(temp_dir)
+            first_service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "name": "Desktop Collector",
+                    "collectorType": "filesystem",
+                    "workstationId": "DEV-WORK",
+                },
+            )
+            first_service.register_collector(
+                "user:demo",
+                {
+                    "collectorId": "collector-b",
+                    "name": "CAD Collector",
+                    "collectorType": "autocad_state",
+                    "workstationId": "DEV-HOME",
+                },
+            )
+            first_service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-a",
+                    "events": [
+                        {
+                            "eventKey": "multi-evt-1",
+                            "eventType": "file_modified",
+                            "projectId": "project-multi",
+                            "path": r"C:\\repo\\drawing-a.dwg",
+                            "timestamp": now_ms - 2000,
+                        },
+                        {
+                            "eventKey": "multi-evt-2",
+                            "eventType": "file_modified",
+                            "projectId": "project-multi",
+                            "path": r"C:\\repo\\drawing-b.dwg",
+                            "timestamp": now_ms - 1500,
+                        },
+                    ],
+                },
+            )
+            first_service.ingest_collector_events(
+                "user:demo",
+                {
+                    "collectorId": "collector-b",
+                    "events": [
+                        {
+                            "eventKey": "multi-evt-3",
+                            "eventType": "drawing_opened",
+                            "projectId": "project-multi",
+                            "drawingPath": r"C:\\repo\\drawing-a.dwg",
+                            "timestamp": now_ms - 1000,
+                        },
+                    ],
+                },
+            )
+
+            second_service = make_service(temp_dir)
+            listed = second_service.list_events(
+                "user:demo", project_id="project-multi"
+            )
+            self.assertEqual(int(listed.get("count") or 0), 3)
+            event_types = [
+                str(e.get("eventType") or "") for e in (listed.get("events") or [])
+            ]
+            self.assertIn("file_modified", event_types)
+            self.assertIn("drawing_opened", event_types)
+
     def test_project_rules_attribute_filesystem_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             now_ms = int(time.time() * 1000)

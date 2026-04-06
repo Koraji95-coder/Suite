@@ -240,7 +240,7 @@ async function reportRepo(repo) {
 			"--state",
 			"open",
 			// gh paginates automatically for limits > 100; cap at 200 for typical repos.
-			// Increase this constant if the repo has more than 200 open PRs.
+			// Increase this limit if the repo has more than 200 open PRs.
 			"--limit",
 			"200",
 			"--json",

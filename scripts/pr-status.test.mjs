@@ -18,7 +18,7 @@ describe("categorizePr", () => {
 			expect(categorizePr("remove security leak in email auth")).toBe("security");
 		});
 		it("does not classify 'insecurity' as security (word boundary)", () => {
-			// 'insecurity' contains 'security' as a suffix — should fall through to 'other'
+			// 'insecurity' contains 'security' as a suffix — should fall through to 'fix'
 			expect(categorizePr("fix: address insecurity in the UX copy")).toBe("fix");
 		});
 	});

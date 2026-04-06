@@ -216,7 +216,7 @@ function createReceipt(
 		outputs: [
 			{
 				label: "PDF",
-				filename: "nanulak-ifc.pdf",
+				filename: "myproject-ifc.pdf",
 				size: 10_240,
 				createdAt: "2026-03-21T01:00:00.000Z",
 			},

@@ -39,6 +39,73 @@ class TestRuntimePaths(unittest.TestCase):
 
             self.assertEqual(resolved_directory, expected_directory.resolve())
 
+    def test_resolve_runtime_directory_maps_repo_suffix_from_posix_host_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+            expected_directory = (
+                runtime_repo_root
+                / "output"
+                / "autodesk-acade-regression-fixtures"
+                / "wddemo-project"
+                / "project"
+            )
+            expected_directory.mkdir(parents=True, exist_ok=True)
+
+            resolved_directory = resolve_runtime_directory(
+                "/workspace/Suite/output/autodesk-acade-regression-fixtures/wddemo-project/project",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertEqual(resolved_directory, expected_directory.resolve())
+
+    def test_resolve_runtime_directory_returns_none_when_candidate_is_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+            parent_dir = runtime_repo_root / "output" / "some-subdir"
+            parent_dir.mkdir(parents=True, exist_ok=True)
+            file_path = parent_dir / "file.txt"
+            file_path.write_text("content")
+
+            resolved_directory = resolve_runtime_directory(
+                r"X:\Workspace\Suite\output\some-subdir\file.txt",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertIsNone(resolved_directory)
+
+    def test_resolve_runtime_directory_returns_none_for_relative_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+
+            resolved_directory = resolve_runtime_directory(
+                "relative/path/to/something",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertIsNone(resolved_directory)
+
+    def test_resolve_runtime_directory_returns_none_for_empty_string(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+
+            resolved_directory = resolve_runtime_directory(
+                "",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertIsNone(resolved_directory)
+
+    def test_resolve_runtime_directory_returns_none_when_path_not_under_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+
+            resolved_directory = resolve_runtime_directory(
+                r"X:\Workspace\Suite\output\nonexistent-path\missing-dir",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertIsNone(resolved_directory)
+
     def test_ensure_absolute_roots_preserves_windows_roots_for_rule_sync(self) -> None:
         root_value = r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project"
 

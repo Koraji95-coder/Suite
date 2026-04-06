@@ -12,6 +12,8 @@ const monitoredFiles = [
 	"backend/route_groups/api_drawing_program.py",
 	"backend/route_groups/api_health.py",
 	"backend/route_groups/api_terminal_authoring.py",
+	"backend/route_groups/api_transmittal.py",
+	"backend/route_groups/api_transmittal_render.py",
 	"backend/route_groups/api_watchdog.py",
 	"backend/route_groups/api_work_ledger.py",
 ].map((relPath) => path.join(root, relPath));

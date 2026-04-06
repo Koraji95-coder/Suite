@@ -111,7 +111,7 @@
 		"test:unit": "vitest run",
 		"test:unit:watch": "vitest",
 		"test:unit:workstation": "node scripts/run-workstation-runtime-tests.mjs",
-		"test:python:security": "python -m pytest backend/tests/test_api_autocad_downloads.py backend/tests/test_api_autodraft_compare_replacements.py backend/tests/test_api_autodraft_execute_provider.py backend/tests/test_api_automation_recipes.py backend/tests/test_api_batch_find_replace.py backend/tests/test_api_drawing_program.py backend/tests/test_api_health.py backend/tests/test_api_terminal_authoring.py backend/tests/test_api_watchdog_security.py backend/tests/test_api_work_ledger.py",
+		"test:python:security": "python -m pytest backend/tests/test_api_autocad_downloads.py backend/tests/test_api_autodraft_compare_replacements.py backend/tests/test_api_autodraft_execute_provider.py backend/tests/test_api_automation_recipes.py backend/tests/test_api_batch_find_replace.py backend/tests/test_api_drawing_program.py backend/tests/test_api_health.py backend/tests/test_api_terminal_authoring.py backend/tests/test_api_transmittal.py backend/tests/test_api_transmittal_pdf_analysis.py backend/tests/test_api_watchdog_security.py backend/tests/test_api_work_ledger.py",
 		"test:e2e": "playwright test",
 		"test:e2e:dashboard:perf": "playwright test tests/e2e/dashboard-performance.spec.ts",
 		"test:e2e:list": "playwright test --list",

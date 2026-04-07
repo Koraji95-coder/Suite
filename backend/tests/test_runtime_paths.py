@@ -124,6 +124,82 @@ class TestRuntimePaths(unittest.TestCase):
             r"C:\Users\Dev\Documents\GitHub\Suite\output\autodesk-acade-regression-fixtures\wddemo-project\project\wddemo.wdp",
         )
 
+    def test_join_under_absolute_root_posix_root_single_part(self) -> None:
+        joined_path = join_under_absolute_root("/home/Dev/output", ["results.json"])
+
+        self.assertEqual(joined_path, "/home/Dev/output/results.json")
+
+    def test_join_under_absolute_root_posix_root_multiple_parts(self) -> None:
+        joined_path = join_under_absolute_root("/home/Dev/output", ["subdir", "results.json"])
+
+        self.assertEqual(joined_path, "/home/Dev/output/subdir/results.json")
+
+    def test_join_under_absolute_root_windows_root_multiple_parts(self) -> None:
+        joined_path = join_under_absolute_root(
+            r"C:\Users\Dev\Projects",
+            ["MyProject", "output", "report.txt"],
+        )
+
+        self.assertEqual(joined_path, r"C:\Users\Dev\Projects\MyProject\output\report.txt")
+
+    def test_join_under_absolute_root_empty_parts_returns_root_unchanged_windows(self) -> None:
+        root = r"C:\Users\Dev\Projects"
+
+        joined_path = join_under_absolute_root(root, [])
+
+        self.assertEqual(joined_path, root)
+
+    def test_join_under_absolute_root_empty_parts_returns_root_unchanged_posix(self) -> None:
+        root = "/home/Dev/output"
+
+        joined_path = join_under_absolute_root(root, [])
+
+        self.assertEqual(joined_path, root)
+
+    def test_join_under_absolute_root_filters_empty_string_parts(self) -> None:
+        joined_path = join_under_absolute_root("/home/Dev/output", ["", "results.json", ""])
+
+        self.assertEqual(joined_path, "/home/Dev/output/results.json")
+
+    def test_join_under_absolute_root_relative_base_returns_base_unchanged(self) -> None:
+        joined_path = join_under_absolute_root("relative/path", ["file.txt"])
+
+        self.assertEqual(joined_path, "relative/path")
+
+    def test_join_under_absolute_root_empty_base_returns_empty(self) -> None:
+        joined_path = join_under_absolute_root("", ["file.txt"])
+
+        self.assertEqual(joined_path, "")
+
+    def test_join_under_absolute_root_unc_path(self) -> None:
+        joined_path = join_under_absolute_root(r"\\DEV-SERVER\share\folder", ["file.txt"])
+
+        self.assertEqual(joined_path, r"\\DEV-SERVER\share\folder\file.txt")
+
+    def test_join_under_absolute_root_parent_traversal_kept_literally_windows(self) -> None:
+        # PureWindowsPath preserves '..' literally without resolving it
+        joined_path = join_under_absolute_root(r"C:\Users\Dev\Projects", ["..", "Other"])
+
+        self.assertEqual(joined_path, r"C:\Users\Dev\Projects\..\Other")
+
+    def test_join_under_absolute_root_parent_traversal_kept_literally_posix(self) -> None:
+        # PurePosixPath preserves '..' literally without resolving it
+        joined_path = join_under_absolute_root("/home/Dev/output", ["..", "results"])
+
+        self.assertEqual(joined_path, "/home/Dev/output/../results")
+
+    def test_join_under_absolute_root_absolute_part_overrides_base_windows(self) -> None:
+        # PureWindowsPath.joinpath replaces the path when a part is absolute
+        joined_path = join_under_absolute_root(r"C:\Users\Dev\Projects", [r"D:\Other"])
+
+        self.assertEqual(joined_path, r"D:\Other")
+
+    def test_join_under_absolute_root_absolute_part_overrides_base_posix(self) -> None:
+        # PurePosixPath.joinpath replaces the path when a part is absolute
+        joined_path = join_under_absolute_root("/home/Dev/output", ["/other"])
+
+        self.assertEqual(joined_path, "/other")
+
 
 if __name__ == "__main__":
     unittest.main()

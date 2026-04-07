@@ -188,6 +188,26 @@ npm run docs:manifest
 npm run arch:generate
 ```
 
+## CI/CD Pipeline
+
+Suite uses GitHub Actions for continuous integration. The pipeline runs on every push and pull request to `main` with four jobs: lint/typecheck, unit tests, production build, and Python smoke tests.
+
+Run the full validation locally before pushing:
+
+```bash
+npm run check          # lint, typecheck, guards, env parity, docs/arch artifacts
+npm run test:unit      # Vitest unit tests
+npm run build          # production build
+```
+
+For backend route changes, also run:
+
+```bash
+npm run check:security:routes
+```
+
+See [`docs/development/ci-cd-pipeline.md`](./docs/development/ci-cd-pipeline.md) for the full pipeline reference including testing strategy, security checks, and deployment process.
+
 ## Documentation Map
 
 Start here:

@@ -642,6 +642,310 @@ describe("ProjectReviewInboxWorkspace", () => {
 		});
 	});
 
+	it("shows native standards review with fail status as high-priority inbox item", async () => {
+		vi.mocked(projectRevisionRegisterService.fetchEntries).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectIssueSetService.fetchIssueSets).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectTransmittalReceiptService.fetchReceipts).mockResolvedValue(
+			{
+				data: [],
+				error: null,
+			},
+		);
+		vi.mocked(projectReviewDecisionService.fetchDecisions).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(fetchProjectStandardsEvidence).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(standardsCheckerBackendService.fetchLatestReview).mockResolvedValue(
+			{
+				data: {
+					id: "review-2",
+					projectId: "project-1",
+					userId: "user-1",
+					requestId: "req-456",
+					recordedAt: "2026-03-21T00:00:00.000Z",
+					cadFamilyId: "jic",
+					standardsCategory: "NEC",
+					selectedStandardIds: ["nec-110"],
+					results: [
+						{
+							standardId: "nec-110",
+							status: "fail",
+							message: "Critical wiring standard violation detected.",
+						},
+					],
+					warnings: [],
+					summary: {
+						inspectedDrawingCount: 6,
+					},
+					meta: {
+						source: "dotnet",
+					},
+					overallStatus: "fail",
+				},
+				error: null,
+			},
+		);
+		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
+			projectId: "project-1",
+			projectRootPath: "C:/Projects/MyProject",
+			profile: {
+				blockName: "R3P-24x36BORDER&TITLE",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
+				acadeLine2: "Issue for review",
+				acadeLine4: "",
+				signerDrawnBy: "KD",
+				signerCheckedBy: "QA",
+				signerEngineer: "",
+			},
+			summary: {
+				totalFiles: 12,
+				drawingFiles: 8,
+				flaggedFiles: 0,
+				suiteWriteCount: 0,
+				acadeWriteCount: 0,
+				wdTbConflictCount: 0,
+			},
+			artifacts: {
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
+				wdtText: "",
+				wdlText: "",
+			},
+			rows: [],
+			titleBlockRows: [],
+			warnings: [],
+		});
+
+		render(
+			<MemoryRouter>
+				<ProjectReviewInboxWorkspace
+					project={createProject()}
+					telemetry={createTelemetry()}
+					onOpenViewMode={vi.fn()}
+				/>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() =>
+			expect(screen.getByText("Project standards review")).toBeTruthy(),
+		);
+		expect(
+			screen.getAllByText("Critical wiring standard violation detected.").length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText(/6 drawings inspected/i).length).toBeGreaterThan(0);
+	});
+
+	it("does not show native standards review inbox item when overall status is pass", async () => {
+		vi.mocked(projectRevisionRegisterService.fetchEntries).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectIssueSetService.fetchIssueSets).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectTransmittalReceiptService.fetchReceipts).mockResolvedValue(
+			{
+				data: [],
+				error: null,
+			},
+		);
+		vi.mocked(projectReviewDecisionService.fetchDecisions).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(fetchProjectStandardsEvidence).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(standardsCheckerBackendService.fetchLatestReview).mockResolvedValue(
+			{
+				data: {
+					id: "review-3",
+					projectId: "project-1",
+					userId: "user-1",
+					requestId: "req-789",
+					recordedAt: "2026-03-21T00:00:00.000Z",
+					cadFamilyId: "jic",
+					standardsCategory: "NEC",
+					selectedStandardIds: ["nec-110", "nec-210"],
+					results: [
+						{
+							standardId: "nec-110",
+							status: "pass",
+							message: "All wiring standards passed.",
+						},
+					],
+					warnings: [],
+					summary: {
+						inspectedDrawingCount: 8,
+					},
+					meta: {
+						source: "dotnet",
+					},
+					overallStatus: "pass",
+				},
+				error: null,
+			},
+		);
+		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
+			projectId: "project-1",
+			projectRootPath: "C:/Projects/MyProject",
+			profile: {
+				blockName: "R3P-24x36BORDER&TITLE",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
+				acadeLine2: "Issue for review",
+				acadeLine4: "",
+				signerDrawnBy: "KD",
+				signerCheckedBy: "QA",
+				signerEngineer: "",
+			},
+			summary: {
+				totalFiles: 12,
+				drawingFiles: 8,
+				flaggedFiles: 0,
+				suiteWriteCount: 0,
+				acadeWriteCount: 0,
+				wdTbConflictCount: 0,
+			},
+			artifacts: {
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
+				wdtText: "",
+				wdlText: "",
+			},
+			rows: [],
+			titleBlockRows: [],
+			warnings: [],
+		});
+
+		render(
+			<MemoryRouter>
+				<ProjectReviewInboxWorkspace
+					project={createProject()}
+					telemetry={createTelemetry()}
+					onOpenViewMode={vi.fn()}
+				/>
+			</MemoryRouter>,
+		);
+
+		expect(await screen.findByText(/review inbox/i)).toBeTruthy();
+		await waitFor(() =>
+			expect(screen.queryByText("Project standards review")).toBeNull(),
+		);
+	});
+
+	it("shows drawing-level standards fail status as inbox item", async () => {
+		vi.mocked(projectRevisionRegisterService.fetchEntries).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectIssueSetService.fetchIssueSets).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(projectTransmittalReceiptService.fetchReceipts).mockResolvedValue(
+			{
+				data: [],
+				error: null,
+			},
+		);
+		vi.mocked(projectReviewDecisionService.fetchDecisions).mockResolvedValue({
+			data: [],
+			error: null,
+		});
+		vi.mocked(fetchProjectStandardsEvidence).mockResolvedValue({
+			data: [
+				{
+					id: "ann-fail",
+					drawing_name: "PROJ-00001-E1-0001 - SINGLE LINE DIAGRAM.dwg",
+					file_path:
+						"/Issued/PROJ-00001-E1-0001 - SINGLE LINE DIAGRAM.dwg",
+					annotations: [
+						{
+							type: "layer",
+							severity: "error",
+							message: "Prohibited layer name used",
+							location: "Sheet 2",
+						},
+					],
+					qa_status: "fail",
+					checked_at: "2026-03-21T00:00:00.000Z",
+					checked_by: "QA",
+					rules_applied: ["Layer Standards", "NEC-210"],
+					issues_found: 1,
+					created_at: "2026-03-21T00:00:00.000Z",
+				},
+			],
+			error: null,
+		});
+		vi.mocked(projectDocumentMetadataService.loadSnapshot).mockResolvedValue({
+			projectId: "project-1",
+			projectRootPath: "C:/Projects/MyProject",
+			profile: {
+				blockName: "R3P-24x36BORDER&TITLE",
+				projectRootPath: "C:/Projects/MyProject",
+				acadeLine1: "MyProject Substation",
+				acadeLine2: "Issue for review",
+				acadeLine4: "",
+				signerDrawnBy: "KD",
+				signerCheckedBy: "QA",
+				signerEngineer: "",
+			},
+			summary: {
+				totalFiles: 12,
+				drawingFiles: 8,
+				flaggedFiles: 1,
+				suiteWriteCount: 0,
+				acadeWriteCount: 0,
+				wdTbConflictCount: 0,
+			},
+			artifacts: {
+				wdtPath: "C:/Projects/MyProject/_suite/scan.wdt",
+				wdlPath: "C:/Projects/MyProject/_suite/scan.wdl",
+				wdtText: "",
+				wdlText: "",
+			},
+			rows: [],
+			titleBlockRows: [],
+			warnings: [],
+		});
+		vi.mocked(useToast).mockReturnValue({
+			showToast: vi.fn(),
+		});
+
+		render(
+			<MemoryRouter>
+				<ProjectReviewInboxWorkspace
+					project={createProject()}
+					telemetry={createTelemetry()}
+					onOpenViewMode={vi.fn()}
+				/>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() =>
+			expect(
+				screen.getByText("PROJ-00001-E1-0001 - SINGLE LINE DIAGRAM.dwg"),
+			).toBeTruthy(),
+		);
+		expect(
+			screen.getAllByText(/Prohibited layer name used/i).length,
+		).toBeGreaterThan(0);
+	});
+
 	it("shows package-level native standards review follow-up from hosted core", async () => {
 		const openViewMode = vi.fn();
 		vi.mocked(projectRevisionRegisterService.fetchEntries).mockResolvedValue({

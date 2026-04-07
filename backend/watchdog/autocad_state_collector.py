@@ -814,9 +814,9 @@ class AutoCadStateCollector:
             return {"ok": True, "skipped": True}
         try:
             result = self.register()
-        except Exception as exc:
+        except Exception:
             self._registration_verified = False
-            return {"ok": False, "error": str(exc)}
+            return {"ok": False, "error": "Registration failed"}
         self._registration_verified = True
         return result
 
@@ -831,7 +831,7 @@ class AutoCadStateCollector:
                 "accepted": 0,
                 "duplicates": 0,
                 "pending": len(self.state_store.load().get("pendingEvents") or []),
-                "error": str(exc),
+                "error": "Flush failed",
             }
 
     def _attempt_heartbeat(self, *, status: str) -> Dict[str, Any]:
@@ -840,7 +840,7 @@ class AutoCadStateCollector:
         except Exception as exc:
             if self._collector_missing_from_backend(exc):
                 self._registration_verified = False
-            return {"ok": False, "status": status, "error": str(exc)}
+            return {"ok": False, "status": status, "error": "Heartbeat failed"}
 
     def heartbeat(self, *, status: str = "online") -> Dict[str, Any]:
         state = self.state_store.load()

@@ -417,6 +417,41 @@ class TestApiPasskeyRuntime(unittest.TestCase):
         )
         self.assertIsNone(runtime.normalize_origin("not-a-url"))
 
+    def test_normalize_origin_edge_cases_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        # HTTP scheme is valid
+        self.assertEqual(
+            runtime.normalize_origin("http://app.example.com/path"),
+            "http://app.example.com",
+        )
+        # Port is preserved
+        self.assertEqual(
+            runtime.normalize_origin("https://app.example.com:8443/path"),
+            "https://app.example.com:8443",
+        )
+        # Subdomain is preserved
+        self.assertEqual(
+            runtime.normalize_origin("https://sub.app.example.com"),
+            "https://sub.app.example.com",
+        )
+        # Non-HTTP scheme returns None
+        self.assertIsNone(runtime.normalize_origin("ftp://example.com"))
+        # Empty string returns None
+        self.assertIsNone(runtime.normalize_origin(""))
+        # No scheme returns None
+        self.assertIsNone(runtime.normalize_origin("example.com/path"))
+        # Uppercase scheme is normalized by urlparse and accepted
+        self.assertEqual(
+            runtime.normalize_origin("HTTP://app.example.com/path"),
+            "http://app.example.com",
+        )
+
     def test_is_valid_rp_id_for_origin_via_runtime(self) -> None:
         runtime = _build_runtime(
             request_obj=_RequestStub(),
@@ -431,6 +466,132 @@ class TestApiPasskeyRuntime(unittest.TestCase):
         self.assertFalse(
             runtime.is_valid_webauthn_rp_id_for_origin("other.com", "https://app.example.com")
         )
+
+    def test_build_passkey_callback_signature_payload_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        payload = runtime.build_passkey_callback_signature_payload(
+            " state-token ",
+            "SIGN-IN",
+            "SUCCESS",
+            "USER@EXAMPLE.COM",
+            "line1\r\nline2",
+            1700000000,
+        )
+        self.assertEqual(
+            payload,
+            "state-token\nsign-in\nsuccess\nuser@example.com\nline1  line2\n1700000000",
+        )
+
+    def test_normalize_passkey_callback_timestamp_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        # Unix timestamp in seconds
+        self.assertEqual(runtime.normalize_passkey_callback_timestamp("1700000000"), 1700000000)
+        # Millisecond timestamp is converted to seconds
+        self.assertEqual(runtime.normalize_passkey_callback_timestamp("1700000000123"), 1700000000)
+        # Invalid format returns None
+        self.assertIsNone(runtime.normalize_passkey_callback_timestamp("bad"))
+        self.assertIsNone(runtime.normalize_passkey_callback_timestamp(""))
+
+    def test_normalize_absolute_http_url_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        # Path, query, and fragment are preserved
+        self.assertEqual(
+            runtime.normalize_absolute_http_url("https://example.com/path?q=1#frag"),
+            "https://example.com/path?q=1#frag",
+        )
+        # Non-HTTP scheme returns None
+        self.assertIsNone(runtime.normalize_absolute_http_url("mailto:user@example.com"))
+        # Relative URL returns None
+        self.assertIsNone(runtime.normalize_absolute_http_url("/path/only"))
+
+    def test_normalized_auth_passkey_allowed_origins_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        # The runtime was configured with ["https://app.example.com"]
+        origins = runtime.normalized_auth_passkey_allowed_origins()
+        self.assertEqual(origins, ["https://app.example.com"])
+
+    def test_resolve_passkey_webauthn_expected_origin_from_header(self) -> None:
+        request_obj = _RequestStub()
+        request_obj.headers["Origin"] = "https://app.example.com"
+        runtime = _build_runtime(
+            request_obj=request_obj,
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        origin, reason = runtime.resolve_passkey_webauthn_expected_origin()
+        self.assertEqual(origin, "https://app.example.com")
+        self.assertEqual(reason, "ok")
+
+    def test_resolve_passkey_webauthn_expected_origin_from_referer(self) -> None:
+        request_obj = _RequestStub()
+        request_obj.headers["Referer"] = "https://app.example.com/settings"
+        runtime = _build_runtime(
+            request_obj=request_obj,
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        origin, reason = runtime.resolve_passkey_webauthn_expected_origin()
+        self.assertEqual(origin, "https://app.example.com")
+        self.assertEqual(reason, "ok")
+
+    def test_resolve_passkey_webauthn_expected_origin_fallback(self) -> None:
+        # No Origin or Referer header — auth_email_redirect_url is used as a candidate
+        # and it is in the allowed list, so reason is "ok" (not "fallback")
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        origin, reason = runtime.resolve_passkey_webauthn_expected_origin()
+        self.assertEqual(origin, "https://app.example.com")
+        self.assertEqual(reason, "ok")
+
+    def test_resolve_passkey_webauthn_expected_origin_unauthorized_origin(self) -> None:
+        # Origin header points to an origin not in the allowed list.
+        # The resolver skips it and falls back to the auth_email_redirect_url candidate
+        # which IS in the allowed list, so reason is "ok".
+        request_obj = _RequestStub()
+        request_obj.headers["Origin"] = "https://unauthorized.example.com"
+        runtime = _build_runtime(
+            request_obj=request_obj,
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        origin, reason = runtime.resolve_passkey_webauthn_expected_origin()
+        self.assertEqual(origin, "https://app.example.com")
+        self.assertEqual(reason, "ok")
 
 
 if __name__ == "__main__":

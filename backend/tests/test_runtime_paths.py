@@ -274,5 +274,114 @@ class TestRuntimePaths(unittest.TestCase):
         self.assertEqual(joined_path, "/other")
 
 
+class TestJoinUnderAbsoluteRootIntegration(unittest.TestCase):
+    """Integration tests that exercise join_under_absolute_root with real
+    filesystem paths created by tempfile, verifying behaviour against
+    directories that either exist or are intentionally absent."""
+
+    # ------------------------------------------------------------------
+    # Existing-directory integration
+    # ------------------------------------------------------------------
+
+    def test_joined_path_exists_when_subdirectory_is_created(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subdir = Path(temp_dir) / "subproject"
+            subdir.mkdir()
+
+            joined = join_under_absolute_root(temp_dir, ["subproject"])
+
+            self.assertEqual(joined, str(subdir))
+            self.assertTrue(Path(joined).is_dir())
+
+    def test_joined_path_resolves_to_existing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_file = Path(temp_dir) / "results.json"
+            output_file.write_text("{}")
+
+            joined = join_under_absolute_root(temp_dir, ["results.json"])
+
+            self.assertEqual(joined, str(output_file))
+            self.assertTrue(Path(joined).is_file())
+
+    def test_joined_nested_path_exists_when_tree_is_created(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nested = Path(temp_dir) / "output" / "reports"
+            nested.mkdir(parents=True)
+
+            joined = join_under_absolute_root(temp_dir, ["output", "reports"])
+
+            self.assertEqual(joined, str(nested))
+            self.assertTrue(Path(joined).is_dir())
+
+    # ------------------------------------------------------------------
+    # Non-existent-directory integration
+    # ------------------------------------------------------------------
+
+    def test_joined_path_for_missing_subdirectory_is_still_returned(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            expected = str(Path(temp_dir) / "does-not-exist")
+
+            joined = join_under_absolute_root(temp_dir, ["does-not-exist"])
+
+            self.assertEqual(joined, expected)
+            self.assertFalse(Path(joined).exists())
+
+    def test_joined_path_for_missing_nested_parts_is_still_returned(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            expected = str(Path(temp_dir) / "missing" / "nested" / "dir")
+
+            joined = join_under_absolute_root(temp_dir, ["missing", "nested", "dir"])
+
+            self.assertEqual(joined, expected)
+            self.assertFalse(Path(joined).exists())
+
+    # ------------------------------------------------------------------
+    # Edge cases
+    # ------------------------------------------------------------------
+
+    def test_whitespace_only_part_is_passed_through(self) -> None:
+        # str("  ") is truthy so the implementation keeps whitespace-only parts
+        with tempfile.TemporaryDirectory() as temp_dir:
+            joined = join_under_absolute_root(temp_dir, ["  "])
+
+            # PurePosixPath joins it literally; the whitespace part is retained
+            self.assertIn("  ", joined)
+
+    def test_base_with_trailing_separator_is_normalised(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base_with_slash = temp_dir.rstrip("/") + "/"
+
+            joined = join_under_absolute_root(base_with_slash, ["output"])
+            joined_without = join_under_absolute_root(temp_dir, ["output"])
+
+            self.assertEqual(joined, joined_without)
+
+    # ------------------------------------------------------------------
+    # Integration with resolve_runtime_path
+    # ------------------------------------------------------------------
+
+    def test_joined_path_resolves_correctly_via_resolve_runtime_path(self) -> None:
+        from backend.runtime_paths import resolve_runtime_path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subdir = Path(temp_dir) / "project"
+            subdir.mkdir()
+
+            joined = join_under_absolute_root(temp_dir, ["project"])
+            resolved = resolve_runtime_path(joined)
+
+            self.assertIsNotNone(resolved)
+            self.assertEqual(resolved, subdir.resolve())
+
+    def test_joined_path_for_missing_dir_resolves_to_none(self) -> None:
+        from backend.runtime_paths import resolve_runtime_path
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            joined = join_under_absolute_root(temp_dir, ["nonexistent-subdir"])
+            resolved = resolve_runtime_path(joined)
+
+            self.assertIsNone(resolved)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,15 @@ blocks.
 
 **Total batch 1:** 20 exposure instances fixed + 1 global handler.
 
+## Files remediated — batch 4
+
+| File | Instances fixed | Notes |
+|---|---|---|
+| `api_auth_email.py` | 1 | `logger.warning(..., exc)` → `logger.exception(...)` + explicit `return` in except block |
+| `api_auth_email_support.py` | 1 | `logger.warning("... %s", exc)` → `logger.warning("...")` (logging-only, no HTTP exposure) |
+
+**Total batch 4:** 2 instances hardened; added `api_auth_email.py` to guard script; added `test_api_auth_email_security.py` to focused security pytest slice.
+
 ## Files remaining — future batches
 
 | File | Approx. instances | Notes |

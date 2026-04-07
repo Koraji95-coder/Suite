@@ -104,15 +104,15 @@ def create_auth_email_blueprint(
                 email_hash,
                 "yes" if client_redirect_to else "no",
             )
-        except Exception as exc:
-            logger.warning(
-                "Email auth request failed flow=%s ip=%s email_hash=%s redirect_supplied=%s: %s",
+        except Exception:
+            logger.exception(
+                "Email auth request failed flow=%s ip=%s email_hash=%s redirect_supplied=%s",
                 flow,
                 client_ip,
                 email_hash,
                 "yes" if client_redirect_to else "no",
-                exc,
             )
+            return _finalize(auth_email_generic_response(), 202)
 
         return _finalize(auth_email_generic_response(), 202)
 

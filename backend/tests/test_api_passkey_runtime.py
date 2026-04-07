@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import re
 import threading
@@ -22,6 +24,11 @@ class _LoggerStub:
         self.warnings.append((message, args))
 
 
+_SIG_PATTERN = re.compile(r"^[A-Fa-f0-9]{64}$")
+_TS_PATTERN = re.compile(r"^\d{10,13}$")
+_SIGNING_SECRET = "test-signing-secret"
+
+
 def _build_runtime(
     *,
     request_obj: _RequestStub,
@@ -29,6 +36,7 @@ def _build_runtime(
     callback_states: dict,
     webauthn_states: dict,
     require_signed_callback: bool,
+    signing_secret: str = _SIGNING_SECRET,
 ):
     return create_passkey_runtime(
         request_obj=request_obj,
@@ -48,10 +56,10 @@ def _build_runtime(
         auth_passkey_webauthn_state_max_entries=1000,
         passkey_credential_id_pattern=re.compile(r"^[A-Za-z0-9_-]{16,1024}$"),
         passkey_callback_state_pattern=re.compile(r"^[A-Za-z0-9_-]{20,200}$"),
-        passkey_callback_signature_pattern=re.compile(r"^[A-Fa-f0-9]{64}$"),
-        passkey_callback_timestamp_pattern=re.compile(r"^\d{10,13}$"),
+        passkey_callback_signature_pattern=_SIG_PATTERN,
+        passkey_callback_timestamp_pattern=_TS_PATTERN,
         auth_passkey_require_signed_callback=require_signed_callback,
-        auth_passkey_callback_signing_secret="secret",
+        auth_passkey_callback_signing_secret=signing_secret,
         auth_passkey_callback_signature_max_age_seconds=300,
         auth_passkey_callback_signature_max_clock_skew_seconds=90,
         auth_passkey_enabled=True,
@@ -67,6 +75,14 @@ def _build_runtime(
         auth_passkey_rp_name="Suite",
         webauthn_import_error="",
     )
+
+
+def _make_signature(secret: str, payload: str) -> str:
+    return hmac.new(
+        secret.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 class TestApiPasskeyRuntime(unittest.TestCase):
@@ -180,6 +196,241 @@ class TestApiPasskeyRuntime(unittest.TestCase):
             str(int(time.time())),
         )
         self.assertEqual((ok, reason), (True, "disabled"))
+
+    def test_verify_signature_success(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        payload = "\n".join([
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            str(timestamp),
+        ])
+        signature = _make_signature(_SIGNING_SECRET, payload)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_verify_signature_missing_secret(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+            signing_secret="",
+        )
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            "a" * 64,
+            str(int(time.time())),
+        )
+        self.assertEqual((ok, reason), (False, "missing-secret"))
+
+    def test_verify_signature_invalid_format(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            "not-a-valid-hex-signature",
+            str(int(time.time())),
+        )
+        self.assertEqual((ok, reason), (False, "invalid-signature-format"))
+
+    def test_verify_signature_invalid_timestamp_format(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            "a" * 64,
+            "not-a-timestamp",
+        )
+        self.assertEqual((ok, reason), (False, "invalid-timestamp-format"))
+
+    def test_verify_signature_timestamp_in_future(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        future_ts = int(time.time()) + 9999
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            "a" * 64,
+            str(future_ts),
+        )
+        self.assertEqual((ok, reason), (False, "timestamp-in-future"))
+
+    def test_verify_signature_timestamp_expired(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        expired_ts = int(time.time()) - 9999
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            "a" * 64,
+            str(expired_ts),
+        )
+        self.assertEqual((ok, reason), (False, "timestamp-expired"))
+
+    def test_verify_signature_mismatch(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        wrong_signature = _make_signature("wrong-secret", "arbitrary-payload")
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            wrong_signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (False, "signature-mismatch"))
+
+    def test_verify_signature_normalizes_email_and_case(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        payload = "\n".join([
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            str(timestamp),
+        ])
+        signature = _make_signature(_SIGNING_SECRET, payload)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "SIGN-IN",
+            "SUCCESS",
+            "USER@EXAMPLE.COM",
+            "",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_verify_signature_normalizes_error_message_whitespace(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        payload = "\n".join([
+            "state-token",
+            "error",
+            "failed",
+            "user@example.com",
+            "line1  line2",
+            str(timestamp),
+        ])
+        signature = _make_signature(_SIGNING_SECRET, payload)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "error",
+            "failed",
+            "user@example.com",
+            "line1\r\nline2",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_normalize_origin_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertEqual(
+            runtime.normalize_origin("https://app.example.com/path?q=1"),
+            "https://app.example.com",
+        )
+        self.assertIsNone(runtime.normalize_origin("not-a-url"))
+
+    def test_is_valid_rp_id_for_origin_via_runtime(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertTrue(
+            runtime.is_valid_webauthn_rp_id_for_origin("example.com", "https://app.example.com")
+        )
+        self.assertFalse(
+            runtime.is_valid_webauthn_rp_id_for_origin("other.com", "https://app.example.com")
+        )
 
 
 if __name__ == "__main__":

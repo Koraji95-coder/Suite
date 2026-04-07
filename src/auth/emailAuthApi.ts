@@ -9,12 +9,6 @@ export type EmailAuthRequestOptions = {
 	honeypot?: string;
 };
 
-type EmailLinkResponse = {
-	ok?: boolean;
-	message?: string;
-	error?: string;
-};
-
 type EmailLinkRequestPayload = {
 	email: string;
 	flow: EmailAuthFlow;
@@ -72,29 +66,12 @@ export async function requestEmailAuthLink(
 			return;
 		}
 
-		let message = "Unable to send email link right now. Please try again.";
-		try {
-			const errorPayload = (await response.clone().json()) as EmailLinkResponse;
-			const candidate = String(
-				errorPayload?.error || errorPayload?.message || "",
-			).trim();
-			if (candidate) {
-				message = candidate;
-			}
-		} catch (jsonError) {
-			const rawText = (await response.text().catch(() => "")).trim();
-			if (rawText) {
-				message = rawText;
-			} else {
-				logger.warn(
-					"Email auth API response was not JSON; using generic error.",
-					"emailAuthApi",
-					{ error: jsonError },
-				);
-			}
-		}
-
-		throw new Error(message);
+		logger.warn(
+			"Email auth API returned non-OK response; using generic error.",
+			"emailAuthApi",
+			{ status: response.status },
+		);
+		throw new Error("Unable to send email link right now. Please try again.");
 	} catch (error) {
 		const fallback = "Unable to send email link right now. Please try again.";
 		throw new Error(mapFetchErrorMessage(error, fallback));

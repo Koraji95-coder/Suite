@@ -499,5 +499,284 @@ class TestApiAutocadReferenceCatalog(unittest.TestCase):
         )
 
 
+class TestApiAutocadReferenceCatalogWithLegacyMenus(unittest.TestCase):
+    """Integration tests for legacy menu fallback behavior (ACE_IEC_MENU.DAT and related files)."""
+
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.menu_index_path = Path(self.temp_dir.name) / "autocad-electrical-2026-menu-index.generated.json"
+        self.lookup_index_path = Path(self.temp_dir.name) / "autocad-electrical-2026-lookup-index.generated.json"
+
+        # Fixture includes JIC (primary), IEC (fallback), Legacy IEC, and Legacy JIC menus.
+        self.menu_index_path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": "suite.autodesk.acade.menu-index.v1",
+                    "generatedAt": "2026-04-02T20:30:00.000Z",
+                    "source": {
+                        "installationContext": "docs/development/autocad-electrical-2026-installation-context-reference.md",
+                    },
+                    "availableKinds": ["schematic"],
+                    "recommendedDefaults": {
+                        "schematic": ["jic", "iec"],
+                        "panel": [],
+                        "process": [],
+                        "utility": [],
+                    },
+                    "families": [
+                        {
+                            "id": "jic",
+                            "label": "JIC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 555,
+                            "topCategories": ["Push Buttons", "PLC I/O"],
+                            "fileNames": ["ACE_JIC_MENU.DAT"],
+                            "includesLegacy": False,
+                        },
+                        {
+                            "id": "iec",
+                            "label": "IEC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 1118,
+                            "topCategories": ["Push Buttons", "Selector Switches", "Breakers/Disconnects"],
+                            "fileNames": ["ACE_IEC_MENU.DAT"],
+                            "includesLegacy": False,
+                        },
+                        {
+                            "id": "legacy_iec",
+                            "label": "Legacy IEC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 642,
+                            "topCategories": ["Push Buttons", "Selector Switches"],
+                            "fileNames": ["IEC_MENU.DAT"],
+                            "includesLegacy": True,
+                        },
+                        {
+                            "id": "legacy_jic",
+                            "label": "Legacy JIC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 535,
+                            "topCategories": ["Push Buttons", "Relays/Contacts"],
+                            "fileNames": ["WD_MENU.DAT"],
+                            "includesLegacy": True,
+                        },
+                    ],
+                    "standards": [
+                        {
+                            "id": "jic",
+                            "label": "JIC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 555,
+                            "topCategories": ["Push Buttons", "PLC I/O"],
+                            "fileNames": ["ACE_JIC_MENU.DAT"],
+                            "includesLegacy": False,
+                        },
+                        {
+                            "id": "iec",
+                            "label": "IEC",
+                            "kind": "schematic",
+                            "menuCount": 1,
+                            "totalEntryCount": 1118,
+                            "topCategories": ["Push Buttons", "Selector Switches", "Breakers/Disconnects"],
+                            "fileNames": ["ACE_IEC_MENU.DAT"],
+                            "includesLegacy": False,
+                        },
+                    ],
+                    "menus": [
+                        {
+                            "id": "ace-jic-menu-dat",
+                            "fileName": "ACE_JIC_MENU.DAT",
+                            "kind": "schematic",
+                            "familyId": "jic",
+                            "familyLabel": "JIC",
+                            "isLegacy": False,
+                            "title": "JIC: Schematic Symbols",
+                            "pageCount": 55,
+                            "totalEntryCount": 555,
+                            "submenuCount": 57,
+                            "commandActionCount": 68,
+                            "symbolInsertCount": 429,
+                            "topCategories": ["Push Buttons", "PLC I/O"],
+                        },
+                        {
+                            "id": "ace-iec-menu-dat",
+                            "fileName": "ACE_IEC_MENU.DAT",
+                            "kind": "schematic",
+                            "familyId": "iec",
+                            "familyLabel": "IEC",
+                            "isLegacy": False,
+                            "title": "IEC: Schematic Symbols",
+                            "pageCount": 104,
+                            "totalEntryCount": 1118,
+                            "submenuCount": 102,
+                            "commandActionCount": 221,
+                            "symbolInsertCount": 793,
+                            "topCategories": ["Push Buttons", "Selector Switches", "Breakers/Disconnects"],
+                        },
+                        {
+                            "id": "iec-menu-dat",
+                            "fileName": "IEC_MENU.DAT",
+                            "kind": "schematic",
+                            "familyId": "legacy_iec",
+                            "familyLabel": "Legacy IEC",
+                            "isLegacy": True,
+                            "title": "IEC Schematic Symbols (Legacy)",
+                            "pageCount": 50,
+                            "totalEntryCount": 642,
+                            "submenuCount": 48,
+                            "commandActionCount": 90,
+                            "symbolInsertCount": 504,
+                            "topCategories": ["Push Buttons", "Selector Switches"],
+                        },
+                        {
+                            "id": "wd-menu-dat",
+                            "fileName": "WD_MENU.DAT",
+                            "kind": "schematic",
+                            "familyId": "legacy_jic",
+                            "familyLabel": "Legacy JIC",
+                            "isLegacy": True,
+                            "title": "Schematic Symbols",
+                            "pageCount": 42,
+                            "totalEntryCount": 535,
+                            "submenuCount": 40,
+                            "commandActionCount": 80,
+                            "symbolInsertCount": 415,
+                            "topCategories": ["Push Buttons", "Relays/Contacts"],
+                        },
+                    ],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        # Minimal lookup index so the blueprint initialises without error.
+        self.lookup_index_path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": "suite.autodesk.acade.lookup-index.v1",
+                    "generatedAt": "2026-04-02T20:35:00.000Z",
+                    "source": {
+                        "installationContext": "docs/development/autocad-electrical-2026-installation-context-reference.md",
+                    },
+                    "availableRoleIds": [],
+                    "recommendedDefaults": {},
+                    "roles": [],
+                    "databases": [],
+                    "counts": {
+                        "databases": 0,
+                        "roles": 0,
+                        "tables": 0,
+                        "databasesWithErrors": 0,
+                    },
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        app = Flask(__name__)
+        app.config["TESTING"] = True
+        limiter = Limiter(
+            app=app,
+            key_func=lambda: "test-client",
+            default_limits=[],
+            storage_uri="memory://",
+            strategy="fixed-window",
+        )
+
+        def require_supabase_user(f):
+            def wrapped(*args, **kwargs):
+                g.supabase_user = {"id": "user-1", "email": "user@example.com"}
+                return f(*args, **kwargs)
+
+            wrapped.__name__ = getattr(f, "__name__", "wrapped")
+            return wrapped
+
+        app.register_blueprint(
+            create_autocad_reference_catalog_blueprint(
+                limiter=limiter,
+                logger=app.logger,
+                require_supabase_user=require_supabase_user,
+                menu_index_path=self.menu_index_path,
+                lookup_index_path=self.lookup_index_path,
+            )
+        )
+        self.client = app.test_client()
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    def test_menu_index_includes_iec_fallback_menu(self) -> None:
+        response = self.client.get("/api/autocad/reference/menu-index")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        self.assertTrue(bool(payload.get("success")))
+        menus = payload.get("menus") or []
+        file_names = [(m or {}).get("fileName") for m in menus]
+        self.assertIn("ACE_IEC_MENU.DAT", file_names)
+
+    def test_menu_index_filter_by_iec_family_returns_ace_iec_menu(self) -> None:
+        response = self.client.get("/api/autocad/reference/menu-index?kind=schematic&family=iec")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        menus = payload.get("menus") or []
+        self.assertEqual(len(menus), 1)
+        self.assertEqual((menus[0] or {}).get("fileName"), "ACE_IEC_MENU.DAT")
+        self.assertFalse((menus[0] or {}).get("isLegacy"))
+
+    def test_recommended_defaults_includes_iec_after_jic(self) -> None:
+        response = self.client.get("/api/autocad/reference/menu-index")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        schematic_defaults = (payload.get("recommendedDefaults") or {}).get("schematic") or []
+        self.assertIn("iec", schematic_defaults)
+        self.assertIn("jic", schematic_defaults)
+        self.assertLess(schematic_defaults.index("jic"), schematic_defaults.index("iec"))
+
+    def test_recommended_defaults_excludes_legacy_families(self) -> None:
+        response = self.client.get("/api/autocad/reference/menu-index")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        schematic_defaults = (payload.get("recommendedDefaults") or {}).get("schematic") or []
+        self.assertNotIn("legacy_iec", schematic_defaults)
+        self.assertNotIn("legacy_jic", schematic_defaults)
+
+    def test_standards_endpoint_includes_iec_family(self) -> None:
+        response = self.client.get("/api/autocad/reference/standards")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        self.assertTrue(bool(payload.get("success")))
+        standards = payload.get("standards") or []
+        standard_ids = [(s or {}).get("id") for s in standards]
+        self.assertIn("iec", standard_ids)
+
+    def test_legacy_menus_have_is_legacy_true(self) -> None:
+        response = self.client.get("/api/autocad/reference/menu-index")
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.get_json() or {}
+        menus = payload.get("menus") or []
+        menus_by_file = {(m or {}).get("fileName"): m for m in menus}
+
+        iec_menu = menus_by_file.get("ACE_IEC_MENU.DAT") or {}
+        self.assertFalse(iec_menu.get("isLegacy"), "ACE_IEC_MENU.DAT should not be flagged as legacy")
+
+        legacy_iec = menus_by_file.get("IEC_MENU.DAT") or {}
+        self.assertTrue(legacy_iec.get("isLegacy"), "IEC_MENU.DAT should be flagged as legacy")
+
+        legacy_jic = menus_by_file.get("WD_MENU.DAT") or {}
+        self.assertTrue(legacy_jic.get("isLegacy"), "WD_MENU.DAT should be flagged as legacy")
+
+
 if __name__ == "__main__":
     unittest.main()

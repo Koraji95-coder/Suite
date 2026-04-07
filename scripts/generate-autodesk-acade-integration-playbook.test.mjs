@@ -105,4 +105,56 @@ describe("AutoCAD Electrical integration playbook generator", () => {
 		expect(markdown).toContain("## Recommended Suite Feature Opportunities");
 		expect(markdown).toContain("## Suggested Next Steps");
 	});
+
+	it("renders fallback note for ACE_IEC_MENU.DAT and legacy menus when present", async () => {
+		const markdown = await buildAcadeIntegrationPlaybookMarkdown({
+			summary: {
+				generatedAt: "2026-04-02T19:00:00.000Z",
+				menuSummaries: [
+					{
+						fileName: "ACE_JIC_MENU.DAT",
+						firstPageTitle: "JIC: Schematic Symbols",
+						totalEntryCount: 555,
+						topLevelEntries: [{ label: "Push Buttons" }],
+					},
+					{
+						fileName: "ACE_IEC_MENU.DAT",
+						firstPageTitle: "IEC: Schematic Symbols",
+						totalEntryCount: 1118,
+						topLevelEntries: [
+							{ label: "Push Buttons" },
+							{ label: "Selector Switches" },
+							{ label: "Breakers/Disconnects" },
+						],
+					},
+					{
+						fileName: "IEC_MENU.DAT",
+						firstPageTitle: "IEC Schematic Symbols (Legacy)",
+						totalEntryCount: 642,
+						topLevelEntries: [
+							{ label: "Push Buttons" },
+							{ label: "Selector Switches" },
+						],
+					},
+					{
+						fileName: "WD_MENU.DAT",
+						firstPageTitle: "Schematic Symbols",
+						totalEntryCount: 535,
+						topLevelEntries: [{ label: "Push Buttons" }],
+					},
+				],
+				supportScripts: [],
+				databaseInventories: [],
+				sampleDrawings: [],
+				demoProjects: [],
+			},
+		});
+
+		expect(markdown).toContain("ACE_IEC_MENU.DAT");
+		expect(markdown).toContain("IEC_MENU.DAT");
+		expect(markdown).toContain("WD_MENU.DAT");
+		expect(markdown).toContain(
+			"Legacy/default menu path that still matters for fallback menu-loading behavior.",
+		);
+	});
 });

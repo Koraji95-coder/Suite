@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -272,6 +274,103 @@ class TestRuntimePaths(unittest.TestCase):
         joined_path = join_under_absolute_root("/home/Dev/output", ["/other"])
 
         self.assertEqual(joined_path, "/other")
+
+
+@unittest.skipIf(sys.platform == "win32", "symlink creation may require elevated privileges on Windows")
+class TestResolveRuntimeDirectorySymlinks(unittest.TestCase):
+    """Integration tests for resolve_runtime_directory with symbolic link paths."""
+
+    def test_symlink_to_directory_resolves_to_real_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_dir = Path(temp_dir) / "real_dir"
+            real_dir.mkdir()
+            link_path = Path(temp_dir) / "link_to_dir"
+            link_path.symlink_to(real_dir)
+
+            result = resolve_runtime_directory(
+                str(link_path),
+                repo_root=Path(temp_dir),
+            )
+
+            self.assertEqual(result, real_dir.resolve())
+
+    def test_symlink_to_file_returns_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_file = Path(temp_dir) / "real_file.txt"
+            real_file.write_text("content")
+            link_path = Path(temp_dir) / "link_to_file"
+            link_path.symlink_to(real_file)
+
+            result = resolve_runtime_directory(
+                str(link_path),
+                repo_root=Path(temp_dir),
+            )
+
+            self.assertIsNone(result)
+
+    def test_broken_symlink_returns_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nonexistent_target = Path(temp_dir) / "nonexistent_target"
+            broken_link = Path(temp_dir) / "broken_link"
+            broken_link.symlink_to(nonexistent_target)
+
+            result = resolve_runtime_directory(
+                str(broken_link),
+                repo_root=Path(temp_dir),
+            )
+
+            self.assertIsNone(result)
+
+    def test_chained_symlinks_resolve_to_real_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            real_dir = Path(temp_dir) / "real_dir"
+            real_dir.mkdir()
+            intermediate_link = Path(temp_dir) / "intermediate_link"
+            intermediate_link.symlink_to(real_dir)
+            final_link = Path(temp_dir) / "final_link"
+            final_link.symlink_to(intermediate_link)
+
+            result = resolve_runtime_directory(
+                str(final_link),
+                repo_root=Path(temp_dir),
+            )
+
+            self.assertEqual(result, real_dir.resolve())
+
+    def test_symlink_under_repo_root_suffix_resolves_correctly(self) -> None:
+        # The suffix-fallback branch is exercised when the direct path does not
+        # exist on the current filesystem (e.g. a Windows host path on Linux).
+        # A symlink placed at the matched suffix location must still be followed.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_repo_root = Path(temp_dir)
+            real_dir = runtime_repo_root / "output" / "real_project"
+            real_dir.mkdir(parents=True)
+            link_path = runtime_repo_root / "output" / "linked_project"
+            link_path.symlink_to(real_dir)
+
+            result = resolve_runtime_directory(
+                "/workspace/Suite/output/linked_project",
+                repo_root=runtime_repo_root,
+            )
+
+            self.assertEqual(result, real_dir.resolve())
+
+    def test_cross_root_symlink_resolves_to_external_directory(self) -> None:
+        # A symlink whose target lives outside the repo-root tree must still
+        # resolve as long as the target directory exists.
+        with tempfile.TemporaryDirectory() as temp_dir_a:
+            with tempfile.TemporaryDirectory() as temp_dir_b:
+                real_dir = Path(temp_dir_b) / "real_dir"
+                real_dir.mkdir()
+                link_path = Path(temp_dir_a) / "link_to_other_root"
+                link_path.symlink_to(real_dir)
+
+                result = resolve_runtime_directory(
+                    str(link_path),
+                    repo_root=Path(temp_dir_a),
+                )
+
+                self.assertEqual(result, real_dir.resolve())
 
 
 if __name__ == "__main__":

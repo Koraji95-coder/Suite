@@ -180,6 +180,22 @@ class TestApiAuthEmailSupport(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(len(logger.messages), 1)
 
+    def test_verify_turnstile_token_exception_log_is_static(self) -> None:
+        logger = _LoggerStub()
+        requests_stub = _RequestsStub(exc=RuntimeError("secret internal path C:\\Users\\Dev\\token.txt"))
+        verify_turnstile_token(
+            "token",
+            "127.0.0.1",
+            auth_email_turnstile_secret="secret",
+            auth_email_turnstile_verify_url="https://verify",
+            auth_email_turnstile_timeout_seconds=5,
+            requests_module=requests_stub,
+            logger=logger,
+        )
+        logged_text = " ".join(str(m) for m in logger.messages)
+        self.assertNotIn("token.txt", logged_text)
+        self.assertNotIn("secret internal path", logged_text)
+
 
 if __name__ == "__main__":
     unittest.main()

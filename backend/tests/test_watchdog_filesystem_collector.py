@@ -209,6 +209,27 @@ class TestFilesystemCollector(unittest.TestCase):
             self.assertEqual(len(pending_events), 1)
             self.assertEqual(str(pending_events[0].get("eventType") or ""), "file_added")
 
+    def test_attempt_error_fields_use_static_messages(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "root"
+            root.mkdir()
+            api_client = FakeCollectorApiClient()
+            api_client.fail_register = True
+            api_client.fail_heartbeat = True
+            collector = FilesystemCollector(
+                make_config(temp_dir, root),
+                api_client=api_client,
+            )
+
+            result = collector.run_once()
+
+            register_err = result["register"].get("error", "")
+            heartbeat_err = result["heartbeat"].get("error", "")
+            self.assertNotIn("backend unavailable", register_err)
+            self.assertNotIn("backend unavailable", heartbeat_err)
+            self.assertEqual(register_err, "Registration failed")
+            self.assertEqual(heartbeat_err, "Heartbeat failed")
+
 
 if __name__ == "__main__":
     unittest.main()

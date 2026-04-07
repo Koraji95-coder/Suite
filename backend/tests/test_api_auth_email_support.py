@@ -180,6 +180,27 @@ class TestApiAuthEmailSupport(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(len(logger.messages), 1)
 
+    def test_verify_turnstile_token_exception_does_not_expose_exc_text(self) -> None:
+        """Exception details must only be logged server-side; the return value must be a bool, not exception text."""
+        logger = _LoggerStub()
+        requests_stub = _RequestsStub(exc=RuntimeError("secret-internal-detail"))
+        result = verify_turnstile_token(
+            "token",
+            "127.0.0.1",
+            auth_email_turnstile_secret="secret",
+            auth_email_turnstile_verify_url="https://verify",
+            auth_email_turnstile_timeout_seconds=5,
+            requests_module=requests_stub,
+            logger=logger,
+        )
+        # Return value must be a plain bool — exception text is never returned to callers
+        self.assertIsInstance(result, bool)
+        self.assertIs(result, False)
+        # Exception detail is available server-side in the log (acceptable), not in the return value
+        self.assertEqual(len(logger.messages), 1)
+        _message, log_args = logger.messages[0]
+        self.assertIn("secret-internal-detail", str(log_args))
+
 
 if __name__ == "__main__":
     unittest.main()

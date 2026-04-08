@@ -63,6 +63,18 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from websocket_manager import WebSocketTicketManager
+from auth_helpers import (
+    build_require_supabase_user_decorator,
+    build_require_api_key_decorator,
+    build_autocad_auth_decorator,
+)
+from security_middleware import (
+    configure_app_cors,
+    build_after_request_security_headers,
+    resolve_limiter_config,
+)
+
 from route_groups import register_route_groups
 from route_groups.api_passkey_store_access import (
     fetch_active_passkey_by_credential_id as passkey_store_fetch_active_passkey_by_credential_id,
@@ -780,6 +792,14 @@ PASSKEY_WEBAUTHN_STATES_LOCK = server_state.passkey_webauthn_states_lock
 WEBSOCKET_TICKETS = server_state.websocket_tickets
 WEBSOCKET_TICKETS_LOCK = server_state.websocket_tickets_lock
 
+# ── WebSocket Ticket Manager ─────────────────────────────────────
+_ws_ticket_manager = WebSocketTicketManager(
+    ttl_seconds=WS_TICKET_TTL_SECONDS,
+    max_entries=WS_TICKET_MAX_ENTRIES,
+    bind_remote_addr=WS_TICKET_BIND_REMOTE_ADDR,
+    logger=logger,
+)
+
 
 # Passkey runtime wiring
 passkey_runtime = passkey_create_runtime_helper(
@@ -976,14 +996,8 @@ def _get_request_ip() -> str:
 
 
 def _prune_expired_ws_tickets_locked(now_ts: float) -> int:
-    expired_tokens: List[str] = []
-    for token, payload in WEBSOCKET_TICKETS.items():
-        expires_at = float(payload.get("expires_at") or 0.0)
-        if expires_at <= now_ts:
-            expired_tokens.append(token)
-    for token in expired_tokens:
-        WEBSOCKET_TICKETS.pop(token, None)
-    return len(expired_tokens)
+    # Delegated to _ws_ticket_manager; kept for backward compatibility.
+    return _ws_ticket_manager._prune_expired_locked(now_ts)  # noqa: SLF001
 
 
 def _issue_ws_ticket(
@@ -992,93 +1006,15 @@ def _issue_ws_ticket(
     auth_mode: str,
     remote_addr: str,
 ) -> Dict[str, Any]:
-    now_ts = time.time()
-    expires_at = now_ts + WS_TICKET_TTL_SECONDS
-    ticket_token = secrets.token_urlsafe(40)
-    auth_mode_value = str(auth_mode or "unknown").strip() or "unknown"
-    user_id_value = str(user_id or "").strip()
-    remote_addr_value = str(remote_addr or "unknown").strip() or "unknown"
-
-    with WEBSOCKET_TICKETS_LOCK:
-        _prune_expired_ws_tickets_locked(now_ts)
-
-        if len(WEBSOCKET_TICKETS) >= WS_TICKET_MAX_ENTRIES:
-            overflow = len(WEBSOCKET_TICKETS) - WS_TICKET_MAX_ENTRIES + 1
-            oldest_tokens = sorted(
-                WEBSOCKET_TICKETS.keys(),
-                key=lambda token: float(WEBSOCKET_TICKETS[token].get("issued_at") or 0.0),
-            )[:overflow]
-            for token in oldest_tokens:
-                WEBSOCKET_TICKETS.pop(token, None)
-            if oldest_tokens:
-                logger.warning(
-                    "Pruned %s websocket tickets due to capacity pressure (max=%s)",
-                    len(oldest_tokens),
-                    WS_TICKET_MAX_ENTRIES,
-                )
-
-        WEBSOCKET_TICKETS[ticket_token] = {
-            "user_id": user_id_value,
-            "auth_mode": auth_mode_value,
-            "remote_addr": remote_addr_value,
-            "issued_at": now_ts,
-            "expires_at": expires_at,
-        }
-
-    logger.info(
-        "Issued websocket ticket (user_id=%s, auth_mode=%s, remote=%s, ttl_seconds=%s)",
-        user_id_value or "unknown",
-        auth_mode_value,
-        remote_addr_value,
-        WS_TICKET_TTL_SECONDS,
+    return _ws_ticket_manager.issue_ticket(
+        user_id=user_id,
+        auth_mode=auth_mode,
+        remote_addr=remote_addr,
     )
-    return {
-        "ticket": ticket_token,
-        "expires_at": expires_at,
-        "ttl_seconds": WS_TICKET_TTL_SECONDS,
-    }
 
 
 def _consume_ws_ticket(ticket_token: str, remote_addr: str) -> Tuple[bool, str]:
-    token_value = str(ticket_token or "").strip()
-    remote_addr_value = str(remote_addr or "unknown").strip() or "unknown"
-    if not token_value:
-        return False, "missing"
-
-    now_ts = time.time()
-    with WEBSOCKET_TICKETS_LOCK:
-        _prune_expired_ws_tickets_locked(now_ts)
-        ticket_payload = WEBSOCKET_TICKETS.pop(token_value, None)
-
-    if not ticket_payload:
-        logger.warning("Rejected websocket ticket (remote=%s, reason=missing_or_used)", remote_addr_value)
-        return False, "missing_or_used"
-
-    expires_at = float(ticket_payload.get("expires_at") or 0.0)
-    if expires_at <= now_ts:
-        logger.warning("Rejected websocket ticket (remote=%s, reason=expired)", remote_addr_value)
-        return False, "expired"
-
-    issued_remote_addr = str(ticket_payload.get("remote_addr") or "").strip()
-    if (
-        WS_TICKET_BIND_REMOTE_ADDR
-        and issued_remote_addr
-        and issued_remote_addr != remote_addr_value
-    ):
-        logger.warning(
-            "Rejected websocket ticket (remote=%s, reason=ip_mismatch, issued_remote=%s)",
-            remote_addr_value,
-            issued_remote_addr,
-        )
-        return False, "ip_mismatch"
-
-    logger.info(
-        "Accepted websocket ticket (remote=%s, user_id=%s, auth_mode=%s)",
-        remote_addr_value,
-        str(ticket_payload.get("user_id") or "unknown"),
-        str(ticket_payload.get("auth_mode") or "unknown"),
-    )
-    return True, "ok"
+    return _ws_ticket_manager.consume_ticket(ticket_token, remote_addr)
 
 
 # Auth-email runtime wiring
@@ -1349,16 +1285,11 @@ def _verify_supabase_user_token(token: str) -> Optional[Dict[str, Any]]:
     return auth_runtime.verify_supabase_user_token(token)
 
 
-def require_supabase_user(f):
-    """Decorator to require a valid Supabase access token."""
-    return auth_runtime.require_supabase_user(f)
+require_supabase_user = build_require_supabase_user_decorator(auth_runtime)
 
+is_valid_api_key = security_runtime.is_valid_api_key
 
-def is_valid_api_key(provided_key: Optional[str]) -> bool:
-    return security_runtime.is_valid_api_key(provided_key)
-
-def require_api_key(f):
-    return security_runtime.require_api_key(f)
+require_api_key = build_require_api_key_decorator(security_runtime)
 
 
 def _decorate_autocad_auth_route(
@@ -1367,92 +1298,22 @@ def _decorate_autocad_auth_route(
     allow_api_key_fallback: bool,
     auth_label: str,
 ):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        remote_addr = _get_request_ip()
-        path = str(request.path or "")
-        method = str(request.method or "GET")
-        auth_header = str(request.headers.get("Authorization") or "").strip()
-
-        if auth_header and not auth_header.lower().startswith("bearer "):
-            logger.warning(
-                "%s auth rejected (invalid authorization scheme) %s %s from %s",
-                auth_label,
-                method,
-                path,
-                remote_addr,
-            )
-            return jsonify({"error": "Invalid Authorization header", "code": "AUTH_INVALID"}), 401
-
-        bearer_token = _get_bearer_token()
-        if bearer_token:
-            user = _verify_supabase_user_token(bearer_token)
-            if user is not None:
-                g.supabase_user = user
-                g.autocad_auth_mode = "bearer"
-                user_id = str(_get_supabase_user_id(user) or "unknown")
-                logger.info(
-                    "%s auth success via bearer %s %s from %s (user_id=%s)",
-                    auth_label,
-                    method,
-                    path,
-                    remote_addr,
-                    user_id,
-                )
-                return f(*args, **kwargs)
-
-            logger.warning(
-                "%s bearer token rejected %s %s from %s",
-                auth_label,
-                method,
-                path,
-                remote_addr,
-            )
-            if not allow_api_key_fallback:
-                return jsonify({"error": "Invalid bearer token", "code": "AUTH_INVALID"}), 401
-
-        provided_key = str(request.headers.get("X-API-Key") or "").strip()
-        if allow_api_key_fallback and provided_key:
-            if is_valid_api_key(provided_key):
-                g.autocad_auth_mode = "api_key"
-                logger.info(
-                    "%s auth success via API key fallback %s %s from %s",
-                    auth_label,
-                    method,
-                    path,
-                    remote_addr,
-                )
-                return f(*args, **kwargs)
-            logger.warning(
-                "%s API-key fallback rejected %s %s from %s",
-                auth_label,
-                method,
-                path,
-                remote_addr,
-            )
-            return jsonify({"error": "Invalid API key", "code": "AUTH_INVALID"}), 401
-
-        auth_required_message = (
-            "Authorization bearer token required"
-            if not allow_api_key_fallback
-            else "Authorization bearer token or API key required"
-        )
-        logger.warning(
-            "%s auth missing credentials %s %s from %s (api_key_fallback=%s)",
-            auth_label,
-            method,
-            path,
-            remote_addr,
-            allow_api_key_fallback,
-        )
-        return jsonify({"error": auth_required_message, "code": "AUTH_REQUIRED"}), 401
-
-    return decorated_function
+    # Delegates to auth_helpers.build_autocad_auth_decorator so the logic
+    # lives in a single place.
+    decorator = build_autocad_auth_decorator(
+        get_bearer_token_fn=_get_bearer_token,
+        verify_supabase_token_fn=_verify_supabase_user_token,
+        get_supabase_user_id_fn=_get_supabase_user_id,
+        is_valid_api_key_fn=is_valid_api_key,
+        allow_api_key_fallback=allow_api_key_fallback,
+        auth_label=auth_label,
+        logger=logger,
+    )
+    return decorator(f)
 
 
 def require_autocad_auth(f):
     """Decorator for AutoCAD routes: bearer-token auth first, optional API-key fallback."""
-
     return _decorate_autocad_auth_route(
         f,
         allow_api_key_fallback=AUTOCAD_ALLOW_API_KEY_FALLBACK,
@@ -1462,7 +1323,6 @@ def require_autocad_auth(f):
 
 def require_watchdog_collector_auth(f):
     """Decorator for non-interactive watchdog collectors."""
-
     return _decorate_autocad_auth_route(
         f,
         allow_api_key_fallback=True,

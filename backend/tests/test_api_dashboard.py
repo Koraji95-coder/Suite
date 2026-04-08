@@ -166,7 +166,8 @@ class TestApiDashboard(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         payload = response.get_json()
         self.assertIsInstance(payload, dict)
-        self.assertIn("error", payload)
+        self.assertFalse(payload.get("success", True))
+        self.assertIn("message", payload)
 
     def test_load_job_completes_and_returns_payload(self) -> None:
         headers = {"Authorization": "Bearer test-access-token"}

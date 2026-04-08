@@ -2088,7 +2088,7 @@ class TestApiRouteGroups(unittest.TestCase):
         self.assertEqual(bad_response.status_code, 400)
         bad_payload = bad_response.get_json()
         self.assertIsInstance(bad_payload, dict)
-        self.assertFalse(bad_payload.get("ok", True))
+        self.assertFalse(bad_payload.get("success", True))
 
         config_response = self.client.put(
             "/api/watchdog/config",

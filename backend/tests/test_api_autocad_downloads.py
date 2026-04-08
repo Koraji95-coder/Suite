@@ -118,7 +118,6 @@ class TestApiAutocadDownloads(unittest.TestCase):
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
         self.assertEqual(payload.get("code"), "WS_TICKET_ISSUE_FAILED")
-        self.assertEqual(payload.get("error"), "Failed to issue websocket ticket")
         self.assertEqual(payload.get("message"), "Failed to issue websocket ticket.")
         self.assertNotIn("secret boom", str(payload))
 

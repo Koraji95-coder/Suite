@@ -572,7 +572,7 @@ class TestApiWorkLedger(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertEqual(
-            payload.get("error"),
+            payload.get("message"),
             "Failed to bootstrap Worktale on this workstation.",
         )
         self.assertEqual(payload.get("code"), "WORK_LEDGER_WORKTALE_BOOTSTRAP_FAILED")

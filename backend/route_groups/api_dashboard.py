@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 from flask import Blueprint, g, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 
 from .api_supabase_service_request import (
@@ -448,14 +449,14 @@ def create_dashboard_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         token = _extract_bearer_token()
         if not token:
-            return jsonify({"error": "Authorization bearer token required."}), 401
+            return make_error_response("Authorization bearer token required.", status=401)
 
         if not supabase_url or not supabase_api_key:
-            return jsonify({"error": "Supabase backend credentials are not configured."}), 503
+            return make_error_response("Supabase backend credentials are not configured.", status=503)
 
         _cleanup_expired_jobs()
         job_id = _create_job(user_id)
@@ -485,12 +486,12 @@ def create_dashboard_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         _cleanup_expired_jobs()
         job = _get_job(job_id)
         if not job or str(job.get("user_id") or "") != user_id:
-            return jsonify({"error": "Dashboard load job not found."}), 404
+            return make_error_response("Dashboard load job not found.", status=404)
 
         payload: Dict[str, Any] = {
             "ok": True,

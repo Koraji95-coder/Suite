@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from flask import Blueprint, Response, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 from werkzeug.utils import secure_filename
 
@@ -74,30 +75,25 @@ def create_backup_blueprint(
     @limiter.limit("60 per hour")
     def api_backup_save():
         if not request.is_json:
-            return jsonify({"success": False, "error": "Expected JSON payload"}), 400
+            return make_error_response("Expected JSON payload")
 
         payload = request.get_json(silent=True) or {}
         filename_raw = str(payload.get("filename") or "").strip()
         content = payload.get("content")
         if not isinstance(content, str) or not content.strip():
-            return jsonify({"success": False, "error": "Backup content is required"}), 400
+            return make_error_response("Backup content is required")
 
         encoded = content.encode("utf-8")
         if len(encoded) > backup_max_bytes:
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": f"Backup exceeds max size of {backup_max_bytes} bytes",
-                    }
-                ),
-                413,
+            return make_error_response(
+                f"Backup exceeds max size of {backup_max_bytes} bytes",
+                status=413,
             )
 
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
+            return make_error_response("Invalid backup file parameter.")
 
         try:
             file_path.write_text(content, encoding="utf-8")
@@ -111,7 +107,7 @@ def create_backup_blueprint(
             )
         except Exception as exc:
             logger.exception("Failed to save backup file")
-            return jsonify({"success": False, "error": "Failed to save backup file."}), 500
+            return make_error_response("Failed to save backup file.", status=500)
 
     @bp.route("/list", methods=["GET"])
     @require_api_key
@@ -131,7 +127,7 @@ def create_backup_blueprint(
             return jsonify(entries[:backup_max_files])
         except Exception as exc:
             logger.exception("Failed to list backup files")
-            return jsonify({"success": False, "error": "Failed to list backup files."}), 500
+            return make_error_response("Failed to list backup files.", status=500)
 
     @bp.route("/read", methods=["GET"])
     @require_api_key
@@ -139,22 +135,22 @@ def create_backup_blueprint(
     def api_backup_read():
         filename_raw = str(request.args.get("file") or "").strip()
         if not filename_raw:
-            return jsonify({"success": False, "error": "Missing file query parameter"}), 400
+            return make_error_response("Missing file query parameter")
 
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
+            return make_error_response("Invalid backup file parameter.")
 
         if not file_path.exists() or not file_path.is_file():
-            return jsonify({"success": False, "error": "Backup file not found"}), 404
+            return make_error_response("Backup file not found", status=404)
 
         try:
             content = file_path.read_text(encoding="utf-8")
             return Response(content, mimetype="text/yaml; charset=utf-8")
         except Exception as exc:
             logger.exception("Failed to read backup file")
-            return jsonify({"success": False, "error": "Failed to read backup file."}), 500
+            return make_error_response("Failed to read backup file.", status=500)
 
     @bp.route("/delete", methods=["DELETE"])
     @require_api_key
@@ -162,21 +158,21 @@ def create_backup_blueprint(
     def api_backup_delete():
         filename_raw = str(request.args.get("file") or "").strip()
         if not filename_raw:
-            return jsonify({"success": False, "error": "Missing file query parameter"}), 400
+            return make_error_response("Missing file query parameter")
 
         try:
             file_path = _resolve_backup_path(filename_raw)
         except ValueError as exc:
-            return jsonify({"success": False, "error": "Invalid backup file parameter."}), 400
+            return make_error_response("Invalid backup file parameter.")
 
         if not file_path.exists() or not file_path.is_file():
-            return jsonify({"success": False, "error": "Backup file not found"}), 404
+            return make_error_response("Backup file not found", status=404)
 
         try:
             file_path.unlink()
             return jsonify({"success": True, "filename": file_path.name})
         except Exception as exc:
             logger.exception("Failed to delete backup file")
-            return jsonify({"success": False, "error": "Failed to delete backup file."}), 500
+            return make_error_response("Failed to delete backup file.", status=500)
 
     return bp

@@ -383,7 +383,7 @@ class TestApiBatchFindReplace(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
-        self.assertIn("not valid JSON", str(payload.get("error")))
+        self.assertIn("not valid JSON", str(payload.get("message")))
 
     def test_preview_rejects_invalid_regex_rule(self) -> None:
         response = self.client.post(
@@ -408,7 +408,7 @@ class TestApiBatchFindReplace(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success", True))
-        self.assertEqual(payload.get("error"), "Invalid regex rule.")
+        self.assertEqual(payload.get("message"), "Invalid regex rule.")
 
     def test_cad_preview_routes_to_acade_host(self) -> None:
         response = self.client.post(

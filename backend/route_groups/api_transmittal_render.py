@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict
 
 from flask import Blueprint, jsonify, request, send_file
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 
 from .api_transmittal_pdf_analysis import (
@@ -95,7 +96,7 @@ def create_transmittal_render_blueprint(
                     None,
                 )
                 if not selected_profile:
-                    return jsonify({"success": False, "message": "Invalid transmittal profile selection."}), 400
+                    return make_error_response("Invalid transmittal profile selection.")
 
                 fields["from_profile_id"] = requested_profile_id
                 fields["from_name"] = selected_profile.get("name", "")
@@ -155,9 +156,9 @@ def create_transmittal_render_blueprint(
             _schedule_cleanup(work_dir)
             template_file = request.files.get("template")
             if not template_file:
-                return jsonify({"success": False, "message": "Template file is required"}), 400
+                return make_error_response("Template file is required")
             if _save_upload is None:
-                return jsonify({"success": False, "message": "Upload helper is unavailable on server."}), 503
+                return make_error_response("Upload helper is unavailable on server.", status=503)
 
             template_path = _save_upload(template_file, work_dir, "template.docx")
 
@@ -167,13 +168,13 @@ def create_transmittal_render_blueprint(
 
             if transmittal_type == "cid":
                 if render_cid_transmittal is None:
-                    return jsonify({"success": False, "message": "CID renderer is unavailable on server."}), 503
+                    return make_error_response("CID renderer is unavailable on server.", status=503)
 
                 cid_files = request.files.getlist("cid_files")
                 if not cid_files:
-                    return jsonify({"success": False, "message": "CID files are required for CID transmittal"}), 400
+                    return make_error_response("CID files are required for CID transmittal")
                 if not cid_index_data:
-                    return jsonify({"success": False, "message": "CID document index data is required"}), 400
+                    return make_error_response("CID document index data is required")
 
                 cid_dir = os.path.join(work_dir, "cid_files")
                 os.makedirs(cid_dir, exist_ok=True)
@@ -195,7 +196,7 @@ def create_transmittal_render_blueprint(
                 )
             else:
                 if render_transmittal is None:
-                    return jsonify({"success": False, "message": "Transmittal renderer is unavailable on server."}), 503
+                    return make_error_response("Transmittal renderer is unavailable on server.", status=503)
 
                 document_files = request.files.getlist("documents")
                 if not document_files:
@@ -286,7 +287,7 @@ def create_transmittal_render_blueprint(
             pdf_path = None
             if output_format in {"pdf", "both"}:
                 if _convert_docx_to_pdf is None:
-                    return jsonify({"success": False, "message": "PDF conversion helper unavailable."}), 503
+                    return make_error_response("PDF conversion helper unavailable.", status=503)
                 pdf_path, pdf_error = _convert_docx_to_pdf(out_path, work_dir)
                 if not pdf_path:
                     return (
@@ -330,6 +331,6 @@ def create_transmittal_render_blueprint(
 
         except Exception as exc:
             traceback_module.print_exc()
-            return jsonify({"success": False, "message": "Transmittal render failed."}), 500
+            return make_error_response("Transmittal render failed.", status=500)
 
     return bp

@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, send_file
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 from openpyxl import Workbook
 from werkzeug.utils import safe_join, secure_filename
@@ -88,7 +89,7 @@ def create_automation_recipe_blueprint(
         return decorated
 
     def _request_error_response(*, message: str, request_id: str, status_code: int):
-        return jsonify({"success": False, "error": message, "requestId": request_id}), status_code
+        return make_error_response(message, status=status_code)
 
     def _normalize_text(value: Any) -> str:
         return str(value or "").strip()
@@ -1626,7 +1627,7 @@ def create_automation_recipe_blueprint(
                 raise ValueError("runId is required.")
             run_record = generated_runs.get(run_id)
             if not run_record:
-                return jsonify({"success": False, "error": "Run not found.", "requestId": request_id}), 404
+                return make_error_response("Run not found.", status=404)
 
             warnings = _normalize_string_array(run_record.get("warnings"))
             verified = True
@@ -1781,11 +1782,11 @@ def create_automation_recipe_blueprint(
     def api_cad_report_download(report_id: str):
         report = generated_reports.get(report_id)
         if not report:
-            return jsonify({"success": False, "error": "Report not found."}), 404
+            return make_error_response("Report not found.", status=404)
         report_path = report.get("path") or ""
         if not report_path or not os.path.exists(report_path):
             generated_reports.pop(report_id, None)
-            return jsonify({"success": False, "error": "Report is no longer available."}), 404
+            return make_error_response("Report is no longer available.", status=404)
 
         return send_file(
             report_path,

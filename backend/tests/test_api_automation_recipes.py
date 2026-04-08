@@ -700,7 +700,7 @@ class TestApiAutomationRecipes(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         body = response.get_json() or {}
         self.assertFalse(body.get("success", True))
-        self.assertEqual(body.get("error"), "Invalid CAD preflight request.")
+        self.assertEqual(body.get("message"), "Invalid CAD preflight request.")
 
     def test_preflight_hides_internal_exception_text(self) -> None:
         with patch(
@@ -716,7 +716,7 @@ class TestApiAutomationRecipes(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         body = response.get_json() or {}
         self.assertFalse(body.get("success", True))
-        self.assertEqual(body.get("error"), "CAD preflight failed.")
+        self.assertEqual(body.get("message"), "CAD preflight failed.")
         self.assertNotIn("secret boom", str(body))
 
 

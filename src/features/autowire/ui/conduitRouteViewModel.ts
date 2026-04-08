@@ -5,7 +5,6 @@ import {
 	SECTION_PRESETS,
 	WIRE_COLORS,
 } from "./conduitRouteData";
-import { buildCostGrid, routePath } from "./conduitRouteEngine";
 import type {
 	CableSystemType,
 	ConduitRouteBackcheckResponse,
@@ -148,13 +147,12 @@ export function createConduitRouteViewModel(args: {
 }): {
 	activeColor: (typeof WIRE_COLORS)[CableSystemType][string];
 	availableWireFunctions: string[];
-	costGrid: ReturnType<typeof buildCostGrid>;
 	heroSubtitle: string;
 	heroTitle: string;
 	isTerminalWorkspace: boolean;
 	obstacleLayerNames: string[];
 	obstacleLayerTypeOverrides: Record<string, ObstacleType>;
-	previewPath: ReturnType<typeof routePath>;
+	previewPath: { path: Point2D[]; valid: boolean; fallbackUsed: boolean };
 	routeStats: {
 		total: number;
 		totalLength: number;
@@ -173,9 +171,6 @@ export function createConduitRouteViewModel(args: {
 		workspace,
 		cableType,
 		wireFunction,
-		activeObstacles,
-		clearance,
-		mode,
 		startPoint,
 		hoverPoint,
 		routes,
@@ -196,11 +191,22 @@ export function createConduitRouteViewModel(args: {
 		overrides[rule.layerName] = rule.obstacleType;
 		return overrides;
 	}, {});
-	const costGrid = buildCostGrid(activeObstacles, clearance, mode);
-	const previewPath =
+	// Route computation delegated to backend (single source of truth).
+	// Real-time hover preview uses an L-shaped sketch; final routes are computed
+	// by the backend via conduitRouteService.computeRoute().
+	// If a smoother preview is needed, add a debounced API call here.
+	const previewPath: { path: Point2D[]; valid: boolean; fallbackUsed: boolean } =
 		startPoint && hoverPoint
-			? routePath(startPoint, hoverPoint, costGrid, mode)
-			: { path: [] as Point2D[], valid: true, fallbackUsed: false };
+			? {
+					path: [
+						startPoint,
+						{ x: hoverPoint.x, y: startPoint.y },
+						hoverPoint,
+					],
+					valid: false,
+					fallbackUsed: true,
+				}
+			: { path: [], valid: true, fallbackUsed: false };
 	const selectedRoute =
 		routes.find((route) => route.id === selectedRouteId) ?? null;
 	const routeStats = routes.reduce(
@@ -225,7 +231,6 @@ export function createConduitRouteViewModel(args: {
 	return {
 		activeColor,
 		availableWireFunctions,
-		costGrid,
 		heroSubtitle: isTerminalWorkspace
 			? "Scan terminal strips, click source and destination, and build route + schedule output."
 			: "Interactive cable/conduit routing with NEC snapshots, section previews, and bend-limit monitoring.",

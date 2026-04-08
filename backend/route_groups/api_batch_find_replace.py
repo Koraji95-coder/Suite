@@ -771,7 +771,7 @@ def create_batch_find_replace_blueprint(
     @limiter.limit("60 per hour")
     def api_batch_find_replace_session():
         token = _create_batch_session_token()
-        response, _ = make_response()
+        response, _status = make_response()
         response.set_cookie(
             batch_session_cookie,
             token,

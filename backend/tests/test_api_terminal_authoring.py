@@ -315,7 +315,7 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
-        self.assertEqual(payload.get("error"), "Invalid request parameters.")
+        self.assertEqual(payload.get("message"), "Invalid request parameters.")
 
     def test_preview_forwards_issue_set_scope_and_returns_grouped_drawings(self) -> None:
         response = self.client.post(
@@ -413,7 +413,7 @@ class TestApiTerminalAuthoring(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
-        self.assertEqual(payload.get("error"), "Invalid request parameters.")
+        self.assertEqual(payload.get("message"), "Invalid request parameters.")
 
     def test_apply_returns_downloadable_report(self) -> None:
         response = self.client.post(

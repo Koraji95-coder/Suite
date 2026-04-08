@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Sequence
 
 from flask import Blueprint, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -50,16 +51,7 @@ def create_drawing_program_blueprint(
         return f"drawing-program-{int(datetime.now().timestamp() * 1000)}"
 
     def _error(message: str, status_code: int, request_id: str):
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "requestId": request_id,
-                    "error": message,
-                }
-            ),
-            status_code,
-        )
+        return make_error_response(message, status=status_code)
 
     def _parse_json() -> Dict[str, Any]:
         payload = request.get_json(silent=True)

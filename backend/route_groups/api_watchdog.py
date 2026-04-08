@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict
 
 import requests
 from flask import Blueprint, g, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 
 from .api_supabase_service_request import (
@@ -106,23 +107,14 @@ def create_watchdog_blueprint(
         raise ValueError(f"Query parameter '{name}' must be a boolean")
 
     def _watchdog_error_response(*, message: str, code: str, status_code: int):
-        return jsonify({"ok": False, "error": message, "code": code}), status_code
+        return make_error_response(message, code=code, status=status_code)
 
     @bp.route("/config", methods=["PUT"])
     @require_autocad_auth
     @limiter.limit("240 per hour")
     def api_watchdog_config():
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_CONFIG_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_CONFIG_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         user_key = _watchdog_user_key()
@@ -161,16 +153,7 @@ def create_watchdog_blueprint(
             payload = service.heartbeat(user_key)
             return jsonify({"ok": True, **payload}), 200
         except KeyError:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Watchdog is not configured for this user",
-                        "code": "WATCHDOG_NOT_CONFIGURED",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Watchdog is not configured for this user", code="WATCHDOG_NOT_CONFIGURED", status=400)
         except Exception:
             logger.exception("Failed to run watchdog heartbeat (user=%s)", user_key)
             return _watchdog_error_response(
@@ -184,16 +167,7 @@ def create_watchdog_blueprint(
     @limiter.limit("3600 per hour")
     def api_watchdog_collectors_register():
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_COLLECTOR_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_COLLECTOR_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         user_key = _watchdog_user_key()
@@ -219,16 +193,7 @@ def create_watchdog_blueprint(
     @limiter.limit("7200 per hour")
     def api_watchdog_collectors_heartbeat():
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_COLLECTOR_HEARTBEAT_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_COLLECTOR_HEARTBEAT_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         user_key = _watchdog_user_key()
@@ -242,16 +207,7 @@ def create_watchdog_blueprint(
                 status_code=400,
             )
         except KeyError:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Collector is not registered",
-                        "code": "WATCHDOG_COLLECTOR_NOT_FOUND",
-                    }
-                ),
-                404,
-            )
+            return make_error_response("Collector is not registered", code="WATCHDOG_COLLECTOR_NOT_FOUND", status=404)
         except Exception:
             logger.exception("Failed collector heartbeat (user=%s)", user_key)
             return _watchdog_error_response(
@@ -265,16 +221,7 @@ def create_watchdog_blueprint(
     @limiter.limit("12000 per hour")
     def api_watchdog_collectors_events():
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_COLLECTOR_EVENTS_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_COLLECTOR_EVENTS_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         user_key = _watchdog_user_key()
@@ -288,16 +235,7 @@ def create_watchdog_blueprint(
                 status_code=400,
             )
         except KeyError:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Collector is not registered",
-                        "code": "WATCHDOG_COLLECTOR_NOT_FOUND",
-                    }
-                ),
-                404,
-            )
+            return make_error_response("Collector is not registered", code="WATCHDOG_COLLECTOR_NOT_FOUND", status=404)
         except Exception:
             logger.exception("Failed to ingest collector events (user=%s)", user_key)
             return _watchdog_error_response(
@@ -439,16 +377,7 @@ def create_watchdog_blueprint(
         user_key = _watchdog_user_key()
         normalized_project_id = str(project_id or "").strip()
         if not normalized_project_id:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "project_id is required",
-                        "code": "WATCHDOG_PROJECT_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("project_id is required", code="WATCHDOG_PROJECT_INVALID", status=400)
         try:
             payload = service.overview(
                 user_key,
@@ -476,16 +405,7 @@ def create_watchdog_blueprint(
         user_key = _watchdog_user_key()
         normalized_project_id = str(project_id or "").strip()
         if not normalized_project_id:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "project_id is required",
-                        "code": "WATCHDOG_PROJECT_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("project_id is required", code="WATCHDOG_PROJECT_INVALID", status=400)
         try:
             payload = service.list_events(
                 user_key,
@@ -523,16 +443,7 @@ def create_watchdog_blueprint(
         user_key = _watchdog_user_key()
         normalized_project_id = str(project_id or "").strip()
         if not normalized_project_id:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "project_id is required",
-                        "code": "WATCHDOG_PROJECT_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("project_id is required", code="WATCHDOG_PROJECT_INVALID", status=400)
         try:
             payload = service.list_sessions(
                 user_key,
@@ -569,16 +480,7 @@ def create_watchdog_blueprint(
         user_key = _watchdog_user_key()
         normalized_project_id = str(project_id or "").strip()
         if not normalized_project_id:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "project_id is required",
-                        "code": "WATCHDOG_PROJECT_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("project_id is required", code="WATCHDOG_PROJECT_INVALID", status=400)
 
         if request.method == "GET":
             try:
@@ -625,16 +527,7 @@ def create_watchdog_blueprint(
                 )
 
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_PROJECT_RULES_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         try:
@@ -664,16 +557,7 @@ def create_watchdog_blueprint(
     def api_watchdog_project_rules_sync():
         user_key = _watchdog_user_key()
         if not request.is_json:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Expected JSON payload",
-                        "code": "WATCHDOG_PROJECT_RULES_INVALID",
-                    }
-                ),
-                400,
-            )
+            return make_error_response("Expected JSON payload", code="WATCHDOG_PROJECT_RULES_INVALID", status=400)
 
         payload = request.get_json(silent=True) or {}
         try:
@@ -701,27 +585,9 @@ def create_watchdog_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = str(user.get("id") or user.get("sub") or "").strip()
         if not user_id:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Authenticated user id not found.",
-                        "code": "WATCHDOG_DRAWING_SYNC_AUTH_INVALID",
-                    }
-                ),
-                401,
-            )
+            return make_error_response("Authenticated user id not found.", code="WATCHDOG_DRAWING_SYNC_AUTH_INVALID", status=401)
         if not supabase_url or not supabase_api_key:
-            return (
-                jsonify(
-                    {
-                        "ok": False,
-                        "error": "Supabase configuration is unavailable.",
-                        "code": "WATCHDOG_DRAWING_SYNC_SUPABASE_UNAVAILABLE",
-                    }
-                ),
-                503,
-            )
+            return make_error_response("Supabase configuration is unavailable.", code="WATCHDOG_DRAWING_SYNC_SUPABASE_UNAVAILABLE", status=503)
 
         payload = request.get_json(silent=True) if request.is_json else {}
         if payload is None:

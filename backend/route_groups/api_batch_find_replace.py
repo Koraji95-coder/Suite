@@ -13,6 +13,7 @@ from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from flask import Blueprint, jsonify, request, send_file
+from ..response_helpers import make_error_response, make_response
 from flask_limiter import Limiter
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -80,7 +81,7 @@ def create_batch_find_replace_blueprint(
                     request.path,
                     request.remote_addr,
                 )
-                return jsonify({"error": "Batch session required", "code": "AUTH_REQUIRED"}), 401
+                return make_error_response("Batch session required", code="AUTH_REQUIRED", status=401)
 
             return f(*args, **kwargs)
 
@@ -338,7 +339,7 @@ def create_batch_find_replace_blueprint(
         )
 
     def _batch_error_response(*, message: str, status_code: int):
-        return jsonify({"success": False, "error": message}), status_code
+        return make_error_response(message, status=status_code)
 
     def _safe_batch_validation_message(exc: ValueError, fallback: str) -> str:
         message = str(exc or "").strip()
@@ -770,7 +771,7 @@ def create_batch_find_replace_blueprint(
     @limiter.limit("60 per hour")
     def api_batch_find_replace_session():
         token = _create_batch_session_token()
-        response = jsonify({"success": True})
+        response, _ = make_response()
         response.set_cookie(
             batch_session_cookie,
             token,
@@ -1181,12 +1182,12 @@ def create_batch_find_replace_blueprint(
     def api_batch_find_replace_report_download(report_id: str):
         report = generated_reports.get(report_id)
         if not report:
-            return jsonify({"success": False, "error": "Report not found."}), 404
+            return make_error_response("Report not found.", status=404)
 
         report_path = report.get("path") or ""
         if not report_path or not os.path.exists(report_path):
             generated_reports.pop(report_id, None)
-            return jsonify({"success": False, "error": "Report is no longer available."}), 404
+            return make_error_response("Report is no longer available.", status=404)
 
         return send_file(
             report_path,

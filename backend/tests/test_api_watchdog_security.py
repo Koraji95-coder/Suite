@@ -69,7 +69,7 @@ class TestApiWatchdogSecurity(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
-        self.assertEqual(payload.get("error"), "Invalid watchdog configuration.")
+        self.assertEqual(payload.get("message"), "Invalid watchdog configuration.")
         self.assertEqual(payload.get("code"), "WATCHDOG_CONFIG_INVALID")
         self.assertNotIn("token.txt", str(payload))
 
@@ -85,7 +85,7 @@ class TestApiWatchdogSecurity(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         payload = response.get_json() or {}
-        self.assertEqual(payload.get("error"), "Failed to sync watchdog project rules")
+        self.assertEqual(payload.get("message"), "Failed to sync watchdog project rules")
         self.assertEqual(payload.get("code"), "WATCHDOG_PROJECT_RULES_FAILED")
         self.assertNotIn("secret boom", str(payload))
 
@@ -106,7 +106,7 @@ class TestApiWatchdogSecurity(unittest.TestCase):
 
         self.assertEqual(response.status_code, 500)
         payload = response.get_json() or {}
-        self.assertEqual(payload.get("error"), "Failed to sync drawing activity segments.")
+        self.assertEqual(payload.get("message"), "Failed to sync drawing activity segments.")
         self.assertEqual(payload.get("code"), "WATCHDOG_DRAWING_SYNC_FAILED")
         self.assertNotIn("secret boom", str(payload))
 

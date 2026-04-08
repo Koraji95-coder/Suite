@@ -8,6 +8,7 @@ from typing import Any, Callable, Optional
 
 import requests
 from flask import Blueprint, g, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 
 from backend.work_ledger.artifacts import (
@@ -51,7 +52,7 @@ def _is_relative_to(path: Path, root: Path) -> bool:
 
 
 def _work_ledger_error_response(*, message: str, code: str, status_code: int):
-    return jsonify({"ok": False, "error": message, "code": code}), status_code
+    return make_error_response(message, code=code, status=status_code)
 
 
 def create_work_ledger_blueprint(
@@ -111,7 +112,7 @@ def create_work_ledger_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"ok": False, "error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         bearer_token = _extract_bearer_token()
         limit = _parse_query_int("limit", 12)
@@ -178,7 +179,7 @@ def create_work_ledger_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"ok": False, "error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         workstation_id = runtime.resolve_workstation_id()
         bearer_token = _extract_bearer_token()
@@ -223,7 +224,7 @@ def create_work_ledger_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"ok": False, "error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         bearer_token = _extract_bearer_token()
         try:
@@ -268,7 +269,7 @@ def create_work_ledger_blueprint(
         user = getattr(g, "supabase_user", {}) or {}
         user_id = _extract_user_id(user)
         if not user_id:
-            return jsonify({"ok": False, "error": "Authenticated user id not found."}), 401
+            return make_error_response("Authenticated user id not found.", status=401)
 
         bearer_token = _extract_bearer_token()
         try:

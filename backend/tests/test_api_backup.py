@@ -58,7 +58,7 @@ class TestApiBackup(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
-        self.assertIn("Expected JSON payload", str(payload.get("error")))
+        self.assertIn("Expected JSON payload", str(payload.get("message")))
 
     def test_save_rejects_oversized_backup(self) -> None:
         response = self.client.post(
@@ -68,7 +68,7 @@ class TestApiBackup(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 413)
         payload = response.get_json() or {}
-        self.assertIn("max size", str(payload.get("error")))
+        self.assertIn("max size", str(payload.get("message")))
 
     def test_read_requires_file_query_param(self) -> None:
         response = self.client.get(
@@ -77,7 +77,7 @@ class TestApiBackup(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
-        self.assertIn("Missing file", str(payload.get("error")))
+        self.assertIn("Missing file", str(payload.get("message")))
 
     def test_delete_returns_not_found_for_missing_file(self) -> None:
         response = self.client.delete(
@@ -86,7 +86,7 @@ class TestApiBackup(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 404)
         payload = response.get_json() or {}
-        self.assertIn("not found", str(payload.get("error")).lower())
+        self.assertIn("not found", str(payload.get("message")).lower())
 
 
 if __name__ == "__main__":

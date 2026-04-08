@@ -252,7 +252,7 @@ class TestApiDrawingProgram(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success"))
-        self.assertEqual(payload.get("error"), "Invalid request parameters.")
+        self.assertEqual(payload.get("message"), "Invalid request parameters.")
         self.assertFalse((self.project_root.parent / "escape.dwg").exists())
 
     def test_sync_acade_rejects_project_file_outside_project_root(self) -> None:
@@ -281,4 +281,4 @@ class TestApiDrawingProgram(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.get_json() or {}
         self.assertFalse(payload.get("success"))
-        self.assertEqual(payload.get("error"), "Invalid request parameters.")
+        self.assertEqual(payload.get("message"), "Invalid request parameters.")

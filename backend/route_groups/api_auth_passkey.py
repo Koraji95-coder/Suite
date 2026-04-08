@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List
 
 from flask import Blueprint, g, jsonify, request
+from ..response_helpers import make_error_response
 from flask_limiter import Limiter
 
 
@@ -186,7 +187,7 @@ def create_auth_passkey_blueprint(
 
         capability = _auth_passkey_capability()
         if not capability.get("enabled"):
-            return jsonify({"error": "Passkey sign-in is disabled.", "code": "passkey-disabled"}), 503
+            return make_error_response("Passkey sign-in is disabled.", code="passkey-disabled", status=503)
 
         if not capability.get("handlers_ready"):
             return (
@@ -360,7 +361,7 @@ def create_auth_passkey_blueprint(
 
         capability = _auth_passkey_capability()
         if not capability.get("enabled"):
-            return jsonify({"error": "Passkey enrollment is disabled.", "code": "passkey-disabled"}), 503
+            return make_error_response("Passkey enrollment is disabled.", code="passkey-disabled", status=503)
 
         if not capability.get("handlers_ready"):
             return (
@@ -586,7 +587,7 @@ def create_auth_passkey_blueprint(
         """Verify a first-party WebAuthn assertion and continue sign-in."""
         capability = _auth_passkey_capability()
         if not capability.get("enabled"):
-            return jsonify({"error": "Passkey sign-in is disabled.", "code": "passkey-disabled"}), 503
+            return make_error_response("Passkey sign-in is disabled.", code="passkey-disabled", status=503)
         if capability.get("provider") != "first-party":
             return (
                 jsonify(
@@ -610,7 +611,7 @@ def create_auth_passkey_blueprint(
                 503,
             )
         if not request.is_json:
-            return jsonify({"error": "Expected JSON payload."}), 400
+            return make_error_response("Expected JSON payload.")
 
         if verify_authentication_response is None or base64url_to_bytes is None or not WEBAUTHN_AVAILABLE:
             return (
@@ -628,11 +629,11 @@ def create_auth_passkey_blueprint(
         credential_payload = payload.get("credential")
 
         if not state_token:
-            return jsonify({"error": "state is required."}), 400
+            return make_error_response("state is required.")
         if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
-            return jsonify({"error": "Invalid state format."}), 400
+            return make_error_response("Invalid state format.")
         if not isinstance(credential_payload, dict):
-            return jsonify({"error": "credential payload is required."}), 400
+            return make_error_response("credential payload is required.")
 
         webauthn_state, reason = _consume_passkey_webauthn_state(
             state_token,
@@ -640,10 +641,10 @@ def create_auth_passkey_blueprint(
         )
         if not webauthn_state:
             if reason == "expired":
-                return jsonify({"error": "Passkey challenge expired. Start again."}), 410
+                return make_error_response("Passkey challenge expired. Start again.", status=410)
             if reason == "intent-mismatch":
-                return jsonify({"error": "Passkey challenge intent mismatch."}), 400
-            return jsonify({"error": "Invalid passkey challenge state."}), 400
+                return make_error_response("Passkey challenge intent mismatch.")
+            return make_error_response("Invalid passkey challenge state.")
 
         credential_id = _extract_passkey_credential_id(credential_payload)
         if not credential_id:
@@ -822,7 +823,7 @@ def create_auth_passkey_blueprint(
         """Verify a first-party WebAuthn registration response and store passkey metadata."""
         capability = _auth_passkey_capability()
         if not capability.get("enabled"):
-            return jsonify({"error": "Passkey enrollment is disabled.", "code": "passkey-disabled"}), 503
+            return make_error_response("Passkey enrollment is disabled.", code="passkey-disabled", status=503)
         if capability.get("provider") != "first-party":
             return (
                 jsonify(
@@ -846,7 +847,7 @@ def create_auth_passkey_blueprint(
                 503,
             )
         if not request.is_json:
-            return jsonify({"error": "Expected JSON payload."}), 400
+            return make_error_response("Expected JSON payload.")
 
         if (
             verify_registration_response is None
@@ -886,11 +887,11 @@ def create_auth_passkey_blueprint(
         )
 
         if not state_token:
-            return jsonify({"error": "state is required."}), 400
+            return make_error_response("state is required.")
         if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
-            return jsonify({"error": "Invalid state format."}), 400
+            return make_error_response("Invalid state format.")
         if not isinstance(credential_payload, dict):
-            return jsonify({"error": "credential payload is required."}), 400
+            return make_error_response("credential payload is required.")
 
         webauthn_state, reason = _consume_passkey_webauthn_state(
             state_token,
@@ -898,10 +899,10 @@ def create_auth_passkey_blueprint(
         )
         if not webauthn_state:
             if reason == "expired":
-                return jsonify({"error": "Passkey challenge expired. Start again."}), 410
+                return make_error_response("Passkey challenge expired. Start again.", status=410)
             if reason == "intent-mismatch":
-                return jsonify({"error": "Passkey challenge intent mismatch."}), 400
-            return jsonify({"error": "Invalid passkey challenge state."}), 400
+                return make_error_response("Passkey challenge intent mismatch.")
+            return make_error_response("Invalid passkey challenge state.")
 
         expected_user_id = str(webauthn_state.get("user_id") or "").strip()
         expected_email = str(webauthn_state.get("email") or "").strip().lower()
@@ -1070,24 +1071,24 @@ def create_auth_passkey_blueprint(
     def api_auth_passkey_callback_complete():
         """Complete a passkey callback by consuming one-time state and issuing the next auth step."""
         if not request.is_json:
-            return jsonify({"error": "Expected JSON payload."}), 400
+            return make_error_response("Expected JSON payload.")
 
         payload = request.get_json(silent=True) or {}
         state_token = str(payload.get("state") or payload.get("passkey_state") or "").strip()
         if not state_token:
-            return jsonify({"error": "state is required."}), 400
+            return make_error_response("state is required.")
         if not PASSKEY_CALLBACK_STATE_PATTERN.match(state_token):
-            return jsonify({"error": "Invalid state format."}), 400
+            return make_error_response("Invalid state format.")
 
         status = str(payload.get("status") or payload.get("passkey_status") or "").strip().lower()
         if status not in {"success", "failed"}:
-            return jsonify({"error": "status must be success or failed."}), 400
+            return make_error_response("status must be success or failed.")
 
         callback_state, reason = _get_passkey_callback_state(state_token)
         if not callback_state:
             if reason == "expired":
-                return jsonify({"error": "Passkey callback state expired. Start again."}), 410
-            return jsonify({"error": "Invalid passkey callback state."}), 400
+                return make_error_response("Passkey callback state expired. Start again.", status=410)
+            return make_error_response("Invalid passkey callback state.")
 
         intent = str(callback_state.get("intent") or "").strip().lower()
         payload_intent = str(payload.get("intent") or payload.get("passkey_intent") or "").strip().lower()
@@ -1160,7 +1161,7 @@ def create_auth_passkey_blueprint(
         callback_state, reason = _consume_passkey_callback_state(state_token)
         if not callback_state:
             if reason == "expired":
-                return jsonify({"error": "Passkey callback state expired. Start again."}), 410
+                return make_error_response("Passkey callback state expired. Start again.", status=410)
             return (
                 jsonify(
                     {

@@ -57,6 +57,8 @@ The authenticated shell is organized around five families:
 - auth and passkey support
 - project, review, watchdog, transmittal, and work-ledger APIs
 
+> **Note:** `backend/Transmittal-Builder/` is a legacy standalone PyQt6 desktop app that is **deprecated** and scheduled for extraction to its own repository. See [`backend/Transmittal-Builder/DEPRECATED.md`](backend/Transmittal-Builder/DEPRECATED.md) for details. Use the web-based transmittal workflow instead.
+
 ### Workstation And .NET
 
 - `dotnet/Suite.RuntimeControl/*` for workstation-local companion behavior

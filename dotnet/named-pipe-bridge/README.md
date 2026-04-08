@@ -97,10 +97,96 @@ Current implementation notes:
   - `panelIdKeys`, `panelNameKeys`, `sideKeys`
   - `stripIdKeys`, `stripNumberKeys`, `terminalCountKeys`, `terminalTagKeys`
   - `terminalNameTokens`, `defaultPanelPrefix`, `defaultTerminalCount`
+  - `blockNameAllowList`, `requireStripId`, `requireTerminalCount`, `requireSide`
+  - See **Terminal Scan Profile** section below for full field reference.
 - Terminal scan also reads optional per-terminal label attributes using
   `TERM01_LABEL`, `TERM02_LABEL`, ... and returns `terminalLabels[]` per strip.
 - Terminal label sync writes `TERM01_LABEL`, `TERM02_LABEL`, ... attributes on
   matched terminal strips (with optional target-strip filtering via `strips[]`).
+
+## Terminal Scan Profile
+
+The `terminalProfile` (or `terminal_profile`) field in the `conduit_route_terminal_scan` and
+`conduit_route_terminal_labels_sync` payloads controls how the bridge identifies and classifies
+terminal-strip block references in the active drawing.
+
+When the field is omitted, all defaults listed below apply. When it is present, any sub-field that
+is omitted also falls back to its default.
+
+### Attribute key arrays
+
+Each field is an ordered array of AutoCAD block-attribute tag names. The bridge checks them
+left-to-right and uses the first non-blank match found on the block.
+
+| Field | Default | Purpose |
+|---|---|---|
+| `panelIdKeys` | `["PANEL_ID","PANEL","PANEL_NAME","CABINET","BOARD"]` | Identifies the parent panel. Falls back to a prefix derived from the strip ID, then `defaultPanelPrefix`. |
+| `panelNameKeys` | `["PANEL_NAME","PANEL_DESC","DESCRIPTION","CABINET_NAME","BOARD_NAME"]` | Human-readable panel label. Falls back to the resolved `panelId`. |
+| `sideKeys` | `["SIDE","PANEL_SIDE","SECTION","LR"]` | Panel side/section (e.g. `"LEFT"`, `"RIGHT"`). Normalised to uppercase. |
+| `stripIdKeys` | `["STRIP_ID","STRIP","TERMINAL_STRIP","TB_ID","TS_ID"]` | Unique strip identifier. If blank, the bridge synthesises an ID from the block name or scan index. |
+| `stripNumberKeys` | `["STRIP_NO","STRIP_NUM","STRIP_NUMBER","NUMBER","NO"]` | Numeric strip ordering hint. Used as a sort key; falls back to `0`. |
+| `terminalCountKeys` | `["TERMINAL_COUNT","TERMINALS","TERM_COUNT","WAYS","POINT_COUNT"]` | Terminal (pole) count on the strip. Falls back to `defaultTerminalCount`. |
+| `terminalTagKeys` | defaults to `stripIdKeys` + `terminalCountKeys` | Extra attribute tags used by block-detection heuristic to classify an unknown block as a terminal strip. |
+| `terminalNameTokens` | `["TERMINAL","TERMS","TB","TS","MARSHALLING"]` | Sub-strings checked against the block name to classify it as a terminal strip. Checked case-sensitively after converting the block name to uppercase. |
+
+### Scalar fields
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `defaultPanelPrefix` | `string` | `"PANEL"` | Panel ID used when no `panelIdKeys` attribute is found and no prefix can be derived from the strip ID. Normalised to uppercase. |
+| `defaultTerminalCount` | `integer` | `12` | Terminal count used when no `terminalCountKeys` attribute is found. Clamped to `1`–`2000`. |
+
+### Qualifier flags
+
+These flags tighten block detection. When set, a block that is missing the required attribute is
+silently skipped instead of being accepted by name-based heuristics.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `requireStripId` | `boolean` | `false` | Reject a block that has no `stripIdKeys` attribute value. |
+| `requireTerminalCount` | `boolean` | `false` | Reject a block that has no `terminalCountKeys` attribute value. |
+| `requireSide` | `boolean` | `false` | Reject a block that has no `sideKeys` attribute value. |
+
+### Allow-list
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `blockNameAllowList` | `string[]` | `[]` (all allowed) | When non-empty, only block references whose `EffectiveName` (case-insensitive) appears in this list are considered. All other blocks are skipped before any attribute checks. |
+
+### Example
+
+```json
+{
+  "id": "job-456",
+  "action": "conduit_route_terminal_scan",
+  "payload": {
+    "requestId": "req-xyz-789",
+    "includeModelspace": true,
+    "selectionOnly": false,
+    "maxEntities": 50000,
+    "terminalProfile": {
+      "panelIdKeys": ["PANEL_ID", "CABINET"],
+      "panelNameKeys": ["PANEL_NAME", "CABINET_NAME"],
+      "sideKeys": ["SIDE"],
+      "stripIdKeys": ["STRIP_ID", "TB_ID"],
+      "stripNumberKeys": ["STRIP_NO"],
+      "terminalCountKeys": ["TERMINAL_COUNT", "WAYS"],
+      "terminalTagKeys": ["STRIP_ID", "TERMINAL_COUNT"],
+      "terminalNameTokens": ["TERMINAL", "TB", "TS"],
+      "blockNameAllowList": [],
+      "requireStripId": false,
+      "requireTerminalCount": false,
+      "requireSide": false,
+      "defaultPanelPrefix": "PANEL",
+      "defaultTerminalCount": 12
+    }
+  },
+  "token": "..."
+}
+```
+
+The resolved profile is echoed back in `result.meta.terminalProfile` so callers can verify which
+defaults were applied.
 
 Planned next step is migration from COM-backed reads to ObjectARX/AutoCAD .NET
 database transactions for higher throughput and stronger write/transaction safety.

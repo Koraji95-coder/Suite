@@ -134,6 +134,16 @@ Named-pipe bridge settings remain relevant for explicit manual validation agains
 
 The in-process ACADE host has separate backend wiring and should be documented in the CAD/runtime ownership docs instead of this bridge-specific reference.
 
+## Terminal Scan Profile
+
+Both `conduit_route_terminal_scan` and `conduit_route_terminal_labels_sync` accept an optional
+`terminalProfile` (or `terminal_profile`) object in their payloads. This profile controls which
+AutoCAD block-attribute tags are used to identify and classify terminal-strip blocks in the active
+drawing. When the field is omitted all built-in defaults apply.
+
+See `dotnet/named-pipe-bridge/README.md` — **Terminal Scan Profile** section for the full field
+reference, defaults, qualifier flags, allow-list usage, and an annotated example payload.
+
 Each named-pipe action response should follow:
 
 ```json

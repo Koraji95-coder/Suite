@@ -85,6 +85,59 @@ class TestNormalizeRuntimePath(unittest.TestCase):
         result = normalize_runtime_path("output/autodesk-acade/project")
         self.assertEqual(result, "output/autodesk-acade/project")
 
+    # ------------------------------------------------------------------
+    # Leading / trailing slashes – additional edge cases
+    # ------------------------------------------------------------------
+
+    def test_posix_absolute_multiple_trailing_slashes_stripped(self) -> None:
+        result = normalize_runtime_path("/suite-test/output/project///")
+        self.assertEqual(result, "/suite-test/output/project")
+
+    def test_windows_absolute_trailing_backslash_stripped(self) -> None:
+        result = normalize_runtime_path("C:\\Users\\Dev\\Documents\\")
+        self.assertEqual(result, r"c:\users\dev\documents")
+
+    def test_posix_absolute_consecutive_separators_collapsed(self) -> None:
+        result = normalize_runtime_path("/suite-test//output//project")
+        self.assertEqual(result, "/suite-test/output/project")
+
+    # ------------------------------------------------------------------
+    # Non-ASCII characters
+    # ------------------------------------------------------------------
+
+    def test_posix_absolute_non_ascii_characters_preserved(self) -> None:
+        result = normalize_runtime_path("/suite-test/été/résultats")
+        self.assertEqual(result, "/suite-test/été/résultats")
+
+    def test_windows_absolute_non_ascii_characters_lowercased(self) -> None:
+        result = normalize_runtime_path("C:\\Ünïcödë\\Folder")
+        self.assertEqual(result, "c:\\ünïcödë\\folder")
+
+    def test_relative_path_non_ascii_characters_preserved(self) -> None:
+        result = normalize_runtime_path("output/café/résultats")
+        self.assertEqual(result, "output/café/résultats")
+
+    # ------------------------------------------------------------------
+    # Invalid / edge-case path formats
+    # ------------------------------------------------------------------
+
+    def test_posix_root_only_returns_slash(self) -> None:
+        result = normalize_runtime_path("/")
+        self.assertEqual(result, "/")
+
+    def test_windows_drive_only_no_root_treated_as_relative(self) -> None:
+        # "C:" without a trailing backslash is drive-relative, not absolute
+        result = normalize_runtime_path("C:")
+        self.assertEqual(result, "C:")
+
+    def test_relative_path_single_dot(self) -> None:
+        result = normalize_runtime_path(".")
+        self.assertEqual(result, ".")
+
+    def test_tab_padded_windows_path_stripped_correctly(self) -> None:
+        result = normalize_runtime_path("\tC:\\Users\\Dev\\Documents\t")
+        self.assertEqual(result, r"c:\users\dev\documents")
+
 
 class TestRuntimePaths(unittest.TestCase):
     def test_is_absolute_path_value_supports_windows_and_posix(self) -> None:

@@ -8,7 +8,7 @@ export interface ProjectOption {
 
 export type PasteMode = "rods" | "conductors";
 
-export type PreviewMode = "2d" | "3d" | "contour" | "editor";
+export type PreviewMode = "2d" | "contour" | "editor";
 
 export interface GridDataSnapshot {
 	rods: GridRod[];

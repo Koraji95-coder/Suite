@@ -1,5 +1,5 @@
 import type * as ExcelJS from "exceljs";
-import type { GridConductor, GridPlacement, GridRod } from "./types";
+import type { GridConductor, GridPlacement, GridRod } from "../ui/types";
 
 const TITLE_FILL: ExcelJS.FillPattern = {
 	type: "pattern",

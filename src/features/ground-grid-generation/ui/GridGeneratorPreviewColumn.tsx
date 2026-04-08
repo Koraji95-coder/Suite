@@ -12,10 +12,8 @@ import {
 	Zap,
 } from "lucide-react";
 import {
-	useEffect,
 	useState,
 	type CSSProperties,
-	type ComponentType,
 } from "react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/system/base/Progress";
@@ -104,62 +102,6 @@ export function GridGeneratorPreviewColumn({
 	const [showCallouts, setShowCallouts] = useState(true);
 	const [calloutScale, setCalloutScale] = useState(1.2);
 	const [showPlotPreview, setShowPlotPreview] = useState(false);
-	const [gridPreview3DLoading, setGridPreview3DLoading] = useState(false);
-	const [gridPreview3DError, setGridPreview3DError] = useState<string | null>(
-		null,
-	);
-	const [GridPreview3DComponent, setGridPreview3DComponent] =
-		useState<ComponentType<{
-			rods: GridRod[];
-			conductors: GridConductor[];
-			placements: GridPlacement[];
-		}> | null>(null);
-
-	useEffect(() => {
-		if (
-			previewMode !== "3d" ||
-			gridPreview3DLoading ||
-			gridPreview3DError ||
-			GridPreview3DComponent
-		) {
-			return;
-		}
-		let active = true;
-		setGridPreview3DLoading(true);
-		void import("./GridPreview3D")
-			.then((module) => {
-				if (!active) return;
-				setGridPreview3DComponent(() => module.GridPreview3D);
-				setGridPreview3DError(null);
-			})
-			.catch((error: unknown) => {
-				if (!active) return;
-				const message =
-					error instanceof Error
-						? error.message
-						: "Failed to load 3D preview module.";
-				setGridPreview3DError(message);
-			})
-			.finally(() => {
-				if (!active) return;
-				setGridPreview3DLoading(false);
-			});
-		return () => {
-			active = false;
-		};
-	}, [
-		previewMode,
-		gridPreview3DLoading,
-		gridPreview3DError,
-		GridPreview3DComponent,
-	]);
-
-	useEffect(() => {
-		if (previewMode === "3d") return;
-		setGridPreview3DError(null);
-		setGridPreview3DComponent(null);
-		setGridPreview3DLoading(false);
-	}, [previewMode]);
 
 	const previewVars = {
 		"--gg-primary": palettePrimary,
@@ -463,53 +405,10 @@ export function GridGeneratorPreviewColumn({
 					/>
 				)}
 				{previewMode === "3d" && (
-					<>
-						{!gridPreview3DError && !GridPreview3DComponent && (
-							<div className={styles.lazyPanelState}>
-								<Progress
-									value={34}
-									indeterminate
-									animated
-									size="sm"
-									color="accent"
-									className={styles.lazyPanelProgress}
-								/>
-								Loading 3D preview module...
-							</div>
-						)}
-						{gridPreview3DError && (
-							<div
-								className={`${styles.lazyPanelState} ${styles.lazyPanelStateError}`}
-							>
-								<div>3D preview module failed to load.</div>
-								<div className={styles.lazyPanelDetail}>
-									{gridPreview3DError}
-									<span className={styles.lazyPanelHelper}>
-										Reload the grid or open the log tab for details before
-										retrying.
-									</span>
-								</div>
-								<button
-									type="button"
-									className={styles.lazyPanelRetry}
-									onClick={() => {
-										setGridPreview3DError(null);
-										setGridPreview3DComponent(null);
-									}}
-									disabled={gridPreview3DLoading}
-								>
-									Retry
-								</button>
-							</div>
-						)}
-						{GridPreview3DComponent && !gridPreview3DError && (
-							<GridPreview3DComponent
-								rods={rods}
-								conductors={conductors}
-								placements={placements}
-							/>
-						)}
-					</>
+					<div className={styles.lazyPanelState}>
+						<Box size={24} />
+						3D preview — Coming Soon
+					</div>
 				)}
 				{previewMode === "contour" && (
 					<PotentialContour

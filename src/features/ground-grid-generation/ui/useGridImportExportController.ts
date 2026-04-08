@@ -228,7 +228,7 @@ export function useGridImportExportController({
 	const handleExcelExport = useCallback(async () => {
 		addLog("generator", "[PROCESSING] Exporting to Excel...");
 		try {
-			const { exportGridToExcel } = await import("./excelExport");
+			const { exportGridToExcel } = await import("../services/GroundGridExcelAdapter");
 			await exportGridToExcel(designName, placements, rods, conductors);
 			addLog("generator", "[SUCCESS] Excel file exported");
 			showToast("success", "Excel file exported");

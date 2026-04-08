@@ -1,5 +1,4 @@
 import {
-	Box,
 	FileSpreadsheet,
 	FileText,
 	Lock,
@@ -213,7 +212,6 @@ export function GridGeneratorPreviewColumn({
 			<div className={styles.previewTabs}>
 				{[
 					{ id: "2d" as const, label: "2D", icon: <Monitor size={12} /> },
-					{ id: "3d" as const, label: "3D", icon: <Box size={12} /> },
 					{
 						id: "contour" as const,
 						label: "Potential",
@@ -403,12 +401,6 @@ export function GridGeneratorPreviewColumn({
 							scale: calloutScale,
 						}}
 					/>
-				)}
-				{previewMode === "3d" && (
-					<div className={styles.lazyPanelState}>
-						<Box size={24} />
-						3D preview — Coming Soon
-					</div>
 				)}
 				{previewMode === "contour" && (
 					<PotentialContour

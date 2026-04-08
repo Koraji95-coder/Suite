@@ -10,7 +10,6 @@ import {
 } from "./components/fx/useSuiteCursor";
 import { ErrorBoundary } from "./components/notification-system/ErrorBoundary";
 import { ToastContainer } from "./components/notification-system/ToastContainer";
-import JamMetadataSync from "./lib/JamMetadataSync";
 import { logger } from "./lib/logger";
 import AudienceRoute from "./routes/AudienceRoute";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -99,7 +98,6 @@ export default function App() {
 			<ErrorBoundary>
 				<AuthProvider>
 					<NotificationProvider>
-						<JamMetadataSync />
 						<EnvDebug />
 						{cursorEnabled && <Cursor />}
 

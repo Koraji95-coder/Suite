@@ -16,12 +16,6 @@ if (import.meta.env.DEV) {
 	});
 }
 
-if (import.meta.env.VITE_JAM_METADATA_ENABLED !== "false") {
-	void import("./lib/jamMetadata").then(({ installSuiteJamMetadata }) => {
-		installSuiteJamMetadata();
-	});
-}
-
 const appTree = (
 	<ThemeProvider>
 		<App />

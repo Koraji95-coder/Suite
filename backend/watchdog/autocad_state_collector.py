@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Mapping
 
-from .filesystem_collector import FilesystemCollectorStateStore, WatchdogCollectorApiClient
+from .filesystem_collector import CollectorNotRegisteredError, FilesystemCollectorStateStore, WatchdogCollectorApiClient
 
 
 def _default_state_json_path() -> Path:
@@ -806,17 +806,16 @@ class AutoCadStateCollector:
         return self.api_client.register()
 
     def _collector_missing_from_backend(self, exc: Exception) -> bool:
-        message = str(exc)
-        return "WATCHDOG_COLLECTOR_NOT_FOUND" in message or "Collector is not registered" in message
+        return isinstance(exc, CollectorNotRegisteredError)
 
     def _attempt_register(self) -> Dict[str, Any]:
         if self._registration_verified:
             return {"ok": True, "skipped": True}
         try:
             result = self.register()
-        except Exception as exc:
+        except Exception:
             self._registration_verified = False
-            return {"ok": False, "error": str(exc)}
+            return {"ok": False, "error": "Collector registration failed"}
         self._registration_verified = True
         return result
 
@@ -831,7 +830,7 @@ class AutoCadStateCollector:
                 "accepted": 0,
                 "duplicates": 0,
                 "pending": len(self.state_store.load().get("pendingEvents") or []),
-                "error": str(exc),
+                "error": "Collector event flush failed",
             }
 
     def _attempt_heartbeat(self, *, status: str) -> Dict[str, Any]:
@@ -840,7 +839,7 @@ class AutoCadStateCollector:
         except Exception as exc:
             if self._collector_missing_from_backend(exc):
                 self._registration_verified = False
-            return {"ok": False, "status": status, "error": str(exc)}
+            return {"ok": False, "status": status, "error": "Collector heartbeat failed"}
 
     def heartbeat(self, *, status: str = "online") -> Dict[str, Any]:
         state = self.state_store.load()

@@ -13,6 +13,14 @@ from typing import Any, Dict, Mapping
 from .filesystem import build_snapshot_events, ensure_absolute_roots, scan_snapshot
 
 
+class CollectorNotRegisteredError(RuntimeError):
+    """Raised when the backend reports that the collector is not registered."""
+
+
+_COLLECTOR_NOT_FOUND_CODE = "WATCHDOG_COLLECTOR_NOT_FOUND"
+_COLLECTOR_NOT_FOUND_MESSAGE = "Collector is not registered"
+
+
 def _split_string_list(raw_value: Any) -> list[str]:
     if raw_value is None:
         return []
@@ -232,7 +240,13 @@ class WatchdogCollectorApiClient:
         if not isinstance(parsed, dict):
             raise RuntimeError("Collector response payload was not an object")
         if parsed.get("ok") is False:
-            raise RuntimeError(str(parsed.get("error") or "Collector request failed"))
+            error_code = str(parsed.get("code") or "")
+            error_message = str(parsed.get("error") or "")
+            if error_code == _COLLECTOR_NOT_FOUND_CODE or (
+                not error_code and error_message == _COLLECTOR_NOT_FOUND_MESSAGE
+            ):
+                raise CollectorNotRegisteredError(_COLLECTOR_NOT_FOUND_MESSAGE)
+            raise RuntimeError("Collector request failed")
         return parsed
 
     def register(self) -> Dict[str, Any]:
@@ -361,17 +375,16 @@ class FilesystemCollector:
         return self.api_client.register()
 
     def _collector_missing_from_backend(self, exc: Exception) -> bool:
-        message = str(exc)
-        return "WATCHDOG_COLLECTOR_NOT_FOUND" in message or "Collector is not registered" in message
+        return isinstance(exc, CollectorNotRegisteredError)
 
     def _attempt_register(self) -> Dict[str, Any]:
         if self._registration_verified:
             return {"ok": True, "skipped": True}
         try:
             result = self.register()
-        except Exception as exc:
+        except Exception:
             self._registration_verified = False
-            return {"ok": False, "error": str(exc)}
+            return {"ok": False, "error": "Collector registration failed"}
         self._registration_verified = True
         return result
 
@@ -386,7 +399,7 @@ class FilesystemCollector:
                 "accepted": 0,
                 "duplicates": 0,
                 "pending": len(self.state_store.load().get("pendingEvents") or []),
-                "error": str(exc),
+                "error": "Collector event flush failed",
             }
 
     def _attempt_heartbeat(self, *, status: str) -> Dict[str, Any]:
@@ -395,7 +408,7 @@ class FilesystemCollector:
         except Exception as exc:
             if self._collector_missing_from_backend(exc):
                 self._registration_verified = False
-            return {"ok": False, "status": status, "error": str(exc)}
+            return {"ok": False, "status": status, "error": "Collector heartbeat failed"}
 
     def scan_once(self) -> Dict[str, Any]:
         state = self.state_store.load()

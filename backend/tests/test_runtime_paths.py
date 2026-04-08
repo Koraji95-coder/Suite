@@ -86,6 +86,70 @@ class TestNormalizeRuntimePath(unittest.TestCase):
         self.assertEqual(result, "output/autodesk-acade/project")
 
 
+class TestIsAbsolutePathValue(unittest.TestCase):
+    # ------------------------------------------------------------------
+    # Empty / blank inputs
+    # ------------------------------------------------------------------
+
+    def test_empty_string_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value(""))
+
+    def test_whitespace_only_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value("   "))
+
+    # ------------------------------------------------------------------
+    # Windows absolute paths
+    # ------------------------------------------------------------------
+
+    def test_windows_drive_letter_backslash_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value(r"C:\Users\Dev\Documents"))
+
+    def test_windows_drive_letter_forward_slash_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value("C:/Users/Dev/Documents"))
+
+    def test_windows_drive_root_only_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value(r"C:\\"))
+
+    def test_windows_unc_path_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value(r"\\DEV-SERVER\share\folder"))
+
+    def test_windows_path_with_surrounding_whitespace_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value(r"  C:\Users\Dev\Documents  "))
+
+    # ------------------------------------------------------------------
+    # POSIX absolute paths
+    # ------------------------------------------------------------------
+
+    def test_posix_root_slash_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value("/"))
+
+    def test_posix_multi_segment_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value("/workspace/output"))
+
+    def test_posix_path_with_surrounding_whitespace_returns_true(self) -> None:
+        self.assertTrue(is_absolute_path_value("  /home/Dev/output  "))
+
+    # ------------------------------------------------------------------
+    # Relative paths — must return False
+    # ------------------------------------------------------------------
+
+    def test_posix_relative_path_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value("relative/path"))
+
+    def test_windows_style_relative_path_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value(r"output\autodesk-acade\project"))
+
+    def test_windows_drive_relative_path_returns_false(self) -> None:
+        # "C:relative" has a drive letter but no leading separator — not absolute
+        self.assertFalse(is_absolute_path_value("C:relative"))
+
+    def test_dot_segment_relative_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value("./relative/path"))
+
+    def test_parent_segment_relative_returns_false(self) -> None:
+        self.assertFalse(is_absolute_path_value("../relative/path"))
+
+
 class TestRuntimePaths(unittest.TestCase):
     def test_is_absolute_path_value_supports_windows_and_posix(self) -> None:
         self.assertTrue(is_absolute_path_value(r"C:\Users\Dev\Documents\GitHub\Suite"))

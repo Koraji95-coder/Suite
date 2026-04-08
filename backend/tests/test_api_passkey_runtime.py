@@ -417,6 +417,75 @@ class TestApiPasskeyRuntime(unittest.TestCase):
         )
         self.assertIsNone(runtime.normalize_origin("not-a-url"))
 
+    def test_normalize_origin_http_scheme(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertEqual(
+            runtime.normalize_origin("http://internal.corp/any/path"),
+            "http://internal.corp",
+        )
+
+    def test_normalize_origin_preserves_port(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertEqual(
+            runtime.normalize_origin("https://app.example.com:8443/path"),
+            "https://app.example.com:8443",
+        )
+
+    def test_normalize_origin_empty_string(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertIsNone(runtime.normalize_origin(""))
+
+    def test_normalize_origin_unsupported_scheme(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertIsNone(runtime.normalize_origin("ftp://files.example.com/pub"))
+
+    def test_normalize_origin_no_netloc(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertIsNone(runtime.normalize_origin("https:///no-host/path"))
+
+    def test_normalize_origin_strips_fragment(self) -> None:
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=False,
+        )
+        self.assertEqual(
+            runtime.normalize_origin("https://app.example.com/page#section"),
+            "https://app.example.com",
+        )
+
     def test_is_valid_rp_id_for_origin_via_runtime(self) -> None:
         runtime = _build_runtime(
             request_obj=_RequestStub(),
@@ -431,6 +500,129 @@ class TestApiPasskeyRuntime(unittest.TestCase):
         self.assertFalse(
             runtime.is_valid_webauthn_rp_id_for_origin("other.com", "https://app.example.com")
         )
+
+    def test_verify_signature_millisecond_timestamp(self) -> None:
+        """Timestamps supplied in milliseconds must be auto-converted to seconds."""
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp_s = int(time.time())
+        timestamp_ms = timestamp_s * 1000
+        payload = "\n".join([
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            str(timestamp_s),
+        ])
+        signature = _make_signature(_SIGNING_SECRET, payload)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            signature,
+            str(timestamp_ms),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_build_and_verify_signature_round_trip(self) -> None:
+        """build_passkey_callback_signature_payload + verify form a consistent round-trip."""
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        payload_str = runtime.build_passkey_callback_signature_payload(
+            "state-abc",
+            "enroll",
+            "success",
+            "user@example.com",
+            "some error",
+            timestamp,
+        )
+        signature = _make_signature(_SIGNING_SECRET, payload_str)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-abc",
+            "enroll",
+            "success",
+            "user@example.com",
+            "some error",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_verify_signature_error_message_multi_newline(self) -> None:
+        """Multi-line error messages are collapsed: \\r→space then \\n→space."""
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        # Normalization: \r→" " then \n→" ".
+        # "line1\r\nline2\nline3" → "line1  line2 line3" (double-space before line2).
+        payload = "\n".join([
+            "state-token",
+            "error",
+            "failed",
+            "user@example.com",
+            "line1  line2 line3",
+            str(timestamp),
+        ])
+        signature = _make_signature(_SIGNING_SECRET, payload)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "error",
+            "failed",
+            "user@example.com",
+            "line1\r\nline2\nline3",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
+
+    def test_verify_signature_empty_error_message(self) -> None:
+        """An empty error_message field round-trips cleanly."""
+        runtime = _build_runtime(
+            request_obj=_RequestStub(),
+            logger=_LoggerStub(),
+            callback_states={},
+            webauthn_states={},
+            require_signed_callback=True,
+        )
+        timestamp = int(time.time())
+        payload_str = runtime.build_passkey_callback_signature_payload(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            timestamp,
+        )
+        signature = _make_signature(_SIGNING_SECRET, payload_str)
+        ok, reason = runtime.verify_passkey_callback_signature(
+            "state-token",
+            "sign-in",
+            "success",
+            "user@example.com",
+            "",
+            signature,
+            str(timestamp),
+        )
+        self.assertEqual((ok, reason), (True, "ok"))
 
 
 if __name__ == "__main__":

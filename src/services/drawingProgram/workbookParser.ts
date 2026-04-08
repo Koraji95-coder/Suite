@@ -1,9 +1,9 @@
+export { parseStandardWorkbook, parseWorkbookMirror } from "./WorkbookParserExcelAdapter";
 import type {
 	ProjectDrawingProgramRecord,
 	ProjectDrawingWorkbookMirrorRow,
 } from "./types";
 import { formatSequenceBand, sortRows } from "./validation";
-export { parseStandardWorkbook, parseWorkbookMirror } from "./WorkbookParserExcelAdapter";
 
 export function buildWorkbookMirrorRows(
 	program: ProjectDrawingProgramRecord,

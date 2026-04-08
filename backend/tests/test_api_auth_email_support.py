@@ -13,7 +13,7 @@ class _LoggerStub:
     def __init__(self) -> None:
         self.messages = []
 
-    def warning(self, message, *args):
+    def warning(self, message, *args, **kwargs):
         self.messages.append((message, args))
 
 
@@ -179,6 +179,10 @@ class TestApiAuthEmailSupport(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(len(logger.messages), 1)
+        # Log message must be a static string — must not contain dynamic exception text.
+        log_message = logger.messages[0][0]
+        self.assertNotIn("network error", log_message)
+        self.assertEqual(log_message, "Turnstile verification error")
 
 
 if __name__ == "__main__":

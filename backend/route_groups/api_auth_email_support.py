@@ -74,6 +74,6 @@ def verify_turnstile_token(
             payload.get("error-codes"),
         )
         return False
-    except Exception as exc:
-        logger.warning("Turnstile verification error: %s", exc)
+    except Exception:
+        logger.warning("Turnstile verification error", exc_info=True)
         return False

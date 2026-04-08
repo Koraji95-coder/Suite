@@ -24,6 +24,15 @@ class TestNormalizeRuntimePath(unittest.TestCase):
     def test_whitespace_only_returns_empty(self) -> None:
         self.assertEqual(normalize_runtime_path("   "), "")
 
+    def test_tab_only_returns_empty(self) -> None:
+        self.assertEqual(normalize_runtime_path("\t"), "")
+
+    def test_newline_only_returns_empty(self) -> None:
+        self.assertEqual(normalize_runtime_path("\n"), "")
+
+    def test_mixed_whitespace_returns_empty(self) -> None:
+        self.assertEqual(normalize_runtime_path(" \t\n "), "")
+
     # ------------------------------------------------------------------
     # Windows absolute paths
     # ------------------------------------------------------------------
